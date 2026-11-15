@@ -9,7 +9,7 @@
 ## 0. 준비물
 
 - 무료 계정 3개: [Supabase](https://supabase.com) · [Vercel](https://vercel.com) · [Kakao Developers](https://developers.kakao.com)
-- 이 저장소가 내 GitHub 계정에 있어야 합니다 (이미 완료: `lapak-life` 비공개 저장소)
+- 이 저장소가 내 GitHub 계정에 있어야 합니다 (`lapak-life` 빈 저장소 생성 후 푸시 필요)
 
 ---
 

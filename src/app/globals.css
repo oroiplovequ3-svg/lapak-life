@@ -1,0 +1,55 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --blue: #074ca1;
+  --line: #eaecf0;
+}
+
+html,
+body {
+  height: 100%;
+}
+
+body {
+  margin: 0;
+  -webkit-tap-highlight-color: transparent;
+  letter-spacing: -0.012em;
+  text-rendering: optimizeLegibility;
+}
+
+button {
+  font: inherit;
+  letter-spacing: inherit;
+  color: inherit;
+  cursor: pointer;
+}
+
+h1,
+h2,
+h3,
+h4,
+p {
+  margin: 0;
+}
+
+input,
+textarea,
+select {
+  font-family: inherit;
+  letter-spacing: inherit;
+}
+
+/* 데스크톱에서 기기 프레임 느낌 */
+@media (min-width: 520px) {
+  body {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 22px 0;
+    background:
+      radial-gradient(900px 420px at 50% -8%, #d7e4f7 0%, rgba(215, 228, 247, 0) 62%),
+      linear-gradient(180deg, #edf1f7 0%, #e4e9f1 100%);
+  }
+}

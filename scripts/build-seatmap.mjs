@@ -394,7 +394,8 @@ ${labSvg}
 ${gateSvg}
 </svg>`;
 
-fs.writeFileSync(path.resolve("../analysis/seat-preview.svg"), preview);
+const previewDir = path.resolve("../analysis");
+if (fs.existsSync(previewDir)) fs.writeFileSync(path.join(previewDir, "seat-preview.svg"), preview);
 
 /* ─────────── TS 모듈 ─────────── */
 const blockLines = blocks.map((b) => {

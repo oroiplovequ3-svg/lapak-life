@@ -4,7 +4,7 @@ import { useMemo, useState } from "react";
 
 import { Icon, Stars } from "@/components/icons";
 import { useApp } from "@/components/providers/app-provider";
-import { SEAT_LEGEND, SeatMap } from "@/components/seat-map";
+import { SeatMap } from "@/components/seat-map";
 import { ZONE_BY_CODE, ZONE_ORDER, zoneFullName } from "@/lib/data/zones";
 import { formatRelativeTime, initialOf } from "@/lib/utils";
 
@@ -31,17 +31,11 @@ export function SeatScreen() {
           </span>
         </div>
         <SeatMap selected={selected} onSelect={(code) => setSelected(code)} />
-        <div className="mx-auto mt-2 flex w-full max-w-[330px] flex-wrap items-center justify-center gap-x-2.5 gap-y-1 border-t border-line-soft pt-2 text-[9.5px] font-bold text-ink-muted">
-          {SEAT_LEGEND.map((item) => (
-            <span key={item.label} className="flex items-center gap-1 whitespace-nowrap">
-              <i
-                className="inline-block h-[8px] w-[8px] rounded-[2.5px]"
-                style={{ backgroundColor: item.color }}
-              />
-              {item.label}
-            </span>
-          ))}
-        </div>
+        <p className="mt-2 border-t border-line-soft pt-2 text-center text-[10px] font-bold text-ink-faint">
+          {selected === "all"
+            ? "도면의 구역을 누르면 시야 특징과 후기가 나와요"
+            : `${zoneName} 선택됨 · 도면에서 다른 구역도 눌러보세요`}
+        </p>
       </section>
 
       <div className="grid grid-cols-3 gap-[7px]">

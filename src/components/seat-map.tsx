@@ -1,19 +1,9 @@
 "use client";
 
-import { useMemo } from "react";
+import { useState } from "react";
 
-import {
-  BLOCKS,
-  COLORS,
-  CONCOURSE,
-  FIELD,
-  GATES,
-  LABELS,
-  OUTER_WALL,
-  type Block,
-  type Label,
-  VIEWBOX,
-} from "@/lib/seat/map-geometry";
+import { MAP_IMAGE, SHAPE_BY_CODE, VIEWBOX, ZONE_SHAPES } from "@/lib/seat/map-geometry";
+import { ZONE_BY_CODE } from "@/lib/data/zones";
 
 interface SeatMapProps {
   /** "all" 또는 구역 코드 (C, T3, BZ, I1, T1, SB, OF, SKY) */
@@ -21,238 +11,72 @@ interface SeatMapProps {
   onSelect: (zone: string) => void;
 }
 
-/** 선택된 구역 위에 얹는 외곽선 */
-function zoneOutline(zone: string): string {
-  return BLOCKS.filter((b) => b.zone === zone)
-    .map((b) => b.path)
-    .join(" ");
-}
-
-const DARK_TEXT_FILLS: string[] = [
-  COLORS.centerGreen,
-  COLORS.centerYellow,
-  COLORS.ofFamily,
-  COLORS.ofTable,
-  COLORS.jungleLight,
-];
-
-function BlockText({ b }: { b: Block }) {
-  if (!b.label || !b.fs) return null;
-  const dark = DARK_TEXT_FILLS.includes(b.fill);
-  return (
-    <text
-      x={b.cx}
-      y={b.cy + b.fs * 0.35}
-      fontSize={b.fs}
-      fontWeight={800}
-      fill={dark ? "#4A3B10" : "#FFFFFF"}
-      textAnchor="middle"
-      transform={b.angle ? `rotate(${b.angle} ${b.cx} ${b.cy})` : undefined}
-    >
-      {b.label}
-    </text>
-  );
-}
-
-function MapLabel({ l }: { l: Label }) {
-  return (
-    <text
-      x={l.x}
-      y={l.y}
-      fontSize={l.size}
-      fontWeight={l.weight ?? 700}
-      fill={l.fill}
-      textAnchor="middle"
-      transform={l.angle ? `rotate(${l.angle} ${l.x} ${l.y})` : undefined}
-    >
-      {l.text}
-    </text>
-  );
-}
-
 /**
  * 대구 삼성라이온즈파크(라팍) 좌석 배치도.
  *
- * 사용자가 올린 구단 좌석안내도를 그대로 옮긴 도면으로, 조각을 누르면
- * 해당 구역이 선택됩니다. 좌표는 원본 이미지 픽셀(1206×1092) 기준이라
- * viewBox 만 지정하면 폭에 맞춰 비율이 유지됩니다.
+ * 구단 좌석안내도 원본 이미지를 리사이즈·보정 없이 그대로 띄우고(Next 이미지
+ * 최적화도 거치지 않도록 원본 파일을 직접 씀), 그 위에 투명한 SVG 오버레이만
+ * 얹습니다. 아무 구역도 고르지 않았을 때는 오버레이가 완전히 투명해서 원본
+ * 그림이 100% 그대로 보이고, 구역을 고르면 그 구역 실루엣만 파랗게 표시되며
+ * 나머지는 살짝 가라앉습니다.
  */
 export function SeatMap({ selected, onSelect }: SeatMapProps) {
-  const outline = useMemo(
-    () => (selected === "all" ? "" : zoneOutline(selected)),
-    [selected],
-  );
-  const dimmed = selected !== "all";
-  const stripes = useMemo(
-    () => Array.from({ length: 44 }, (_, i) => 290 + i * 15).filter((_, i) => i % 2 === 1),
-    [],
-  );
-
-  const isOn = (b: Block) => !dimmed || b.zone === selected;
+  const [hovered, setHovered] = useState<string | null>(null);
+  const active =
+    selected && selected !== "all"
+      ? SHAPE_BY_CODE[selected as keyof typeof SHAPE_BY_CODE]
+      : undefined;
 
   return (
-    <svg
-      viewBox={VIEWBOX}
-      className="block h-auto w-full select-none"
-      role="img"
-      aria-label="라팍 좌석 배치도"
-    >
-      <defs>
-        <clipPath id="lapak-grass-clip">
-          <path d={FIELD.grass} />
-        </clipPath>
-      </defs>
-
-      {/* 외곽 벽 · 통로 */}
-      <path d={OUTER_WALL} fill={COLORS.outerWall} />
-      <path d={CONCOURSE} fill={COLORS.concourse} />
-
-      {/* 그라운드 */}
-      <g opacity={dimmed ? 0.55 : 1}>
-      <path d={FIELD.track} fill={COLORS.track} />
-      <path d={FIELD.grass} fill={COLORS.grassA} />
-      <g clipPath="url(#lapak-grass-clip)">
-        {stripes.map((x) => (
-          <rect key={x} x={x} y={150} width={15} height={620} fill={COLORS.grassB} />
-        ))}
-      </g>
-      <path
-        d={FIELD.infieldBand}
-        fill="none"
-        stroke={COLORS.track}
-        strokeWidth={42}
-        strokeLinejoin="round"
-        strokeLinecap="round"
+    <div className="relative overflow-hidden rounded-[10px] bg-white">
+      {/* eslint-disable-next-line @next/next/no-img-element -- 원본 좌석도 픽셀을 그대로 보여주려고 최적화를 건너뜁니다 */}
+      <img
+        src={MAP_IMAGE.src}
+        width={MAP_IMAGE.width}
+        height={MAP_IMAGE.height}
+        alt="라팍 좌석 배치도"
+        draggable={false}
+        decoding="async"
+        className="block h-auto w-full select-none"
       />
-      <circle
-        cx={FIELD.mound.x}
-        cy={FIELD.mound.y}
-        r={FIELD.mound.r + 7}
-        fill="none"
-        stroke="#FFFFFF"
-        strokeWidth={4}
-      />
-      <circle cx={FIELD.mound.x} cy={FIELD.mound.y} r={FIELD.mound.r} fill={COLORS.track} />
-      <path d={FIELD.homePlate} fill="#FFFFFF" />
-      {FIELD.bases.map(([x, y]) => (
-        <rect
-          key={`${x}-${y}`}
-          x={x - 11}
-          y={y - 11}
-          width={22}
-          height={22}
-          fill="#FFFFFF"
-          transform={`rotate(45 ${x} ${y})`}
-        />
-      ))}
-      </g>
 
-      {/* 좌석 셀 */}
-      {BLOCKS.filter((b) => !b.plain).map((b, i) => (
-        <path
-          key={`c-${i}`}
-          d={b.path}
-          fill={b.fill}
-          stroke="#FFFFFF"
-          strokeWidth={1.6}
-          strokeLinejoin="round"
-          opacity={isOn(b) ? 1 : 0.28}
-          className="cursor-pointer transition-opacity duration-150"
-          onClick={() => onSelect(b.zone)}
-        />
-      ))}
-
-      {/* 중앙·상층 블록 */}
-      {BLOCKS.filter((b) => b.plain).map((b, i) => (
-        <path
-          key={`p-${i}`}
-          d={b.path}
-          fill={b.fill}
-          stroke="#FFFFFF"
-          strokeWidth={1.6}
-          strokeLinejoin="round"
-          opacity={isOn(b) ? 1 : 0.28}
-          className="cursor-pointer transition-opacity duration-150"
-          onClick={() => onSelect(b.zone)}
-        />
-      ))}
-
-      {outline ? (
-        <>
-          <path
-            d={outline}
-            fill="none"
-            stroke="#FFFFFF"
-            strokeWidth={13}
-            strokeLinejoin="round"
-            pointerEvents="none"
-          />
-          <path
-            d={outline}
-            fill="none"
-            stroke="#0A58CA"
-            strokeWidth={8}
-            strokeLinejoin="round"
-            pointerEvents="none"
-          />
-        </>
-      ) : null}
-
-      {/* 좌석 번호 */}
-      <g pointerEvents="none">
-        {BLOCKS.map((b, i) => (
-          <g key={`t-${i}`} opacity={isOn(b) ? 1 : 0.22}>
-            <BlockText b={b} />
-          </g>
-        ))}
-      </g>
-
-      {/* 구역 이름 */}
-      <g pointerEvents="none">
-        {LABELS.map((l, i) => (
-          <g key={`l-${i}`} opacity={!dimmed || !l.zone || l.zone === selected ? 1 : 0.3}>
-            <MapLabel l={l} />
-          </g>
-        ))}
-      </g>
-
-      {/* 출입구 */}
-      <g pointerEvents="none">
-        {GATES.map((g) => (
-          <g key={g.text}>
-            <rect x={g.x - 58} y={g.y - 32} width={116} height={44} rx={6} fill="#C4CEDA" />
-            <text
-              x={g.x}
-              y={g.y - 9}
-              fontSize={18}
-              fontWeight={800}
-              fill="#FFFFFF"
-              textAnchor="middle"
+      <svg
+        viewBox={VIEWBOX}
+        className="absolute inset-0 h-full w-full"
+        role="group"
+        aria-label="좌석 구역 선택"
+      >
+        {ZONE_SHAPES.map((z) => {
+          const isActive = active?.code === z.code;
+          const isDimmed = Boolean(active) && !isActive;
+          const isHovered = hovered === z.code && !isActive;
+          return (
+            <path
+              key={z.code}
+              d={z.path}
+              fillRule="evenodd"
+              fill={
+                isActive
+                  ? "rgba(37, 99, 235, 0.22)"
+                  : isHovered
+                    ? "rgba(37, 99, 235, 0.1)"
+                    : isDimmed
+                      ? "rgba(255, 255, 255, 0.38)"
+                      : "transparent"
+              }
+              stroke={isActive ? "#1D4ED8" : "transparent"}
+              strokeWidth={isActive ? 4 : 0}
+              strokeLinejoin="round"
+              className="cursor-pointer transition-[fill] duration-150"
+              onClick={() => onSelect(z.code)}
+              onMouseEnter={() => setHovered(z.code)}
+              onMouseLeave={() => setHovered((h) => (h === z.code ? null : h))}
             >
-              {g.text}
-            </text>
-            <text
-              x={g.x}
-              y={g.y + 7}
-              fontSize={12}
-              fontWeight={700}
-              fill="#EEF3F9"
-              textAnchor="middle"
-            >
-              {g.sub}
-            </text>
-          </g>
-        ))}
-      </g>
-    </svg>
+              <title>{ZONE_BY_CODE[z.code]?.name ?? z.code}</title>
+            </path>
+          );
+        })}
+      </svg>
+    </div>
   );
 }
-
-/** 좌석 도식 아래 붙이는 범례 색 */
-export const SEAT_LEGEND = [
-  { label: "3루 홈", color: COLORS.blue },
-  { label: "테이블·중앙", color: COLORS.centerYellow },
-  { label: "1루 내야", color: COLORS.purple },
-  { label: "외야", color: COLORS.outfield },
-  { label: "SKY", color: COLORS.navy },
-] as const;

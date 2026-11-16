@@ -4,7 +4,7 @@ import { useMemo, useState } from "react";
 
 import { Icon, Stars } from "@/components/icons";
 import { useApp } from "@/components/providers/app-provider";
-import { SeatMap } from "@/components/seat-map";
+import { SEAT_LEGEND, SeatMap } from "@/components/seat-map";
 import { ZONE_BY_CODE, ZONE_ORDER, zoneFullName } from "@/lib/data/zones";
 import { formatRelativeTime, initialOf } from "@/lib/utils";
 
@@ -31,23 +31,16 @@ export function SeatScreen() {
           </span>
         </div>
         <SeatMap selected={selected} onSelect={(code) => setSelected(code)} />
-        <div className="flex flex-wrap justify-center gap-3 pb-0 pt-1.5 text-[10.5px] font-bold text-ink-muted">
-          <span>
-            <i className="mr-1 inline-block h-[9px] w-[9px] rounded-[3px] bg-[#BFD6F6] align-[-1px]" />
-            3루 홈 응원
-          </span>
-          <span>
-            <i className="mr-1 inline-block h-[9px] w-[9px] rounded-[3px] bg-[#E5E9F0] align-[-1px]" />
-            1루 원정
-          </span>
-          <span>
-            <i className="mr-1 inline-block h-[9px] w-[9px] rounded-[3px] bg-[#D9EEE1] align-[-1px]" />
-            외야
-          </span>
-          <span>
-            <i className="mr-1 inline-block h-[9px] w-[9px] rounded-[3px] bg-[#E9EEF7] align-[-1px]" />
-            상층(SKY·스윗박스)
-          </span>
+        <div className="mx-auto mt-2 flex w-full max-w-[330px] flex-wrap items-center justify-center gap-x-2.5 gap-y-1 border-t border-line-soft pt-2 text-[9.5px] font-bold text-ink-muted">
+          {SEAT_LEGEND.map((item) => (
+            <span key={item.label} className="flex items-center gap-1 whitespace-nowrap">
+              <i
+                className="inline-block h-[8px] w-[8px] rounded-[2.5px]"
+                style={{ backgroundColor: item.color }}
+              />
+              {item.label}
+            </span>
+          ))}
         </div>
       </section>
 

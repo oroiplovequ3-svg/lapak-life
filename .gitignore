@@ -46,3 +46,7 @@ yarn-error.log*
 /test-results
 /playwright-report
 /lighthouse
+
+# scratch build dirs
+/.next-bak-*/
+/.next-old-*/

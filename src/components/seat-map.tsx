@@ -6,7 +6,7 @@ import { MAP_IMAGE, SHAPE_BY_CODE, VIEWBOX, ZONE_SHAPES } from "@/lib/seat/map-g
 import { ZONE_BY_CODE } from "@/lib/data/zones";
 
 interface SeatMapProps {
-  /** "all" 또는 구역 코드 (C, T3, BZ, I1, T1, SB, OF, SKY) */
+  /** "all" 또는 구역 코드 (ZONE_SHAPES 참고) */
   selected: string;
   onSelect: (zone: string) => void;
 }
@@ -26,7 +26,6 @@ export function SeatMap({ selected, onSelect }: SeatMapProps) {
     selected && selected !== "all"
       ? SHAPE_BY_CODE[selected as keyof typeof SHAPE_BY_CODE]
       : undefined;
-
   return (
     <div className="relative overflow-hidden rounded-[10px] bg-white">
       {/* eslint-disable-next-line @next/next/no-img-element -- 원본 좌석도 픽셀을 그대로 보여주려고 최적화를 건너뜁니다 */}

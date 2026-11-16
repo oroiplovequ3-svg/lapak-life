@@ -7,8 +7,38 @@ public/images/lapak-seatmap.jpg (원본 좌석안내도, 1206×1092)를 **읽기
     python scripts/build-seat-hitareas.py
 
 원본 이미지는 절대 수정·리사이즈하지 않습니다. 좌표만 뽑아 씁니다.
+
+구역 코드 (2026 시즌 좌석안내도 기준)
+  3층 내야·중앙
+    C    VIP석               (연두, 중앙테이블석 바로 앞 3·2·1)
+    CT   중앙 테이블석        (노랑, 포수 뒤 정면 + 맨 뒤 VIP 두 칸)
+    T3   3루 테이블석         (진밤색, 3루)
+    T1   1루 테이블석         (진밤색, 1루)
+    E3   3루 익사이팅석       (분홍, 파울라인 옆 1·2)
+    E1   1루 익사이팅석       (분홍, 파울라인 옆 1·2)
+    BZ   블루존               (파랑, 3루)
+    N3   3루 내야지정석       (보라, 3루 6~13)
+    I1   원정 응원석          (파랑, 1루 1~5)
+    N1   1루 내야지정석       (보라, 1루 6~13)
+  4층
+    SB   스윗박스             (자주 띠, 3루 쪽 S1~S7)
+    PF   파티플로어 라이브석   (갈색, 3루 끝)
+  5층 SKY
+    SH   SKY 하단 지정석      (자주 띠 U1~U31)
+    U3   3루 SKY 상단 지정석   (남색)
+    UC   중앙 SKY 상단 지정석  (남색, 하단 중앙)
+    U1   1루 SKY 상단 지정석   (남색)
+    SKB  SKY 블루존           (하늘색 20~24)
+    SF   SKY 요기보 패밀리존   (주황 SKY박스)
+  외야·잔디
+    OF   외야 지정석          (주황 LF·RF)
+    OT   외야 테이블석        (도면에 따로 그려진 블록 없음 → 히트영역 없음)
+    OC   외야 커플 테이블석    (연두 띠, 외야 라인 바로 뒤)
+    RT   루프탑 테이블석       (연두, 11시 방향 LF 바깥)
+    OP   외야 패밀리석        (연노랑 다이아, 2시 방향)
+    DG   잔디 그린존          (진초록, 3시)
+    CP   캠핑존               (연한 연두 띠, 잔디그린존 오른쪽)
 """
-import json
 import os
 import cv2
 import numpy as np
@@ -35,87 +65,153 @@ PAL = {
     'midgreen':  (0x8A, 0xB9, 0x6C),
     'rooftop':   (0xA8, 0x3B, 0x28),
     'brown':     (0x8A, 0x6A, 0x43),
-    'skybox':    (0xE8, 0xA8, 0x48),
+    'skybox':    (0xDE, 0x81, 0x31),
 }
 TOL = 24
-MIN_AREA = 380
+MIN_AREA = 250
+MID = 603  # 홈플레이트 기준 좌(3루) / 우(1루) 경계 x
+
+# 히트영역을 뽑을 구역 코드 (이 순서대로 map-geometry.ts 에 씀)
+ZONES = [
+    'C', 'CT', 'T3', 'T1', 'E3', 'E1', 'BZ', 'N3', 'I1', 'N1',
+    'SB', 'PF',
+    'SH', 'U3', 'UC', 'U1', 'SKB', 'SF',
+    'OF', 'OC', 'RT', 'OP', 'DG', 'CP',
+]
 
 
-def mask_of(rgb):
-    r, g, b = rgb
-    lo = np.array([max(0, b - TOL), max(0, g - TOL), max(0, r - TOL)], np.uint8)
-    hi = np.array([min(255, b + TOL), min(255, g + TOL), min(255, r + TOL)], np.uint8)
-    return cv2.inRange(im, lo, hi)
+def assign(color, cx, cy, area, bbox):
+    """색 + 위치로 구역 코드를 정합니다. 원본 도면의 실제 배치를 그대로 따릅니다."""
+    if color == 'navy':
+        if cy > 940:                     # 아래쪽 호: 3루 / 중앙 / 1루 SKY 상단
+            if cx < 470:
+                return 'U3'
+            if cx < 730:
+                return 'UC'
+            return 'U1'
+        return 'U3' if cx < 300 else 'U1'  # 양옆 세로 띠
 
+    if color == 'lightblue':
+        return 'SKB'
 
-def assign(color, cx, cy, area):
-    if color in ('navy', 'lightblue'):
-        return 'SKY'
-    if color == 'skybox':
-        return 'SKY' if (cy > 1000 and 480 < cx < 720) else None
-    if color in ('blue', 'purple', 'pink'):
-        return 'BZ' if cx < 603 else 'I1'
-    if color == 'maroon':
-        return 'T3' if cx < 603 else 'T1'
+    if color == 'blue':                  # 3루 블루존 / 1루 원정 응원석
+        return 'BZ' if cx < MID else 'I1'
+
+    if color == 'purple':                # 3루 / 1루 내야지정석
+        return 'N3' if cx < MID else 'N1'
+
+    if color == 'pink':                  # 익사이팅석
+        return 'E3' if cx < MID else 'E1'
+
+    if color == 'maroon':                # 3루 / 1루 테이블석
+        return 'T3' if cx < MID else 'T1'
+
     if color == 'magenta':
+        # 가운데 'VIP' 두 칸은 중앙테이블석 뒤줄이라 CT 로 붙입니다.
         if 490 < cx < 710 and 950 < cy < 995 and area > 1500:
-            return 'C'
-        return 'SB'
+            return 'CT'
+        # 3루 쪽 세로 띠(S1~S7)는 스윗박스, 나머지 자주 띠는 SKY 하단 지정석.
+        if bbox[0] + bbox[2] <= 240:
+            return 'SB'
+        return 'SH'
+
     if color == 'brown':
-        return 'SB'
-    if color == 'yellow':
-        return 'C' if (cy > 820 and 455 < cx < 735) else None
+        return 'PF'
+
+    if color in ('oforange', 'rooftop'):  # 외야 지정석
+        return 'OF'
+
     if color == 'olive':
-        if 790 < cy < 832 and 525 < cx < 670:
+        if 790 < cy < 832 and 525 < cx < 670:   # 홈플레이트 바로 뒤 연두 3·2·1
             return 'C'
-        return 'OF'
-    if color in ('oforange', 'rooftop'):
-        return 'OF'
-    if color in ('darkgreen', 'midgreen'):
-        return 'OF' if cx > 995 else None
+        if cy < 320 and area > 2000:            # 11시 방향 외야 데크(큰 블록)
+            return 'RT'
+        if cy < 320:                            # 외야 라인 바로 뒤 연두 띠
+            return 'OC'
+        return None
+
+    if color == 'yellow':
+        if cy > 820 and 455 < cx < 735:         # 중앙 테이블석
+            return 'CT'
+        if cy < 320:                            # 2시 방향 다이아 = 외야 패밀리석
+            return 'OP'
+        return None
+
+    if color == 'darkgreen':
+        return 'DG' if cx > 995 else None
+
+    if color == 'midgreen':
+        return 'CP' if cx > 995 else None
+
+    if color == 'skybox':                       # 5층 맨 아래 주황 SKY박스
+        if cy > 1040 and 500 < cx < 640 and area < 6000:
+            return 'SF'
+        return None
     return None
 
 
-cells = {z: [] for z in ['C', 'T3', 'BZ', 'I1', 'T1', 'SB', 'OF', 'SKY']}
+cells = {z: [] for z in ZONES}
 for color, rgb in PAL.items():
-    m = mask_of(rgb)
+    r, g, b = rgb
+    lo = np.array([max(0, b - TOL), max(0, g - TOL), max(0, r - TOL)], np.uint8)
+    hi = np.array([min(255, b + TOL), min(255, g + TOL), min(255, r + TOL)], np.uint8)
+    m = cv2.inRange(im, lo, hi)
     n, cc, stats, cen = cv2.connectedComponentsWithStats((m > 0).astype(np.uint8), 8)
     for i in range(1, n):
         area = int(stats[i, 4])
         if area < MIN_AREA:
             continue
         cx, cy = cen[i]
-        zone = assign(color, cx, cy, area)
+        bbox = [int(stats[i, 0]), int(stats[i, 1]), int(stats[i, 2]), int(stats[i, 3])]
+        zone = assign(color, cx, cy, area, bbox)
         if not zone:
             continue
         comp = ((cc == i) & (m > 0)).astype(np.uint8)
         comp = cv2.morphologyEx(comp, cv2.MORPH_CLOSE, np.ones((11, 11), np.uint8))
         cnts, _ = cv2.findContours(comp, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
         for c in cnts:
-            if cv2.contourArea(c) < MIN_AREA * 0.6:
+            if cv2.contourArea(c) < MIN_AREA * 0.5:
                 continue
             ap = cv2.approxPolyDP(c, 3.0, True).reshape(-1, 2)
             if len(ap) >= 3:
                 cells[zone].append([[int(x), int(y)] for x, y in ap])
 
-outlines = {}
-for z, cs in cells.items():
+
+def outline_of(cs, approx=4.5, min_area=500, close=9, open_=5, pad=0):
     m = np.zeros((H, W), np.uint8)
     for pts in cs:
         cv2.fillPoly(m, [np.array(pts, np.int32)], 255)
-    m = cv2.morphologyEx(m, cv2.MORPH_CLOSE, cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (9, 9)))
-    m = cv2.morphologyEx(m, cv2.MORPH_OPEN, cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (5, 5)))
+    m = cv2.morphologyEx(m, cv2.MORPH_CLOSE,
+                         cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (close, close)))
+    m = cv2.morphologyEx(m, cv2.MORPH_OPEN,
+                         cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (open_, open_)))
+    if pad:
+        k = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (pad * 2 + 1, pad * 2 + 1))
+        m = cv2.dilate(m, k)
     cnts, _ = cv2.findContours(m, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
     polys = []
     for c in cnts:
-        if cv2.contourArea(c) < 700:
+        if cv2.contourArea(c) < min_area:
             continue
-        ap = cv2.approxPolyDP(c, 4.5, True).reshape(-1, 2)
+        ap = cv2.approxPolyDP(c, approx, True).reshape(-1, 2)
         if len(ap) >= 3:
             polys.append({'area': int(cv2.contourArea(c)),
                           'pts': [[int(x), int(y)] for x, y in ap]})
     polys.sort(key=lambda p: -p['area'])
-    outlines[z] = polys
+    return polys
+
+
+outlines = {z: outline_of(cs) for z, cs in cells.items()}
+# 좁은 띠·작은 블록은 커널을 줄여 외곽선을 조이고, 손가락으로 누를 만하게 살짝 부풉니다.
+for small in ('E3', 'E1'):
+    outlines[small] = outline_of(cells[small], approx=3.0, close=5, open_=3, pad=2)
+outlines['C'] = outline_of(cells['C'], approx=3.5, close=5, open_=3)
+outlines['CP'] = outline_of(cells['CP'], approx=3.0, min_area=400, close=3, open_=3, pad=6)
+outlines['SB'] = outline_of(cells['SB'], approx=3.0, close=3, open_=3)
+outlines['SH'] = outline_of(cells['SH'], approx=4.0, close=23, open_=3, pad=2)
+outlines['OC'] = outline_of(cells['OC'], approx=2.5, min_area=150, close=7, open_=3, pad=2)
+outlines['SF'] = outline_of(cells['SF'], approx=3.0, min_area=200, close=3, open_=3, pad=3)
+
 
 def path_of(polys):
     parts = []
@@ -146,8 +242,10 @@ L.append('} as const;')
 L.append('')
 L.append('export const VIEWBOX = "0 0 1206 1092";')
 L.append('')
-L.append('/** 클릭 가능한 좌석 구역 코드 (8개) */')
-L.append('export type ZoneCode = "C" | "T3" | "BZ" | "I1" | "T1" | "SB" | "OF" | "SKY";')
+L.append('/** 클릭 가능한 좌석 구역 코드 */')
+L.append('export type ZoneCode =')
+for i, z in enumerate(ZONES):
+    L.append('  | "%s"%s' % (z, ';' if i == len(ZONES) - 1 else ''))
 L.append('')
 L.append('export interface ZoneShape {')
 L.append('  code: ZoneCode;')
@@ -156,7 +254,10 @@ L.append('  path: string;')
 L.append('}')
 L.append('')
 L.append('export const ZONE_SHAPES: ZoneShape[] = [')
-for code in ['BZ', 'I1', 'T3', 'T1', 'C', 'SB', 'OF', 'SKY']:
+# 뒤에 그려지는 구역이 클릭을 먼저 받습니다 (좁은 익사이팅존을 맨 뒤로).
+order = ['BZ', 'I1', 'N3', 'N1', 'CT', 'C', 'T3', 'T1', 'SB', 'PF',
+         'SH', 'U3', 'UC', 'U1', 'SKB', 'SF', 'OF', 'OC', 'RT', 'OP', 'DG', 'CP', 'E3', 'E1']
+for code in order:
     L.append('  {')
     L.append('    code: "%s",' % code)
     L.append('    path:')
@@ -164,11 +265,14 @@ for code in ['BZ', 'I1', 'T3', 'T1', 'C', 'SB', 'OF', 'SKY']:
     L.append('  },')
 L.append('];')
 L.append('')
-L.append('/** 구역 코드 → 실루엣 (클릭·하이라이트에 씀) */')
+L.append('/** 구역 코드 → 실루엣 (클릭·하이라이트에 씀). 히트영역이 없는 구역은 빠집니다. */')
 L.append('export const SHAPE_BY_CODE = Object.fromEntries(')
 L.append('  ZONE_SHAPES.map((s) => [s.code, s]),')
-L.append(') as Record<ZoneCode, ZoneShape>;')
+L.append(') as Partial<Record<ZoneCode, ZoneShape>>;')
 L.append('')
 
 open(OUT, 'w').write('\n'.join(L))
 print('wrote', OUT)
+for code in order:
+    print('%-4s polys=%d area=%d' % (code, len(outlines[code]),
+                                     sum(p['area'] for p in outlines[code])))

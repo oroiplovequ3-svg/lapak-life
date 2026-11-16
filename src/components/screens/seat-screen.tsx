@@ -5,18 +5,41 @@ import { useMemo, useState } from "react";
 import { Icon, Stars } from "@/components/icons";
 import { useApp } from "@/components/providers/app-provider";
 import { SeatMap } from "@/components/seat-map";
-import { ZONE_BY_CODE, ZONE_ORDER, zoneFullName } from "@/lib/data/zones";
+import {
+  ZONE_BY_CODE,
+  ZONE_GROUPS,
+  zoneFamily,
+  zoneFullName,
+  zoneGroupOf,
+  zoneSubtitle,
+  type ZoneGroupId,
+} from "@/lib/data/zones";
 import { formatRelativeTime, initialOf } from "@/lib/utils";
+
+const ALL_CODES = ZONE_GROUPS.flatMap((group) => group.codes);
 
 export function SeatScreen() {
   const { zones, reviews, saves, toggleSaveZone } = useApp();
   const [selected, setSelected] = useState<string>("all");
-  const zone = selected === "all" ? null : zones.find((z) => z.code === selected) ?? ZONE_BY_CODE[selected];
+  const [group, setGroup] = useState<ZoneGroupId>("all");
+  const zone =
+    selected === "all" ? null : zones.find((z) => z.code === selected) ?? ZONE_BY_CODE[selected];
   const filteredReviews = useMemo(
     () => (selected === "all" ? reviews : reviews.filter((r) => r.zoneCode === selected)),
     [reviews, selected],
   );
   const zoneName = selected === "all" ? "전체 구역" : zone?.short ?? selected;
+  const visibleCodes = group === "all" ? ALL_CODES : ZONE_GROUPS.find((g) => g.id === group)?.codes ?? ALL_CODES;
+  const family = zoneFamily(zone?.code);
+
+  function pick(code: string) {
+    setSelected(code);
+  }
+
+  function pickFromMap(code: string) {
+    setSelected(code);
+    setGroup(zoneGroupOf(code));
+  }
 
   return (
     <div className="flex flex-col gap-3.5 px-4 pb-[30px] pt-3.5">
@@ -30,13 +53,41 @@ export function SeatScreen() {
             {zoneName}
           </span>
         </div>
-        <SeatMap selected={selected} onSelect={(code) => setSelected(code)} />
+        <SeatMap selected={selected} onSelect={pickFromMap} />
         <p className="mt-2 border-t border-line-soft pt-2 text-center text-[10px] font-bold text-ink-faint">
           {selected === "all"
             ? "도면의 구역을 누르면 시야 특징과 후기가 나와요"
             : `${zoneName} 선택됨 · 도면에서 다른 구역도 눌러보세요`}
         </p>
       </section>
+
+      <div className="-mx-1 flex gap-1.5 overflow-x-auto px-1 pb-0.5">
+        <button
+          type="button"
+          onClick={() => setGroup("all")}
+          className={`flex-none rounded-full border px-3 py-[7px] text-[11.5px] font-extrabold transition ${
+            group === "all"
+              ? "border-brand-600 bg-brand text-white"
+              : "border-line bg-white text-ink-2"
+          }`}
+        >
+          전체
+        </button>
+        {ZONE_GROUPS.map((g) => (
+          <button
+            key={g.id}
+            type="button"
+            onClick={() => setGroup(g.id)}
+            className={`flex-none rounded-full border px-3 py-[7px] text-[11.5px] font-extrabold transition ${
+              group === g.id
+                ? "border-brand-600 bg-brand text-white"
+                : "border-line bg-white text-ink-2"
+            }`}
+          >
+            {g.label}
+          </button>
+        ))}
+      </div>
 
       <div className="grid grid-cols-3 gap-[7px]">
         <button
@@ -55,13 +106,14 @@ export function SeatScreen() {
             모든 후기 보기
           </span>
         </button>
-        {ZONE_ORDER.map((code) => {
+        {visibleCodes.map((code) => {
           const z = ZONE_BY_CODE[code];
+          if (!z) return null;
           return (
             <button
               key={code}
               type="button"
-              onClick={() => setSelected(code)}
+              onClick={() => pick(code)}
               className={`rounded-[13px] border bg-white px-2 py-[9px] text-left transition active:scale-[.975] ${
                 selected === code
                   ? "border-brand-600 bg-[#F3F8FF] shadow-[0_0_0_2px_rgba(10,88,202,.13)]"
@@ -71,8 +123,8 @@ export function SeatScreen() {
               <span className="block text-xs font-extrabold leading-tight tracking-tight2 text-ink">
                 {z.short}
               </span>
-              <span className="mt-[3px] block text-[10px] font-semibold text-ink-faint">
-                {z.emoji} {z.side.split(" · ")[0]}
+              <span className="mt-[3px] block text-[10px] font-semibold leading-snug text-ink-faint">
+                {z.emoji} {zoneSubtitle(z)}
               </span>
             </button>
           );
@@ -86,9 +138,43 @@ export function SeatScreen() {
             <div className="relative text-lg font-extrabold tracking-tight3">
               {zone.emoji} {zone.name}
             </div>
+            {zone.sub ? (
+              <div className="relative mt-1 flex items-center gap-1.5">
+                <span className="rounded-md bg-white/[.16] px-2 py-[3px] text-[10px] font-extrabold text-white/85">
+                  소분류
+                </span>
+                <span className="text-[11px] font-bold text-white/80">{zone.sub}</span>
+              </div>
+            ) : null}
             <div className="relative mt-[5px] text-[11.5px] font-semibold text-white/80">
               {zone.side} · {zone.price}
             </div>
+            {family ? (
+              <div className="relative mt-2.5 flex flex-wrap gap-1.5">
+                {family.codes.map((code) => {
+                  const sibling = ZONE_BY_CODE[code];
+                  if (!sibling) return null;
+                  const on = code === zone.code;
+                  return (
+                    <button
+                      key={code}
+                      type="button"
+                      onClick={() => pick(code)}
+                      className={`rounded-full px-2.5 py-[5px] text-[10.5px] font-extrabold transition ${
+                        on
+                          ? "bg-white text-brand-600"
+                          : "bg-white/[.16] text-white/85"
+                      }`}
+                    >
+                      {sibling.short}
+                    </button>
+                  );
+                })}
+                <span className="self-center text-[10px] font-bold text-white/60">
+                  {family.label} 안에서 골라보세요
+                </span>
+              </div>
+            ) : null}
             <div className="relative mt-3.5 grid grid-cols-3 gap-[7px]">
               {[
                 ["내야까지", zone.dist],
@@ -163,8 +249,8 @@ export function SeatScreen() {
             {[
               ["🦁", "홈 더그아웃이 3루", "다른 구장과 반대예요. 삼성 팬은 3루, 원정 팬은 1루 쪽으로 앉으면 됩니다."],
               ["☀️", "해는 1루 쪽으로", "낮 경기엔 1루 쪽이 햇빛이 강하고 3루 쪽이 그늘이 빨리 옵니다."],
-              ["🔭", "지붕은 상층만", "SKY·스윗박스는 지붕이 있고, 내야·외야 일반석은 비를 그대로 맞습니다."],
-              ["👇", "구역을 눌러보세요", "위 도식이나 아래 구역 카드를 누르면 시야 특징과 유저 후기가 나옵니다."],
+              ["🔭", "지붕은 상층만", "5층 SKY·4층 스윗박스는 지붕이 있고, 내야·외야 일반석은 비를 그대로 맞습니다."],
+              ["👇", "구역을 눌러보세요", "위 탭으로 층을 고르고, 구역을 누르면 시야 특징과 유저 후기가 나옵니다."],
             ].map(([fi, fl, ft], index, all) => (
               <div
                 key={fl}
@@ -249,4 +335,3 @@ export function SeatScreen() {
     </div>
   );
 }
-

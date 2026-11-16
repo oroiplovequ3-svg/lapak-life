@@ -12,6 +12,8 @@ export interface Zone {
   code: string;
   name: string;
   short: string;
+  /** 구역 대표 이름 아래 붙는 소분류 (예: 원정응원석 → 1루 내야 (지정석)) */
+  sub?: string;
   emoji: string;
   side: string;
   grade: string;

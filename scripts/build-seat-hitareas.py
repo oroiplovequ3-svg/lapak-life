@@ -11,7 +11,7 @@ public/images/lapak-seatmap.jpg (원본 좌석안내도, 1206×1092)를 **읽기
 구역 코드 (2026 시즌 좌석안내도 기준)
   3층 내야·중앙
     C    VIP석               (연두, 중앙테이블석 바로 앞 3·2·1)
-    CT   중앙 테이블석        (노랑, 포수 뒤 정면 + 맨 뒤 VIP 두 칸)
+    CT   중앙 테이블석        (노랑, 포수 뒤 정면 — 맨 뒤 'VIP' 두 칸은 제외)
     T3   3루 테이블석         (진밤색, 3루)
     T1   1루 테이블석         (진밤색, 1루)
     E3   3루 익사이팅석       (분홍, 파울라인 옆 1·2)
@@ -108,9 +108,10 @@ def assign(color, cx, cy, area, bbox):
         return 'T3' if cx < MID else 'T1'
 
     if color == 'magenta':
-        # 가운데 'VIP' 두 칸은 중앙테이블석 뒤줄이라 CT 로 붙입니다.
+        # 가운데 'VIP' 두 칸은 중앙테이블석 뒤에 붙은 별도 VIP석 표기라
+        # 중앙테이블(CT) 히트영역에서 뺍니다 (노란 중앙테이블석만 CT).
         if 490 < cx < 710 and 950 < cy < 995 and area > 1500:
-            return 'CT'
+            return None
         # 자주 띠는 전부 스윗박스입니다. 좁은 세로 띠(S1~S7)는 따로 뽑아 이어 붙입니다.
         if bbox[0] + bbox[2] <= 240:
             return 'SB'

@@ -1,5 +1,6 @@
 "use client";
 
+import Image from "next/image";
 import { useMemo, useState } from "react";
 
 import { Icon } from "@/components/icons";
@@ -96,9 +97,13 @@ export function MyScreen({ onOpenPost, onCompose, onAddGame }: MyScreenProps) {
         ) : (
           <div className="flex flex-col items-start gap-2.5">
             <div className="flex items-center gap-3">
-              <div className="grid h-[54px] w-[54px] flex-none place-items-center rounded-full bg-gradient-to-br from-brand-500 to-brand text-xl font-extrabold text-white shadow-[0_6px_16px_-6px_rgba(7,76,161,.7)]">
-                🦁
-              </div>
+              <Image
+                src="/images/lapak-mascot-badge.png"
+                alt="라팍생활 마스코트"
+                width={108}
+                height={108}
+                className="h-[54px] w-[54px] flex-none rounded-full border-2 border-brand-100 bg-brand-50 object-cover shadow-[0_6px_16px_-6px_rgba(7,76,161,.7)]"
+              />
               <div>
                 <div className="text-[17px] font-extrabold tracking-tight3">게스트</div>
                 <div className="mt-[3px] text-[11.5px] font-semibold text-ink-faint">

@@ -1,5 +1,6 @@
 "use client";
 
+import Image from "next/image";
 import { useState } from "react";
 
 import { ComposeSheet } from "@/components/compose-sheet";
@@ -58,9 +59,15 @@ export function AppShell() {
       {/* 상단 앱바 */}
       <header className="z-20 flex flex-none items-center gap-2.5 border-b border-transparent bg-white/[.94] px-4 pb-[11px] pt-[calc(12px+env(safe-area-inset-top))] backdrop-blur">
         <div className="flex min-w-0 items-center gap-2">
-          <div className="grid h-[31px] w-[31px] flex-none place-items-center rounded-[10px] bg-gradient-to-br from-brand-500 to-brand text-base shadow-[0_2px_7px_rgba(7,76,161,.34)]">
-            {tab === "home" ? "🦁" : "⚾"}
-          </div>
+          <Image
+            src="/images/lapak-mascot-badge.png"
+            alt=""
+            aria-hidden
+            width={72}
+            height={72}
+            priority
+            className="h-[36px] w-[36px] flex-none rounded-full border-[1.5px] border-brand-100 bg-brand-50 object-cover shadow-[0_2px_8px_rgba(7,76,161,.24)]"
+          />
           <div className="flex min-w-0 flex-col">
             <span className="text-lg font-extrabold leading-[1.15] tracking-tight3">
               {TITLES[tab]}

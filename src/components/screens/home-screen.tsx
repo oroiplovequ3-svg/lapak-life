@@ -1,5 +1,6 @@
 "use client";
 
+import Image from "next/image";
 import { useMemo, useState } from "react";
 
 import { Icon } from "@/components/icons";
@@ -210,6 +211,14 @@ export function HomeScreen({ onCompose, highlightedPostId, onGoSeat, onGoFood }:
       )}
 
       <section className="relative overflow-hidden rounded-[22px] bg-gradient-to-br from-[#063E84] via-brand to-brand-500 px-[17px] pb-[15px] pt-[17px] text-white shadow-brand">
+        <Image
+          src="/images/lapak-mascot-hero.png"
+          alt=""
+          aria-hidden
+          width={192}
+          height={260}
+          className="pointer-events-none absolute bottom-[56px] right-2 h-[130px] w-auto select-none"
+        />
         <div className="pointer-events-none absolute -right-14 -top-[72px] h-[190px] w-[190px] rounded-full bg-white/[.18] blur-[1px]" />
         <div className="pointer-events-none absolute -bottom-20 -left-[30px] h-[170px] w-[170px] rounded-full border-[26px] border-white/[.06]" />
         <div className="relative flex items-center gap-1.5 text-[11.5px] font-bold text-white/80">

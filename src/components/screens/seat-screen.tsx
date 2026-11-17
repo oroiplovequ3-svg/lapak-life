@@ -44,12 +44,12 @@ export function SeatScreen() {
   return (
     <div className="flex flex-col gap-3.5 px-4 pb-[30px] pt-3.5">
       <section className="rounded-md2 border border-line bg-gradient-to-b from-white to-[#F8FAFD] px-2.5 pb-3 pt-2.5 shadow-card">
-        <div className="flex items-center justify-between px-1 pb-2">
-          <span className="flex items-center gap-1.5 text-[12.5px] font-extrabold text-ink-2">
+        <div className="flex items-center justify-between gap-2 px-1 pb-2">
+          <span className="flex min-w-0 items-center gap-1.5 whitespace-nowrap text-[12.5px] font-extrabold text-ink-2">
             <Icon name="seat" size={15} strokeWidth={2} />
-            구장 도식
+            라이온즈파크 좌석배치도
           </span>
-          <span className="rounded-lg bg-brand-50 px-2 py-[3px] text-[11px] font-extrabold text-brand-600">
+          <span className="flex-none whitespace-nowrap rounded-lg bg-brand-50 px-2 py-[3px] text-[11px] font-extrabold text-brand-600">
             {zoneName}
           </span>
         </div>

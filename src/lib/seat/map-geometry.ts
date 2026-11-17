@@ -143,7 +143,7 @@ export const ZONE_SHAPES: ZoneShape[] = [
   {
     code: "RT",
     path:
-      "M400,146L296,244L314,265L418,169ZM847,133L813,168L858,210L891,176Z",
+      "M400,146L296,244L314,265L418,169Z",
   },
   {
     code: "OP",

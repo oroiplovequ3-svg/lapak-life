@@ -18,10 +18,117 @@ import { formatRelativeTime, initialOf } from "@/lib/utils";
 
 const ALL_CODES = ZONE_GROUPS.flatMap((group) => group.codes);
 
+interface LightboxState {
+  urls: string[];
+  index: number;
+}
+
+/** 후기 카드 안의 첨부 사진 — 1장은 크게, 2~3장은 정사각 그리드 */
+function ReviewPhotos({ urls, onOpen }: { urls: string[]; onOpen: (index: number) => void }) {
+  if (!urls.length) return null;
+
+  if (urls.length === 1) {
+    return (
+      <button
+        type="button"
+        onClick={() => onOpen(0)}
+        aria-label="첨부 사진 크게 보기"
+        className="mt-2.5 block w-full overflow-hidden rounded-[12px] border border-line bg-[#F5F7FA] active:opacity-90"
+      >
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img
+          src={urls[0]}
+          alt="후기 첨부 사진"
+          loading="lazy"
+          className="h-[170px] w-full object-cover"
+        />
+      </button>
+    );
+  }
+
+  return (
+    <div className={`mt-2.5 grid gap-1.5 ${urls.length === 2 ? "grid-cols-2" : "grid-cols-3"}`}>
+      {urls.map((url, index) => (
+        <button
+          key={`${index}-${url.slice(-12)}`}
+          type="button"
+          onClick={() => onOpen(index)}
+          aria-label={`첨부 사진 ${index + 1} 크게 보기`}
+          className="aspect-square overflow-hidden rounded-[11px] border border-line bg-[#F5F7FA] active:opacity-90"
+        >
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img
+            src={url}
+            alt={`후기 첨부 사진 ${index + 1}`}
+            loading="lazy"
+            className="h-full w-full object-cover"
+          />
+        </button>
+      ))}
+    </div>
+  );
+}
+
+function PhotoLightbox({ state, onClose, onPick }: { state: LightboxState; onClose: () => void; onPick: (index: number) => void }) {
+  return (
+    <div
+      role="dialog"
+      aria-modal="true"
+      aria-label="후기 사진 크게 보기"
+      className="animate-fadeIn fixed inset-0 z-[60] mx-auto flex w-full max-w-[430px] flex-col bg-black/95"
+    >
+      <div className="flex items-center justify-between px-4 pb-2 pt-[calc(12px+env(safe-area-inset-top))] text-white">
+        <span className="text-[11.5px] font-extrabold tracking-tight2 text-white/70">
+          {state.index + 1} / {state.urls.length}
+        </span>
+        <button
+          type="button"
+          onClick={onClose}
+          aria-label="사진 닫기"
+          className="grid h-9 w-9 place-items-center rounded-full bg-white/[.12] text-white"
+        >
+          <Icon name="close" size={16} strokeWidth={2.4} />
+        </button>
+      </div>
+
+      <button
+        type="button"
+        onClick={onClose}
+        aria-label="사진 닫기"
+        className="flex flex-1 items-center justify-center px-3 pb-3"
+      >
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img
+          src={state.urls[state.index]}
+          alt="후기 사진"
+          className="max-h-full w-full rounded-[14px] object-contain"
+        />
+      </button>
+
+      {state.urls.length > 1 ? (
+        <div className="flex items-center justify-center gap-2 pb-[calc(18px+env(safe-area-inset-bottom))]">
+          {state.urls.map((url, index) => (
+            <button
+              key={`${index}-${url.slice(-12)}`}
+              type="button"
+              onClick={() => onPick(index)}
+              aria-label={`${index + 1}번째 사진 보기`}
+              className={`h-1.5 rounded-full transition-all ${
+                index === state.index ? "w-5 bg-white" : "w-1.5 bg-white/[.38]"
+              }`}
+            />
+          ))}
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
 export function SeatScreen() {
   const { zones, reviews, saves, toggleSaveZone } = useApp();
   const [selected, setSelected] = useState<string>("all");
   const [group, setGroup] = useState<ZoneGroupId>("all");
+  const [lightbox, setLightbox] = useState<LightboxState | null>(null);
   const zone =
     selected === "all" ? null : zones.find((z) => z.code === selected) ?? ZONE_BY_CODE[selected];
   const filteredReviews = useMemo(
@@ -313,6 +420,10 @@ export function SeatScreen() {
               <p className="mt-[9px] break-keep text-[13.5px] leading-relaxed text-[#1D2939]">
                 {review.body}
               </p>
+              <ReviewPhotos
+                urls={review.photoUrls ?? []}
+                onOpen={(index) => setLightbox({ urls: review.photoUrls, index })}
+              />
               <span className="mt-[9px] inline-block rounded-md bg-[#F3F8FF] px-[7px] py-0.5 text-[11px] font-bold text-brand-600">
                 {review.seatDetail}
               </span>
@@ -332,6 +443,14 @@ export function SeatScreen() {
       <p className="break-keep px-2.5 pt-1 text-center text-[10.5px] leading-relaxed text-[#AEB6C2]">
         가격·구역명은 2026 시즌 공개 자료 기준이며 시즌마다 달라질 수 있어요.
       </p>
+
+      {lightbox ? (
+        <PhotoLightbox
+          state={lightbox}
+          onClose={() => setLightbox(null)}
+          onPick={(index) => setLightbox({ ...lightbox, index })}
+        />
+      ) : null}
     </div>
   );
 }

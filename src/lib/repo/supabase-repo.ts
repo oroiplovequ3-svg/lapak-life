@@ -91,6 +91,9 @@ function mapReview(row: AnyRow, viewerId: string | null): ZoneReview {
     seatDetail: str(row.seat_detail),
     stars: num(row.rating, 5),
     body: str(row.body),
+    photoUrls: Array.isArray(row.photo_urls)
+      ? (row.photo_urls as unknown[]).filter((value): value is string => typeof value === "string")
+      : [],
     createdAt: str(row.created_at) || new Date().toISOString(),
     mine: Boolean(viewerId && userId === viewerId),
   };
@@ -115,7 +118,10 @@ const POST_COLUMNS =
   "id, user_id, category, body, seat_zone, seat_detail, media, created_at, like_count, comment_count, profiles(nickname, avatar_url)";
 const COMMENT_COLUMNS = "id, post_id, user_id, body, created_at, profiles(nickname, avatar_url)";
 const REVIEW_COLUMNS =
-  "id, zone_code, user_id, seat_detail, rating, body, created_at, profiles(nickname, avatar_url)";
+  "id, zone_code, user_id, seat_detail, rating, body, photo_urls, created_at, profiles(nickname, avatar_url)";
+
+/** 시야 후기 사진 버킷 (supabase/migrations/002_review_photos.sql) */
+const REVIEW_PHOTO_BUCKET = "review-photos";
 
 function fail(context: string, error: { message: string } | null): never {
   throw new Error(`${context}: ${error?.message ?? "알 수 없는 오류"}`);
@@ -297,7 +303,39 @@ export class SupabaseRepository implements Repository {
     return ((data ?? []) as AnyRow[]).map((row) => mapReview(row, viewerId));
   }
 
+  /**
+   * 브라우저에서 축소한 data URL 사진을 Storage에 올리고 공개 URL을 돌려줍니다.
+   * 사진 업로드가 실패해도 후기 본문 등록은 막지 않습니다.
+   */
+  private async uploadReviewPhotos(dataUrls: string[], userId: string | null): Promise<string[]> {
+    if (!userId || !dataUrls.length) return [];
+    const bucket = this.supabase.storage.from(REVIEW_PHOTO_BUCKET);
+    const uploaded: string[] = [];
+
+    for (const dataUrl of dataUrls.slice(0, 3)) {
+      try {
+        const response = await fetch(dataUrl);
+        const blob = await response.blob();
+        const ext = blob.type === "image/png" ? "png" : "jpg";
+        const path = `${userId}/${Date.now()}-${Math.random().toString(36).slice(2, 8)}.${ext}`;
+        const { error } = await bucket.upload(path, blob, {
+          contentType: blob.type || "image/jpeg",
+          cacheControl: "31536000",
+          upsert: false,
+        });
+        if (error) throw new Error(error.message);
+        uploaded.push(bucket.getPublicUrl(path).data.publicUrl);
+      } catch {
+        // 개별 사진 실패는 건너뜁니다.
+      }
+    }
+
+    return uploaded;
+  }
+
   async createReview(input: NewReviewInput, author: Author): Promise<ZoneReview> {
+    const photoUrls = await this.uploadReviewPhotos(input.photoUrls ?? [], author.id);
+
     const { data, error } = await this.supabase
       .from("zone_reviews")
       .insert({
@@ -306,6 +344,7 @@ export class SupabaseRepository implements Repository {
         seat_detail: input.seatDetail,
         rating: input.stars,
         body: input.body,
+        photo_urls: photoUrls,
       })
       .select(REVIEW_COLUMNS)
       .single();

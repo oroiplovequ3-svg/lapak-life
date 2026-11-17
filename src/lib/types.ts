@@ -91,6 +91,8 @@ export interface ZoneReview {
   seatDetail: string;
   stars: number;
   body: string;
+  /** 첨부 사진 (최대 3장 · 데모는 축소된 data URL, 연동 시 Storage 공개 URL) */
+  photoUrls: string[];
   createdAt: string;
   mine: boolean;
 }
@@ -136,6 +138,7 @@ export interface NewReviewInput {
   seatDetail: string;
   stars: number;
   body: string;
+  photoUrls?: string[];
 }
 
 export interface NewGameInput {

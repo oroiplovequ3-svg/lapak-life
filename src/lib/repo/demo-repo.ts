@@ -108,13 +108,38 @@ export class DemoRepository implements Repository {
     this.persist = readPersist();
   }
 
-  private save() {
-    if (typeof window === "undefined") return;
-    try {
+  /**
+   * localStorage 저장. 후기 사진(data URL) 때문에 용량이 넘치면
+   * 가장 오래된 내 후기 사진부터 비우고 다시 시도합니다.
+   */
+  private save(): "ok" | "pruned" | "failed" {
+    if (typeof window === "undefined") return "ok";
+
+    const write = () => {
       window.localStorage.setItem(STORAGE_KEY, JSON.stringify(this.persist));
+    };
+
+    try {
+      write();
+      return "ok";
     } catch {
-      // 저장 공간이 막혀 있어도 화면 동작은 계속되게 합니다.
+      // 용량 초과 → 아래에서 사진부터 정리합니다.
     }
+
+    for (let i = this.persist.reviews.length - 1; i >= 0; i -= 1) {
+      const review = this.persist.reviews[i];
+      if (!review.photoUrls?.length) continue;
+      review.photoUrls = [];
+      try {
+        write();
+        return "pruned";
+      } catch {
+        // 다음(더 최근) 후기 사진도 비워봅니다.
+      }
+    }
+
+    // 사진을 모두 비워도 저장할 수 없으면 화면 동작은 계속되게 둡니다.
+    return "failed";
   }
 
   private seedCommentCount(postId: string): number {
@@ -236,6 +261,7 @@ export class DemoRepository implements Repository {
       seatDetail: r.seat,
       stars: r.stars,
       body: r.body,
+      photoUrls: [],
       createdAt: minutesAgoISO(r.minutesAgo),
       mine: false,
     }));
@@ -252,11 +278,17 @@ export class DemoRepository implements Repository {
       seatDetail: input.seatDetail || ZONES.find((z) => z.code === input.zoneCode)?.name || "",
       stars: input.stars,
       body: input.body,
+      photoUrls: (input.photoUrls ?? []).filter(Boolean).slice(0, 3),
       createdAt: new Date().toISOString(),
       mine: true,
     };
     this.persist.reviews.unshift(review);
-    this.save();
+
+    if (this.save() === "failed") {
+      // 사진을 다 비워도 저장 공간이 없으면 사진 없는 후기로 남깁니다.
+      review.photoUrls = [];
+      this.save();
+    }
     return review;
   }
 

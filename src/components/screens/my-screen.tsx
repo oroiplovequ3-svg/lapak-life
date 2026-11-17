@@ -179,6 +179,11 @@ export function MyScreen({ onOpenPost, onCompose, onAddGame }: MyScreenProps) {
         {games.length ? (
           games.map((game) => {
             const result = game.scoreFor > game.scoreAgainst ? "W" : game.scoreFor < game.scoreAgainst ? "L" : "D";
+            // 좌석 구역 없이 저장된 기록도 자연스럽게 보이도록 표시 항목을 골라 이어 붙입니다.
+            const zoneLabel = game.zoneCode
+              ? (ZONE_BY_CODE[game.zoneCode]?.short ?? game.zoneCode)
+              : null;
+            const meta = [zoneLabel, game.note].filter(Boolean).join(" · ");
             return (
               <div
                 key={game.id}
@@ -201,10 +206,9 @@ export function MyScreen({ onOpenPost, onCompose, onAddGame }: MyScreenProps) {
                       {formatDotDate(game.playedOn)} vs {game.opponent}
                       {game.homeAway === "away" ? " (원정)" : ""}
                     </div>
-                    <div className="mt-0.5 text-[11px] font-semibold text-ink-faint">
-                      {game.zoneCode ? (ZONE_BY_CODE[game.zoneCode]?.short ?? game.zoneCode) : "-"}
-                      {game.note ? ` · ${game.note}` : ""}
-                    </div>
+                    {meta ? (
+                      <div className="mt-0.5 text-[11px] font-semibold text-ink-faint">{meta}</div>
+                    ) : null}
                   </div>
                   <span className="text-[13px] font-extrabold tracking-tight text-ink-2">
                     {game.scoreFor} : {game.scoreAgainst}

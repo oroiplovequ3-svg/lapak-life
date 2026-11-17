@@ -4,7 +4,6 @@ import { useApp } from "@/components/providers/app-provider";
 import { useToast } from "@/components/providers/toast-provider";
 import { Sheet } from "@/components/sheet";
 import { Icon } from "@/components/icons";
-import { ZONE_BY_CODE, ZONE_ORDER } from "@/lib/data/zones";
 import {
   MAX_GAME_PHOTOS,
   formatPhotoSize,
@@ -27,7 +26,6 @@ export function GameSheet({ open, onClose }: GameSheetProps) {
   const [playedOn, setPlayedOn] = useState(todayISO());
   const [opponent, setOpponent] = useState("");
   const [homeAway, setHomeAway] = useState<"home" | "away">("home");
-  const [zoneCode, setZoneCode] = useState("T3");
   const [scoreFor, setScoreFor] = useState("");
   const [scoreAgainst, setScoreAgainst] = useState("");
   const [note, setNote] = useState("");
@@ -85,7 +83,8 @@ export function GameSheet({ open, onClose }: GameSheetProps) {
       playedOn,
       opponent: opponent.trim(),
       homeAway,
-      zoneCode,
+      // 좌석 구역은 기록에서 받지 않습니다(구역 없이 저장).
+      zoneCode: null,
       scoreFor: Number(scoreFor),
       scoreAgainst: Number(scoreAgainst),
       note: note.trim(),
@@ -136,24 +135,6 @@ export function GameSheet({ open, onClose }: GameSheetProps) {
             }`}
           >
             {label}
-          </button>
-        ))}
-      </div>
-
-      <span className="text-xs font-extrabold text-ink-2">좌석 구역</span>
-      <div className="flex flex-wrap gap-1.5">
-        {ZONE_ORDER.map((code) => (
-          <button
-            key={code}
-            type="button"
-            onClick={() => setZoneCode(code)}
-            className={`rounded-full border px-3 py-[7px] text-xs font-bold transition ${
-              zoneCode === code
-                ? "border-brand bg-brand text-white"
-                : "border-line bg-white text-[#475467]"
-            }`}
-          >
-            {ZONE_BY_CODE[code]?.short ?? code}
           </button>
         ))}
       </div>

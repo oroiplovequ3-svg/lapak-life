@@ -1,10 +1,13 @@
 /**
- * 시야 후기 사진을 브라우저에서 바로 쓸 수 있는 크기로 줄입니다.
+ * 첨부 사진(시야 후기 · 직관 기록)을 브라우저에서 바로 쓸 수 있는 크기로 줄입니다.
  * - 폰으로 찍은 4~8MB 사진도 긴 변 1000px · JPEG로 다시 그려 장당 140KB 아래로 맞춥니다.
  * - 데모 모드(localStorage)에서도 용량이 터지지 않고, Supabase Storage에 올릴 때도 그대로 씁니다.
  */
 
 export const MAX_REVIEW_PHOTOS = 3;
+
+/** 직관 기록 카드에 붙일 수 있는 사진 수 */
+export const MAX_GAME_PHOTOS = 3;
 
 /** 장당 목표 용량 */
 export const PHOTO_TARGET_BYTES = 140 * 1024;
@@ -78,7 +81,7 @@ async function loadDrawable(file: File): Promise<Drawable> {
 }
 
 /** 파일 → 축소된 JPEG data URL */
-export async function prepareReviewPhoto(file: File): Promise<PreparedPhoto> {
+export async function preparePhoto(file: File): Promise<PreparedPhoto> {
   if (!file.type.startsWith("image/")) {
     throw new Error("이미지 파일만 첨부할 수 있어요");
   }
@@ -125,3 +128,6 @@ export async function prepareReviewPhoto(file: File): Promise<PreparedPhoto> {
     image.release();
   }
 }
+
+/** 시야 후기에서 쓰던 이름 (기존 코드 호환) */
+export const prepareReviewPhoto = preparePhoto;

@@ -1,8 +1,13 @@
 "use client";
 
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
 
 import { Icon } from "@/components/icons";
+import {
+  PhotoLightbox,
+  PhotoTiles,
+  type PhotoLightboxState,
+} from "@/components/photo-gallery";
 import { useApp } from "@/components/providers/app-provider";
 import { categoryOf } from "@/lib/data/categories";
 import { FOOD_BY_ID } from "@/lib/data/foods";
@@ -30,6 +35,8 @@ export function MyScreen({ onOpenPost, onCompose, onAddGame }: MyScreenProps) {
     toggleSaveZone,
     toggleSaveFood,
   } = useApp();
+
+  const [lightbox, setLightbox] = useState<PhotoLightboxState | null>(null);
 
   const myPosts = useMemo(() => posts.filter((post) => post.mine), [posts]);
 
@@ -175,40 +182,48 @@ export function MyScreen({ onOpenPost, onCompose, onAddGame }: MyScreenProps) {
             return (
               <div
                 key={game.id}
-                className="flex items-center gap-2.5 border-b border-line-soft py-[11px] last:border-none"
+                className="border-b border-line-soft py-[11px] last:border-none"
               >
-                <div
-                  className={`grid h-6 w-6 flex-none place-items-center rounded-lg text-[11px] font-extrabold ${
-                    result === "W"
-                      ? "bg-[#ECFDF3] text-[#039855]"
-                      : result === "L"
-                        ? "bg-[#FEF3F2] text-[#B42318]"
-                        : "bg-[#FFFAEB] text-[#B54708]"
-                  }`}
-                >
-                  {result === "W" ? "승" : result === "L" ? "패" : "무"}
-                </div>
-                <div className="min-w-0 flex-1">
-                  <div className="text-[13px] font-extrabold tracking-tight">
-                    {formatDotDate(game.playedOn)} vs {game.opponent}
-                    {game.homeAway === "away" ? " (원정)" : ""}
+                <div className="flex items-center gap-2.5">
+                  <div
+                    className={`grid h-6 w-6 flex-none place-items-center rounded-lg text-[11px] font-extrabold ${
+                      result === "W"
+                        ? "bg-[#ECFDF3] text-[#039855]"
+                        : result === "L"
+                          ? "bg-[#FEF3F2] text-[#B42318]"
+                          : "bg-[#FFFAEB] text-[#B54708]"
+                    }`}
+                  >
+                    {result === "W" ? "승" : result === "L" ? "패" : "무"}
                   </div>
-                  <div className="mt-0.5 text-[11px] font-semibold text-ink-faint">
-                    {game.zoneCode ? (ZONE_BY_CODE[game.zoneCode]?.short ?? game.zoneCode) : "-"}
-                    {game.note ? ` · ${game.note}` : ""}
+                  <div className="min-w-0 flex-1">
+                    <div className="text-[13px] font-extrabold tracking-tight">
+                      {formatDotDate(game.playedOn)} vs {game.opponent}
+                      {game.homeAway === "away" ? " (원정)" : ""}
+                    </div>
+                    <div className="mt-0.5 text-[11px] font-semibold text-ink-faint">
+                      {game.zoneCode ? (ZONE_BY_CODE[game.zoneCode]?.short ?? game.zoneCode) : "-"}
+                      {game.note ? ` · ${game.note}` : ""}
+                    </div>
                   </div>
+                  <span className="text-[13px] font-extrabold tracking-tight text-ink-2">
+                    {game.scoreFor} : {game.scoreAgainst}
+                  </span>
+                  <button
+                    type="button"
+                    aria-label="기록 삭제"
+                    onClick={() => void deleteGame(game.id)}
+                    className="flex-none rounded-lg p-1.5 text-[#C4CBD6]"
+                  >
+                    <Icon name="trash" size={15} />
+                  </button>
                 </div>
-                <span className="text-[13px] font-extrabold tracking-tight text-ink-2">
-                  {game.scoreFor} : {game.scoreAgainst}
-                </span>
-                <button
-                  type="button"
-                  aria-label="기록 삭제"
-                  onClick={() => void deleteGame(game.id)}
-                  className="flex-none rounded-lg p-1.5 text-[#C4CBD6]"
-                >
-                  <Icon name="trash" size={15} />
-                </button>
+                <PhotoTiles
+                  urls={game.photoUrls ?? []}
+                  onOpen={(index) => setLightbox({ urls: game.photoUrls, index })}
+                  singleHeight={150}
+                  label="직관 기록 사진"
+                />
               </div>
             );
           })
@@ -335,6 +350,15 @@ export function MyScreen({ onOpenPost, onCompose, onAddGame }: MyScreenProps) {
       <p className="break-keep px-2.5 pt-1 text-center text-[10.5px] leading-relaxed text-[#AEB6C2]">
         직관 성적은 이 앱에 저장한 기록만 계산됩니다.
       </p>
+
+      {lightbox ? (
+        <PhotoLightbox
+          state={lightbox}
+          onClose={() => setLightbox(null)}
+          onPick={(index) => setLightbox({ ...lightbox, index })}
+          label="직관 기록 사진"
+        />
+      ) : null}
     </div>
   );
 }

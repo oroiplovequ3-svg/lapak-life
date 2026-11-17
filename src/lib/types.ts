@@ -107,6 +107,8 @@ export interface Game {
   scoreFor: number;
   scoreAgainst: number;
   note: string;
+  /** 직관 기록에 첨부한 사진 (최대 3장 · 데모는 축소된 data URL, 연동 시 Storage 공개 URL) */
+  photoUrls: string[];
   createdAt: string;
 }
 
@@ -149,4 +151,5 @@ export interface NewGameInput {
   scoreFor: number;
   scoreAgainst: number;
   note: string;
+  photoUrls?: string[];
 }

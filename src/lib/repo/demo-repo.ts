@@ -109,8 +109,8 @@ export class DemoRepository implements Repository {
   }
 
   /**
-   * localStorage 저장. 후기 사진(data URL) 때문에 용량이 넘치면
-   * 가장 오래된 내 후기 사진부터 비우고 다시 시도합니다.
+   * localStorage 저장. 첨부 사진(data URL) 때문에 용량이 넘치면
+   * 가장 오래된 후기·직관 기록의 사진부터 비우고 다시 시도합니다.
    */
   private save(): "ok" | "pruned" | "failed" {
     if (typeof window === "undefined") return "ok";
@@ -126,15 +126,25 @@ export class DemoRepository implements Repository {
       // 용량 초과 → 아래에서 사진부터 정리합니다.
     }
 
-    for (let i = this.persist.reviews.length - 1; i >= 0; i -= 1) {
-      const review = this.persist.reviews[i];
+    // 오래된 후기·직관 기록의 사진부터 하나씩 비우며 다시 저장합니다.
+    const targets: { createdAt: string; clear: () => void }[] = [];
+    for (const review of this.persist.reviews) {
       if (!review.photoUrls?.length) continue;
-      review.photoUrls = [];
+      targets.push({ createdAt: review.createdAt, clear: () => (review.photoUrls = []) });
+    }
+    for (const game of this.persist.games) {
+      if (!game.photoUrls?.length) continue;
+      targets.push({ createdAt: game.createdAt, clear: () => (game.photoUrls = []) });
+    }
+    targets.sort((a, b) => (a.createdAt < b.createdAt ? -1 : 1));
+
+    for (const target of targets) {
+      target.clear();
       try {
         write();
         return "pruned";
       } catch {
-        // 다음(더 최근) 후기 사진도 비워봅니다.
+        // 다음(더 최근) 항목의 사진도 비워봅니다.
       }
     }
 
@@ -322,6 +332,7 @@ export class DemoRepository implements Repository {
       scoreFor: g.scoreFor,
       scoreAgainst: g.scoreAgainst,
       note: g.note,
+      photoUrls: [],
       createdAt: new Date(g.playedOn).toISOString(),
     }));
     return [...this.persist.games, ...seeded].sort((a, b) =>
@@ -340,10 +351,16 @@ export class DemoRepository implements Repository {
       scoreFor: input.scoreFor,
       scoreAgainst: input.scoreAgainst,
       note: input.note,
+      photoUrls: (input.photoUrls ?? []).filter(Boolean).slice(0, 3),
       createdAt: new Date().toISOString(),
     };
     this.persist.games.unshift(game);
-    this.save();
+
+    if (this.save() === "failed") {
+      // 사진을 다 비워도 저장 공간이 없으면 사진 없는 기록으로 남깁니다.
+      game.photoUrls = [];
+      this.save();
+    }
     return game;
   }
 

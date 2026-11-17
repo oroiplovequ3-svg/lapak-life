@@ -42,6 +42,12 @@ function embeddedProfile(row: AnyRow): { nickname: string; avatarUrl: string | n
   return { nickname, avatarUrl: typeof avatar === "string" ? avatar : null };
 }
 
+function photoUrlList(value: unknown): string[] {
+  return Array.isArray(value)
+    ? value.filter((item): item is string => typeof item === "string")
+    : [];
+}
+
 function mapPost(row: AnyRow, viewerId: string | null, likedIds: Set<string>): Post {
   const { nickname } = embeddedProfile(row);
   const id = str(row.id);
@@ -91,9 +97,7 @@ function mapReview(row: AnyRow, viewerId: string | null): ZoneReview {
     seatDetail: str(row.seat_detail),
     stars: num(row.rating, 5),
     body: str(row.body),
-    photoUrls: Array.isArray(row.photo_urls)
-      ? (row.photo_urls as unknown[]).filter((value): value is string => typeof value === "string")
-      : [],
+    photoUrls: photoUrlList(row.photo_urls),
     createdAt: str(row.created_at) || new Date().toISOString(),
     mine: Boolean(viewerId && userId === viewerId),
   };
@@ -110,6 +114,7 @@ function mapGame(row: AnyRow): Game {
     scoreFor: num(row.score_for),
     scoreAgainst: num(row.score_against),
     note: str(row.note),
+    photoUrls: photoUrlList(row.photo_urls),
     createdAt: str(row.created_at) || new Date().toISOString(),
   };
 }
@@ -122,6 +127,12 @@ const REVIEW_COLUMNS =
 
 /** 시야 후기 사진 버킷 (supabase/migrations/002_review_photos.sql) */
 const REVIEW_PHOTO_BUCKET = "review-photos";
+
+/** 직관 기록 사진 버킷 (supabase/migrations/003_checkin_photos.sql) */
+const CHECKIN_PHOTO_BUCKET = "checkin-photos";
+
+const GAME_COLUMNS =
+  "id, user_id, played_on, opponent, home_away, zone_code, score_for, score_against, note, photo_urls, created_at";
 
 function fail(context: string, error: { message: string } | null): never {
   throw new Error(`${context}: ${error?.message ?? "알 수 없는 오류"}`);
@@ -305,11 +316,15 @@ export class SupabaseRepository implements Repository {
 
   /**
    * 브라우저에서 축소한 data URL 사진을 Storage에 올리고 공개 URL을 돌려줍니다.
-   * 사진 업로드가 실패해도 후기 본문 등록은 막지 않습니다.
+   * 사진 업로드가 실패해도 후기·직관 기록 본문 등록은 막지 않습니다.
    */
-  private async uploadReviewPhotos(dataUrls: string[], userId: string | null): Promise<string[]> {
+  private async uploadPhotos(
+    bucketName: string,
+    dataUrls: string[],
+    userId: string | null,
+  ): Promise<string[]> {
     if (!userId || !dataUrls.length) return [];
-    const bucket = this.supabase.storage.from(REVIEW_PHOTO_BUCKET);
+    const bucket = this.supabase.storage.from(bucketName);
     const uploaded: string[] = [];
 
     for (const dataUrl of dataUrls.slice(0, 3)) {
@@ -334,7 +349,11 @@ export class SupabaseRepository implements Repository {
   }
 
   async createReview(input: NewReviewInput, author: Author): Promise<ZoneReview> {
-    const photoUrls = await this.uploadReviewPhotos(input.photoUrls ?? [], author.id);
+    const photoUrls = await this.uploadPhotos(
+      REVIEW_PHOTO_BUCKET,
+      input.photoUrls ?? [],
+      author.id,
+    );
 
     const { data, error } = await this.supabase
       .from("zone_reviews")
@@ -401,7 +420,7 @@ export class SupabaseRepository implements Repository {
     if (!viewerId) return [];
     const { data, error } = await this.supabase
       .from("games")
-      .select("id, user_id, played_on, opponent, home_away, zone_code, score_for, score_against, note, created_at")
+      .select(GAME_COLUMNS)
       .eq("user_id", viewerId)
       .order("played_on", { ascending: false });
 
@@ -410,6 +429,12 @@ export class SupabaseRepository implements Repository {
   }
 
   async createGame(input: NewGameInput, viewerId: string): Promise<Game> {
+    const photoUrls = await this.uploadPhotos(
+      CHECKIN_PHOTO_BUCKET,
+      input.photoUrls ?? [],
+      viewerId,
+    );
+
     const { data, error } = await this.supabase
       .from("games")
       .insert({
@@ -421,8 +446,9 @@ export class SupabaseRepository implements Repository {
         score_for: input.scoreFor,
         score_against: input.scoreAgainst,
         note: input.note,
+        photo_urls: photoUrls,
       })
-      .select("id, user_id, played_on, opponent, home_away, zone_code, score_for, score_against, note, created_at")
+      .select(GAME_COLUMNS)
       .single();
 
     if (error || !data) fail("직관 기록을 저장하지 못했습니다", error);

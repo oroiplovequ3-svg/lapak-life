@@ -21,10 +21,9 @@ public/images/lapak-seatmap.jpg (원본 좌석안내도, 1206×1092)를 **읽기
     I1   원정 응원석          (파랑, 1루 1~5)
     N1   1루 내야지정석       (보라, 1루 6~13)
   4층
-    SB   스윗박스             (자주 띠, 3루 쪽 S1~S7)
+    SB   스윗박스             (자주 띠 전체 — 3루 쪽 S1~S7 세로 띠 + 내야를 감싸는 띠)
     PF   파티플로어 라이브석   (갈색, 3루 끝)
   5층 SKY
-    SH   SKY 하단 지정석      (자주 띠 U1~U31)
     U3   3루 SKY 상단 지정석   (남색)
     UC   중앙 SKY 상단 지정석  (남색, 하단 중앙)
     U1   1루 SKY 상단 지정석   (남색)
@@ -75,9 +74,11 @@ MID = 603  # 홈플레이트 기준 좌(3루) / 우(1루) 경계 x
 ZONES = [
     'C', 'CT', 'T3', 'T1', 'E3', 'E1', 'BZ', 'N3', 'I1', 'N1',
     'SB', 'PF',
-    'SH', 'U3', 'UC', 'U1', 'SKB', 'SF',
+    'U3', 'UC', 'U1', 'SKB', 'SF',
     'OF', 'OC', 'RT', 'OP', 'DG', 'CP',
 ]
+# SB 는 좌측 세로 띠와 내야를 감싸는 띠로 나눠 뽑은 뒤 하나로 붙입니다.
+EXTRA = ['SB_BAND']
 
 
 def assign(color, cx, cy, area, bbox):
@@ -110,10 +111,10 @@ def assign(color, cx, cy, area, bbox):
         # 가운데 'VIP' 두 칸은 중앙테이블석 뒤줄이라 CT 로 붙입니다.
         if 490 < cx < 710 and 950 < cy < 995 and area > 1500:
             return 'CT'
-        # 3루 쪽 세로 띠(S1~S7)는 스윗박스, 나머지 자주 띠는 SKY 하단 지정석.
+        # 자주 띠는 전부 스윗박스입니다. 좁은 세로 띠(S1~S7)는 따로 뽑아 이어 붙입니다.
         if bbox[0] + bbox[2] <= 240:
             return 'SB'
-        return 'SH'
+        return 'SB_BAND'
 
     if color == 'brown':
         return 'PF'
@@ -150,7 +151,7 @@ def assign(color, cx, cy, area, bbox):
     return None
 
 
-cells = {z: [] for z in ZONES}
+cells = {z: [] for z in ZONES + EXTRA}
 for color, rgb in PAL.items():
     r, g, b = rgb
     lo = np.array([max(0, b - TOL), max(0, g - TOL), max(0, r - TOL)], np.uint8)
@@ -207,8 +208,9 @@ for small in ('E3', 'E1'):
     outlines[small] = outline_of(cells[small], approx=3.0, close=5, open_=3, pad=2)
 outlines['C'] = outline_of(cells['C'], approx=3.5, close=5, open_=3)
 outlines['CP'] = outline_of(cells['CP'], approx=3.0, min_area=400, close=3, open_=3, pad=6)
-outlines['SB'] = outline_of(cells['SB'], approx=3.0, close=3, open_=3)
-outlines['SH'] = outline_of(cells['SH'], approx=4.0, close=23, open_=3, pad=2)
+# 스윗박스는 좁은 세로 띠(작은 커널)와 넓은 띠(큰 커널)를 따로 뽑아 경로를 이어 붙입니다.
+outlines['SB'] = (outline_of(cells['SB'], approx=3.0, close=3, open_=3)
+                  + outline_of(cells['SB_BAND'], approx=4.0, close=23, open_=3, pad=2))
 outlines['OC'] = outline_of(cells['OC'], approx=2.5, min_area=150, close=7, open_=3, pad=2)
 outlines['SF'] = outline_of(cells['SF'], approx=3.0, min_area=200, close=3, open_=3, pad=3)
 
@@ -256,7 +258,7 @@ L.append('')
 L.append('export const ZONE_SHAPES: ZoneShape[] = [')
 # 뒤에 그려지는 구역이 클릭을 먼저 받습니다 (좁은 익사이팅존을 맨 뒤로).
 order = ['BZ', 'I1', 'N3', 'N1', 'CT', 'C', 'T3', 'T1', 'SB', 'PF',
-         'SH', 'U3', 'UC', 'U1', 'SKB', 'SF', 'OF', 'OC', 'RT', 'OP', 'DG', 'CP', 'E3', 'E1']
+         'U3', 'UC', 'U1', 'SKB', 'SF', 'OF', 'OC', 'RT', 'OP', 'DG', 'CP', 'E3', 'E1']
 for code in order:
     L.append('  {')
     L.append('    code: "%s",' % code)

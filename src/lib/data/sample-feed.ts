@@ -265,12 +265,12 @@ export const SEED_REVIEWS: SeedReview[] = [
   },
   {
     id: "r14",
-    zone: "SH",
+    zone: "SB",
     nickname: "비오는날직관",
     badge: "우천 단골",
-    seat: "SKY 하단 U27 · 3열",
+    seat: "스윗박스 S12 · 3열",
     stars: 4,
-    body: "비 와도 지붕 있어서 끝까지 볼 수 있었어요. 대신 계단이 많아 어르신 모시고는 힘듭니다.",
+    body: "비 와도 지붕 있어서 끝까지 볼 수 있었어요. 박스 안이라 아이 데려가도 자리 이동이 없어서 좋았습니다.",
     minutesAgo: 4320,
   },
   {
@@ -480,6 +480,6 @@ export const SEED_GAMES: SeedGame[] = [
   { playedOn: "2026-10-08", opponent: "kt", homeAway: "home", zoneCode: "T3", scoreFor: 12, scoreAgainst: 1, note: "한국시리즈 5차전 · 우승" },
   { playedOn: "2026-10-07", opponent: "kt", homeAway: "home", zoneCode: "BZ", scoreFor: 7, scoreAgainst: 3, note: "한국시리즈 4차전" },
   { playedOn: "2026-09-21", opponent: "KIA", homeAway: "home", zoneCode: "BZ", scoreFor: 2, scoreAgainst: 5, note: "주말 3연전" },
-  { playedOn: "2026-08-30", opponent: "롯데", homeAway: "away", zoneCode: "SH", scoreFor: 9, scoreAgainst: 4, note: "가족 직관" },
+  { playedOn: "2026-08-30", opponent: "롯데", homeAway: "away", zoneCode: "SB", scoreFor: 9, scoreAgainst: 4, note: "가족 직관" },
   { playedOn: "2026-07-11", opponent: "두산", homeAway: "home", zoneCode: "T1", scoreFor: 6, scoreAgainst: 2, note: "친구와" },
 ];

@@ -25,9 +25,15 @@
 2. 이 저장소의 `supabase/migrations/001_init.sql` 파일 내용 전체를 붙여넣고 **Run**
    - "Success. No rows returned" 가 나오면 성공
 3. 같은 방법으로 `supabase/seed.sql` 내용 전체를 붙여넣고 **Run**
-4. 같은 방법으로 아래 마이그레이션도 차례로 실행합니다 (직관러가 직접 올리는 맛집·주차 팁)
+4. 같은 방법으로 아래 마이그레이션을 **번호 순서대로** 실행합니다 (사진 첨부·권한·카테고리·프로필 사진)
+   - `supabase/migrations/002_review_photos.sql`
+   - `supabase/migrations/003_checkin_photos.sql`
    - `supabase/migrations/004_user_foods.sql`
    - `supabase/migrations/005_user_parkings.sql`
+   - `supabase/migrations/006_user_food_photos.sql`
+   - `supabase/migrations/007_grants.sql`
+   - `supabase/migrations/008_post_categories.sql`
+   - `supabase/migrations/009_profile_avatars.sql` (프로필 사진 Storage 버킷 `avatars`)
 5. 왼쪽 **Table Editor** 에서 `zones`(8행) · `foods`(14행) 가 채워졌는지 확인합니다.
 
 ## 3. 구글 OAuth 클라이언트 만들기 (10분, 무료)
@@ -97,6 +103,7 @@ npm run dev                  # http://localhost:3000
 
 - [ ] Google Cloud **승인된 리디렉션 URI** 에 `https://<프로젝트ID>.supabase.co/auth/v1/callback` 이 있는지 (이미 3-3에서 했으면 패스)
 - [ ] Supabase **Redirect URLs** 에 `https://<내프로젝트>.vercel.app/auth/callback` 이 있는지
+- [ ] `009_profile_avatars.sql` 까지 실행됐는지 (안 했으면 프로필 사진을 올릴 때 오류가 납니다)
 - [ ] `004_user_foods.sql` · `005_user_parkings.sql` 까지 실행됐는지 (안 했으면 직관러 섹션은 비어 보입니다)
 - [ ] Vercel의 `NEXT_PUBLIC_SITE_URL`을 최종 주소로 맞추고 **Redeploy**
 - [ ] 폰으로 접속 → 구글 로그인 → 글쓰기 → 라팍톡에 글 올라오는지 확인

@@ -379,7 +379,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
         if (userRef.current) {
           setUser({ ...userRef.current, nickname: next.nickname, avatarUrl: next.avatarUrl });
         }
-        // 내가 쓴 글·댓글·후기·맛집·주차 팁과 랍톡 피드까지 새 이름·사진으로 다시 그립니다.
+        // 내가 쓴 글·댓글·후기·맛집·주차 팁과 라팍톡 피드까지 새 이름·사진으로 다시 그립니다.
         await reload();
         toast("프로필을 저장했어요");
         return true;

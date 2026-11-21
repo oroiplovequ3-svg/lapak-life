@@ -1,6 +1,6 @@
 "use client";
 
-import { useRef, useState, type ChangeEvent } from "react";
+import { useEffect, useRef, useState, type ChangeEvent } from "react";
 
 import { Icon, Stars } from "@/components/icons";
 import { useApp } from "@/components/providers/app-provider";
@@ -33,6 +33,11 @@ export function ReviewSheet({ open, onClose, initialZone = "T3", onPosted }: Rev
   const [photos, setPhotos] = useState<PreparedPhoto[]>([]);
   const [busy, setBusy] = useState(false);
   const [submitting, setSubmitting] = useState(false);
+
+  // 시트를 열 때마다 지금 고른 구역이 미리 선택되게 맞춥니다.
+  useEffect(() => {
+    if (open) setZone(initialZone);
+  }, [open, initialZone]);
 
   const reset = () => {
     setBody("");
@@ -96,7 +101,7 @@ export function ReviewSheet({ open, onClose, initialZone = "T3", onPosted }: Rev
   const totalSize = photos.reduce((sum, photo) => sum + photo.bytes, 0);
 
   return (
-    <Sheet open={open} title="시야 후기 올리기" onClose={onClose}>
+    <Sheet open={open} title="직관 시야 후기 쓰기" onClose={onClose}>
       <span className="text-xs font-extrabold text-ink-2">구역</span>
       <div className="flex flex-wrap gap-1.5">
         {ZONE_ORDER.map((code) => (

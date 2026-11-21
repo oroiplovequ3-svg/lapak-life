@@ -31,7 +31,7 @@ const TITLES: Record<Tab, string> = {
 
 const SUBS: Record<Tab, string> = {
   home: "삼성 라이온즈 팬 커뮤니티",
-  seat: "구역별 시야와 유저 후기",
+  seat: "구역별 시야와 직관 후기",
   food: "라팍 먹거리와 주차·교통",
   my: "직관 기록과 저장한 것들",
 };
@@ -100,7 +100,7 @@ export function AppShell() {
           {tab === "seat" ? (
             <button
               type="button"
-              aria-label="시야 후기 올리기"
+              aria-label="직관 시야 후기 작성"
               onClick={() => {
                 setReviewZone("T3");
                 setReviewOpen(true);
@@ -132,7 +132,14 @@ export function AppShell() {
             onGoFood={() => setTab("food")}
           />
         ) : null}
-        {tab === "seat" ? <SeatScreen /> : null}
+        {tab === "seat" ? (
+          <SeatScreen
+            onWriteReview={(zoneCode) => {
+              setReviewZone(zoneCode);
+              setReviewOpen(true);
+            }}
+          />
+        ) : null}
         {tab === "food" ? <FoodScreen /> : null}
         {tab === "my" ? (
           <MyScreen

@@ -19,7 +19,15 @@ import {
 } from "@/lib/data/zones";
 import { formatRelativeTime, initialOf } from "@/lib/utils";
 
-export function SeatScreen() {
+interface SeatScreenProps {
+  /** 후기 작성 시트를 열고, 지금 고른 구역을 미리 선택해 둡니다. */
+  onWriteReview?: (zoneCode: string) => void;
+}
+
+/** '전체 구역'에서 후기를 쓸 때 미리 골라 둘 기본 구역 (홈 응원 3루 테이블) */
+const DEFAULT_REVIEW_ZONE = "T3";
+
+export function SeatScreen({ onWriteReview }: SeatScreenProps) {
   const { zones, reviews, saves, toggleSaveZone, deleteReview } = useApp();
   const [selected, setSelected] = useState<string>("all");
   const [pickerOpen, setPickerOpen] = useState(false);
@@ -35,6 +43,8 @@ export function SeatScreen() {
   );
   const zoneName = selected === "all" ? "전체 구역" : zone?.short ?? selected;
   const family = zoneFamily(zone?.code);
+  const reviewZone = selected === "all" ? DEFAULT_REVIEW_ZONE : selected;
+  const writeReview = () => onWriteReview?.(reviewZone);
 
   // 목록을 열면 화면이 선택기 전체를 보여주게 올리고,
   // 지금 고른 구역이 스크롤 가운데에 오도록 맞춰요.
@@ -326,7 +336,7 @@ export function SeatScreen() {
               ["🦁", "홈 더그아웃이 3루", "다른 구장과 반대예요. 삼성 팬은 3루, 원정 팬은 1루 쪽으로 앉으면 됩니다."],
               ["☀️", "해는 1루 쪽으로", "낮 경기엔 1루 쪽이 햇빛이 강하고 3루 쪽이 그늘이 빨리 옵니다."],
               ["🔭", "지붕은 상층만", "5층 SKY·4층 스윗박스는 지붕이 있고, 내야·외야 일반석은 비를 그대로 맞습니다."],
-              ["👇", "구역을 눌러보세요", "위 '좌석 선택'을 눌러 구역을 고르면 시야 특징과 유저 후기가 나옵니다."],
+              ["👇", "구역을 눌러보세요", "위 '좌석 선택'을 눌러 구역을 고르면 시야 특징과 직관 시야 후기가 나옵니다."],
             ].map(([fi, fl, ft], index, all) => (
               <div
                 key={fl}
@@ -345,9 +355,20 @@ export function SeatScreen() {
 
       <div className="flex items-center justify-between gap-2.5 px-0.5">
         <h2 className="flex items-center gap-1.5 text-[15.5px] font-extrabold tracking-tight2">
-          유저 시야 후기
+          직관 시야 후기
           <span className="text-xs font-bold text-ink-faint">{filteredReviews.length}</span>
         </h2>
+        {onWriteReview ? (
+          <button
+            type="button"
+            onClick={writeReview}
+            aria-label="직관 시야 후기 작성"
+            className="flex flex-none items-center gap-1 rounded-full bg-brand px-2.5 py-[6px] text-[11.5px] font-extrabold tracking-tight2 text-white shadow-brand transition active:scale-[.97]"
+          >
+            <Icon name="plus" size={12} strokeWidth={2.6} />
+            후기 작성
+          </button>
+        ) : null}
       </div>
 
       <div className="flex flex-col gap-2.5">
@@ -410,10 +431,24 @@ export function SeatScreen() {
         ) : (
           <div className="rounded-md2 border border-dashed border-[#D9DEE7] bg-[#FBFCFE] px-4 py-[22px] text-center">
             <div className="mb-[7px] text-[26px]">👀</div>
-            <p className="text-[13px] font-extrabold text-ink-2">이 구역 후기가 아직 없어요</p>
-            <p className="mt-1 text-[11.5px] leading-relaxed text-ink-faint">
-              첫 시야 후기를 남겨보세요.
+            <p className="text-[13px] font-extrabold text-ink-2">
+              {selected === "all" ? "아직 등록된 후기가 없어요" : "이 구역 후기가 아직 없어요"}
             </p>
+            <p className="mt-1 text-[11.5px] leading-relaxed text-ink-faint">
+              {selected === "all"
+                ? "첫 직관 시야 후기를 남겨보세요."
+                : `${zoneName} 첫 직관 시야 후기를 남겨보세요.`}
+            </p>
+            {onWriteReview ? (
+              <button
+                type="button"
+                onClick={writeReview}
+                className="mt-3 inline-flex items-center gap-1 rounded-[11px] bg-brand px-3.5 py-[9px] text-[12px] font-extrabold text-white shadow-brand transition active:scale-[.98]"
+              >
+                <Icon name="plus" size={12} strokeWidth={2.6} />
+                후기 작성
+              </button>
+            ) : null}
           </div>
         )}
       </div>

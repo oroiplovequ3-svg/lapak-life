@@ -6,6 +6,7 @@ import { ToastProvider } from "@/components/providers/toast-provider";
 import "./globals.css";
 
 export const metadata: Metadata = {
+  metadataBase: new URL("https://inblue-fan.vercel.app"),
   title: "인블루 — 삼성 라이온즈 팬 커뮤니티",
   description:
     "인블루(INBLUE)는 라팍(대구 삼성라이온즈파크)에 가는 사람이, 가기 전에·있는 동안·다녀온 뒤에 쓰는 팬 커뮤니티입니다. 좌석 시야 후기, 먹거리·주차 정보, 직관 기록.",
@@ -18,11 +19,26 @@ export const metadata: Metadata = {
   openGraph: {
     title: "인블루 — 삼성 라이온즈 팬 커뮤니티",
     description:
-      "라팍(대구 삼성라이온즈파크)에 가는 사람이, 가기 전에·있는 동안·다녀온 뒤에 쓰는 팬 커뮤니티. 좌석 시야 후기, 먹거리·주차 정보, 직관 기록.",
+      "라팍(대구 삼성라이온즈파크)에 가는 사람이, 가기 전에·있는 동안·다녀온 뒤에 쓰는 팬 커뮤니티. 좌석 시야, 먹거리·주차, 직관 기록.",
+    url: "https://inblue-fan.vercel.app",
     siteName: "인블루",
     locale: "ko_KR",
     type: "website",
-    images: [{ url: "/images/lapak-mascot.png", width: 640, height: 640, alt: "인블루 마스코트" }],
+    images: [
+      {
+        url: "/og-inblue.png",
+        width: 1200,
+        height: 630,
+        alt: "인블루 (INBLUE) — 삼성 라이온즈 팬 커뮤니티",
+      },
+    ],
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: "인블루 — 삼성 라이온즈 팬 커뮤니티",
+    description:
+      "라팍(대구 삼성라이온즈파크) 직관 팬 커뮤니티. 좌석 시야, 먹거리·주차, 직관 기록.",
+    images: [{ url: "/og-inblue.png", alt: "인블루 (INBLUE) — 삼성 라이온즈 팬 커뮤니티" }],
   },
 };
 

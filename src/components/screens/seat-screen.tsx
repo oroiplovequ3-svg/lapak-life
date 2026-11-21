@@ -23,6 +23,7 @@ export function SeatScreen() {
   const [selected, setSelected] = useState<string>("all");
   const [pickerOpen, setPickerOpen] = useState(false);
   const [lightbox, setLightbox] = useState<PhotoLightboxState | null>(null);
+  const pickerRef = useRef<HTMLElement | null>(null);
   const listRef = useRef<HTMLDivElement | null>(null);
   const selectedRowRef = useRef<HTMLButtonElement | null>(null);
   const zone =
@@ -34,11 +35,19 @@ export function SeatScreen() {
   const zoneName = selected === "all" ? "전체 구역" : zone?.short ?? selected;
   const family = zoneFamily(zone?.code);
 
-  // 목록을 열면 지금 고른 구역이 스크롤 가운데에 보이게 맞춰요.
+  // 목록을 열면 화면이 선택기 전체를 보여주게 올리고,
+  // 지금 고른 구역이 스크롤 가운데에 오도록 맞춰요.
   useEffect(() => {
     if (!pickerOpen) return;
+    const picker = pickerRef.current;
     const list = listRef.current;
     const row = selectedRowRef.current;
+    const screen = document.getElementById("screen");
+    if (picker && screen) {
+      const pickerRect = picker.getBoundingClientRect();
+      const screenRect = screen.getBoundingClientRect();
+      screen.scrollTop += pickerRect.top - screenRect.top - 8;
+    }
     if (!list || !row) return;
     const listRect = list.getBoundingClientRect();
     const rowRect = row.getBoundingClientRect();
@@ -75,7 +84,10 @@ export function SeatScreen() {
         </p>
       </section>
 
-      <section className="overflow-hidden rounded-md2 border border-line bg-white shadow-card">
+      <section
+        ref={pickerRef}
+        className="overflow-hidden rounded-md2 border border-line bg-white shadow-card"
+      >
         <button
           type="button"
           onClick={() => setPickerOpen((open) => !open)}

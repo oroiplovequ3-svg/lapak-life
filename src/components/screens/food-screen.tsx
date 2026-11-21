@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 
+import { Avatar } from "@/components/avatar";
 import { DeleteButton } from "@/components/delete-button";
 import { Icon, Stars } from "@/components/icons";
 import {
@@ -77,6 +78,12 @@ function UserFoodCard({
           </div>
           <div className="mt-[3px] flex items-center gap-1 text-[10.5px] font-semibold text-ink-faint">
             <Stars value={food.rating} size={10} />
+            <Avatar
+              nickname={food.nickname}
+              avatarUrl={food.avatarUrl}
+              size={16}
+              className="ml-0.5 bg-brand-50 text-[8.5px] text-brand"
+            />
             <span className="ml-0.5">{food.nickname}</span>
           </div>
           {food.menu ? (
@@ -128,8 +135,14 @@ function UserParkingCard({
               {parking.isFree ? "무료" : parking.feeNote || "유료"}
             </span>
           </div>
-          <div className="mt-[3px] break-keep text-[10.5px] font-semibold text-ink-faint">
-            {[parking.location, parking.walkTime, parking.nickname].filter(Boolean).join(" · ")}
+          <div className="mt-[3px] flex items-center gap-1 break-keep text-[10.5px] font-semibold text-ink-faint">
+            <Avatar
+              nickname={parking.nickname}
+              avatarUrl={parking.avatarUrl}
+              size={16}
+              className="flex-none bg-brand-50 text-[8.5px] text-brand"
+            />
+            <span>{[parking.location, parking.walkTime, parking.nickname].filter(Boolean).join(" · ")}</span>
           </div>
           {parking.tip ? (
             <div className="mt-1.5 break-keep rounded-[9px] bg-[#F8FAFC] px-[9px] py-[7px] text-[11.5px] leading-[1.5] text-[#475467]">

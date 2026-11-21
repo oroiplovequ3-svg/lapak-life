@@ -18,6 +18,7 @@ import type {
   NewUserFoodInput,
   NewUserParkingInput,
   Post,
+  ProfileUpdate,
   Saves,
   UserFood,
   UserParking,
@@ -27,11 +28,13 @@ import type {
 import { minutesAgoISO } from "@/lib/utils";
 import { MAX_USER_FOOD_PHOTOS } from "@/lib/image";
 
-import type { Repository, SaveTargetType } from "./types";
+import { DEMO_AUTHOR, type Repository, type SaveTargetType } from "./types";
 
 const STORAGE_KEY = "lapak-life:demo:v1";
 
 interface DemoPersist {
+  /** 데모 모드의 내 프로필 (닉네임·프로필 사진) */
+  profile: Author;
   liked: string[];
   posts: Post[];
   extraComments: Record<string, Comment[]>;
@@ -45,6 +48,7 @@ interface DemoPersist {
 
 function emptyPersist(): DemoPersist {
   return {
+    profile: { ...DEMO_AUTHOR },
     liked: [],
     posts: [],
     extraComments: {},
@@ -68,6 +72,7 @@ function readPersist(): DemoPersist {
       ...base,
       ...parsed,
       saves: { ...base.saves, ...(parsed.saves ?? {}) },
+      profile: { ...base.profile, ...(parsed.profile ?? {}), id: null },
       extraComments: parsed.extraComments ?? {},
       userFoods: parsed.userFoods ?? [],
       userParkings: parsed.userParkings ?? [],
@@ -83,6 +88,7 @@ function seedComments(sp: SeedPost): Comment[] {
     postId: sp.id,
     userId: null,
     nickname: c.nickname,
+    avatarUrl: null,
     body: c.body,
     createdAt: minutesAgoISO(c.minutesAgo),
     mine: false,
@@ -94,6 +100,7 @@ function seedPostToPost(sp: SeedPost, liked: boolean, commentCount: number): Pos
     id: sp.id,
     userId: null,
     nickname: sp.nickname,
+    avatarUrl: null,
     badge: sp.badge,
     category: sp.category,
     body: sp.body,
@@ -118,6 +125,37 @@ export class DemoRepository implements Repository {
 
   constructor() {
     this.persist = readPersist();
+  }
+
+  /** 데모 모드에서 내가 보이는 이름·사진 */
+  private get me(): Author {
+    return this.persist.profile;
+  }
+
+  async loadProfile(): Promise<Author> {
+    return { ...this.me, id: null };
+  }
+
+  /**
+   * 데모 모드 프로필 저장. 사진은 브라우저에서 줄인 data URL 그대로
+   * localStorage 에 넣고, 닉네임·사진은 내가 쓴 글·후기 표시에도 바로 반영합니다.
+   */
+  async updateProfile(input: ProfileUpdate): Promise<Author> {
+    const nickname = input.nickname.trim();
+    if (nickname.length < 2 || nickname.length > 16) {
+      throw new Error("닉네임은 2~16자로 정해주세요");
+    }
+
+    const avatarUrl =
+      input.avatarDataUrl === undefined ? this.me.avatarUrl : input.avatarDataUrl;
+
+    this.persist.profile = { id: null, nickname, avatarUrl };
+    if (this.save() === "failed") {
+      throw new Error(
+        "브라우저 저장 공간이 부족해 프로필 사진을 저장하지 못했어요. 더 작은 사진으로 다시 시도해 주세요.",
+      );
+    }
+    return { ...this.persist.profile };
   }
 
   /**
@@ -198,6 +236,8 @@ export class DemoRepository implements Repository {
       .filter((p) => !deleted.has(p.id))
       .map((p) => ({
         ...p,
+        nickname: this.me.nickname,
+        avatarUrl: this.me.avatarUrl,
         liked: liked.has(p.id),
         likeCount: p.likeCount + (liked.has(p.id) ? 1 : 0),
         commentCount: extra[p.id]?.length ?? 0,
@@ -214,6 +254,7 @@ export class DemoRepository implements Repository {
       id: `demo-post-${Date.now()}`,
       userId: null,
       nickname: author.nickname,
+      avatarUrl: author.avatarUrl ?? null,
       badge: "나",
       category: input.category,
       body: input.body,
@@ -258,7 +299,14 @@ export class DemoRepository implements Repository {
     const seeded = SEED_POSTS.find((p) => p.id === postId);
     const base = seeded ? seedComments(seeded) : [];
     const extra = this.persist.extraComments[postId] ?? [];
-    return [...base, ...extra];
+    return [
+      ...base,
+      ...extra.map((comment) =>
+        comment.mine
+          ? { ...comment, nickname: this.me.nickname, avatarUrl: this.me.avatarUrl }
+          : comment,
+      ),
+    ];
   }
 
   async addComment(postId: string, body: string, author: Author): Promise<Comment> {
@@ -267,6 +315,7 @@ export class DemoRepository implements Repository {
       postId,
       userId: null,
       nickname: author.nickname,
+      avatarUrl: author.avatarUrl ?? null,
       body,
       createdAt: new Date().toISOString(),
       mine: true,
@@ -293,6 +342,7 @@ export class DemoRepository implements Repository {
       zoneCode: r.zone,
       userId: null,
       nickname: r.nickname,
+      avatarUrl: null,
       badge: r.badge,
       seatDetail: r.seat,
       stars: r.stars,
@@ -301,7 +351,14 @@ export class DemoRepository implements Repository {
       createdAt: minutesAgoISO(r.minutesAgo),
       mine: false,
     }));
-    return [...this.persist.reviews, ...seeded];
+    return [
+      ...this.persist.reviews.map((review) => ({
+        ...review,
+        nickname: this.me.nickname,
+        avatarUrl: this.me.avatarUrl,
+      })),
+      ...seeded,
+    ];
   }
 
   async createReview(input: NewReviewInput, author: Author): Promise<ZoneReview> {
@@ -310,6 +367,7 @@ export class DemoRepository implements Repository {
       zoneCode: input.zoneCode,
       userId: null,
       nickname: author.nickname,
+      avatarUrl: author.avatarUrl ?? null,
       badge: "나",
       seatDetail: input.seatDetail || ZONES.find((z) => z.code === input.zoneCode)?.name || "",
       stars: input.stars,
@@ -402,7 +460,13 @@ export class DemoRepository implements Repository {
 
   /* ── 직관러 맛집 ──────────────────────────────────────────── */
   async loadUserFoods(): Promise<UserFood[]> {
-    return [...this.persist.userFoods, ...SEED_USER_FOODS].map((food) => ({
+    const mine = this.persist.userFoods.map((food) => ({
+      ...food,
+      nickname: this.me.nickname,
+      avatarUrl: this.me.avatarUrl,
+      photoUrls: food.photoUrls ?? [],
+    }));
+    return [...mine, ...SEED_USER_FOODS].map((food) => ({
       ...food,
       photoUrls: food.photoUrls ?? [],
     }));
@@ -413,6 +477,7 @@ export class DemoRepository implements Repository {
       id: `demo-ufood-${Date.now()}`,
       userId: null,
       nickname: author.nickname,
+      avatarUrl: author.avatarUrl ?? null,
       name: input.name,
       menu: input.menu,
       tip: input.tip,
@@ -439,7 +504,12 @@ export class DemoRepository implements Repository {
 
   /* ── 직관러 주차 팁 ──────────────────────────────────────── */
   async loadUserParkings(): Promise<UserParking[]> {
-    return [...this.persist.userParkings, ...SEED_USER_PARKINGS];
+    const mine = this.persist.userParkings.map((parking) => ({
+      ...parking,
+      nickname: this.me.nickname,
+      avatarUrl: this.me.avatarUrl,
+    }));
+    return [...mine, ...SEED_USER_PARKINGS];
   }
 
   async createUserParking(
@@ -450,6 +520,7 @@ export class DemoRepository implements Repository {
       id: `demo-uparking-${Date.now()}`,
       userId: null,
       nickname: author.nickname,
+      avatarUrl: author.avatarUrl ?? null,
       name: input.name,
       location: input.location,
       isFree: input.isFree,

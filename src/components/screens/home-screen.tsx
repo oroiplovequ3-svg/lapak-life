@@ -3,21 +3,25 @@
 import Image from "next/image";
 import { useMemo, useState } from "react";
 
+import { Avatar } from "@/components/avatar";
 import { DeleteButton } from "@/components/delete-button";
 import { Icon } from "@/components/icons";
 import { PostMedia } from "@/components/media-illustration";
 import { useApp } from "@/components/providers/app-provider";
 import { categoryOf, FEED_FILTERS, type FilterId } from "@/lib/data/categories";
 import { isSupabaseConfigured } from "@/lib/supabase/config";
-import { formatRelativeTime, initialOf } from "@/lib/utils";
+import { formatRelativeTime } from "@/lib/utils";
 import type { Comment, Post } from "@/lib/types";
 
 function CommentRow({ comment, onDelete }: { comment: Comment; onDelete: () => void }) {
   return (
     <div className="flex items-start gap-[7px]">
-      <div className="grid h-[25px] w-[25px] flex-none place-items-center rounded-full bg-brand-50 text-[10.5px] font-extrabold text-brand">
-        {initialOf(comment.nickname)}
-      </div>
+      <Avatar
+        nickname={comment.nickname}
+        avatarUrl={comment.avatarUrl}
+        size={25}
+        className="bg-brand-50 text-[10.5px] text-brand"
+      />
       <div className="flex min-w-0 flex-1 items-start gap-1">
         <p className="min-w-0 flex-1 break-keep pt-px text-[12.5px] leading-relaxed text-ink-2">
           <span className="mr-[5px] text-xs font-extrabold text-ink">{comment.nickname}</span>
@@ -75,15 +79,16 @@ function PostCard({ post, highlight }: { post: Post; highlight?: boolean }) {
       data-post-id={post.id}
     >
       <div className="flex items-center gap-2">
-        <div
-          className={`grid h-9 w-9 flex-none place-items-center rounded-full text-[13.5px] font-extrabold ${
+        <Avatar
+          nickname={post.nickname}
+          avatarUrl={post.avatarUrl}
+          size={36}
+          className={
             post.mine
-              ? "bg-gradient-to-br from-brand-500 to-brand text-white"
-              : "bg-brand-50 text-brand"
-          }`}
-        >
-          {initialOf(post.nickname)}
-        </div>
+              ? "bg-gradient-to-br from-brand-500 to-brand text-[13.5px] text-white"
+              : "bg-brand-50 text-[13.5px] text-brand"
+          }
+        />
         <div className="min-w-0 flex-1">
           <div className="flex flex-wrap items-center gap-1">
             <span className="text-[13.5px] font-extrabold tracking-tight">{post.nickname}</span>

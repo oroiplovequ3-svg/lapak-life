@@ -60,6 +60,7 @@ export interface UserFood {
   id: string;
   userId: string | null;
   nickname: string;
+  avatarUrl: string | null;
   name: string;
   menu: string;
   tip: string;
@@ -76,6 +77,7 @@ export interface UserParking {
   id: string;
   userId: string | null;
   nickname: string;
+  avatarUrl: string | null;
   name: string;
   location: string;
   isFree: boolean;
@@ -90,6 +92,7 @@ export interface Post {
   id: string;
   userId: string | null;
   nickname: string;
+  avatarUrl: string | null;
   badge: string;
   category: CategoryId;
   body: string;
@@ -108,6 +111,7 @@ export interface Comment {
   postId: string;
   userId: string | null;
   nickname: string;
+  avatarUrl: string | null;
   body: string;
   createdAt: string;
   mine: boolean;
@@ -118,6 +122,7 @@ export interface ZoneReview {
   zoneCode: string;
   userId: string | null;
   nickname: string;
+  avatarUrl: string | null;
   badge: string;
   seatDetail: string;
   stars: number;
@@ -157,6 +162,15 @@ export interface AppUser extends Author {
 export interface Saves {
   zones: string[];
   foods: string[];
+}
+
+export interface ProfileUpdate {
+  nickname: string;
+  /**
+   * undefined: 지금 사진 유지 · null: 기본 아바타로 되돌리기
+   * string: 브라우저에서 줄인 프로필 사진 data URL
+   */
+  avatarDataUrl?: string | null;
 }
 
 export interface NewPostInput {

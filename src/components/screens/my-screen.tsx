@@ -3,6 +3,7 @@
 import Image from "next/image";
 import { useMemo, useState } from "react";
 
+import { Avatar } from "@/components/avatar";
 import { DeleteButton } from "@/components/delete-button";
 import { Icon } from "@/components/icons";
 import {
@@ -10,11 +11,12 @@ import {
   PhotoTiles,
   type PhotoLightboxState,
 } from "@/components/photo-gallery";
+import { ProfileSheet } from "@/components/profile-sheet";
 import { useApp } from "@/components/providers/app-provider";
 import { categoryOf } from "@/lib/data/categories";
 import { FOOD_BY_ID } from "@/lib/data/foods";
 import { ZONE_BY_CODE } from "@/lib/data/zones";
-import { formatDotDate, formatRelativeTime, initialOf } from "@/lib/utils";
+import { formatDotDate, formatRelativeTime } from "@/lib/utils";
 
 interface MyScreenProps {
   onOpenPost?: (postId: string) => void;
@@ -25,6 +27,7 @@ interface MyScreenProps {
 export function MyScreen({ onOpenPost, onCompose, onAddGame }: MyScreenProps) {
   const {
     user,
+    profile,
     configured,
     signInWithGoogle,
     signOut,
@@ -40,6 +43,7 @@ export function MyScreen({ onOpenPost, onCompose, onAddGame }: MyScreenProps) {
   } = useApp();
 
   const [lightbox, setLightbox] = useState<PhotoLightboxState | null>(null);
+  const [profileOpen, setProfileOpen] = useState(false);
 
   const myPosts = useMemo(() => posts.filter((post) => post.mine), [posts]);
 
@@ -71,12 +75,27 @@ export function MyScreen({ onOpenPost, onCompose, onAddGame }: MyScreenProps) {
       <section className="rounded-md2 border border-line bg-white p-3.5 shadow-card">
         {configured && user ? (
           <div className="flex items-center gap-3">
-            <div className="grid h-[54px] w-[54px] flex-none place-items-center rounded-full bg-gradient-to-br from-brand-500 to-brand text-xl font-extrabold text-white shadow-[0_6px_16px_-6px_rgba(7,76,161,.7)]">
-              {initialOf(user.nickname)}
-            </div>
+            <button
+              type="button"
+              onClick={() => setProfileOpen(true)}
+              aria-label="프로필 사진·닉네임 변경"
+              className="relative flex-none rounded-full transition active:scale-[.97]"
+            >
+              <Avatar
+                nickname={user.nickname}
+                avatarUrl={user.avatarUrl}
+                size={54}
+                className="bg-gradient-to-br from-brand-500 to-brand text-xl text-white shadow-[0_6px_16px_-6px_rgba(7,76,161,.7)]"
+              />
+              <span className="absolute -bottom-0.5 -right-0.5 grid h-[21px] w-[21px] place-items-center rounded-full border-2 border-white bg-brand text-white shadow-sm">
+                <Icon name="camera" size={11} strokeWidth={2.2} />
+              </span>
+            </button>
             <div className="min-w-0 flex-1">
-              <div className="text-[17px] font-extrabold tracking-tight3">{user.nickname}</div>
-              <div className="mt-[3px] text-[11.5px] font-semibold text-ink-faint">
+              <div className="truncate text-[17px] font-extrabold tracking-tight3">
+                {user.nickname}
+              </div>
+              <div className="mt-[3px] truncate text-[11.5px] font-semibold text-ink-faint">
                 {user.email ?? "구글 로그인"} · 삼성 라이온즈 팬
               </div>
               <div className="mt-[7px] flex gap-1.5">
@@ -88,13 +107,62 @@ export function MyScreen({ onOpenPost, onCompose, onAddGame }: MyScreenProps) {
                 </span>
               </div>
             </div>
-            <button
-              type="button"
-              onClick={() => void signOut()}
-              className="flex-none rounded-[11px] bg-[#F3F5F9] px-3 py-2 text-[11.5px] font-bold text-ink-muted"
-            >
-              로그아웃
-            </button>
+            <div className="flex flex-none flex-col items-stretch gap-1.5">
+              <button
+                type="button"
+                onClick={() => setProfileOpen(true)}
+                className="rounded-[11px] bg-brand-50 px-3 py-2 text-[11.5px] font-extrabold text-brand-600"
+              >
+                프로필 설정
+              </button>
+              <button
+                type="button"
+                onClick={() => void signOut()}
+                className="rounded-[11px] bg-[#F3F5F9] px-3 py-2 text-[11.5px] font-bold text-ink-muted"
+              >
+                로그아웃
+              </button>
+            </div>
+          </div>
+        ) : !configured ? (
+          <div className="flex flex-col items-start gap-2.5">
+            <div className="flex w-full items-center gap-3">
+              <button
+                type="button"
+                onClick={() => setProfileOpen(true)}
+                aria-label="프로필 사진·닉네임 변경"
+                className="relative flex-none rounded-full transition active:scale-[.97]"
+              >
+                <Avatar
+                  nickname={profile.nickname}
+                  avatarUrl={profile.avatarUrl}
+                  size={54}
+                  className="bg-gradient-to-br from-brand-500 to-brand text-xl text-white shadow-[0_6px_16px_-6px_rgba(7,76,161,.7)]"
+                />
+                <span className="absolute -bottom-0.5 -right-0.5 grid h-[21px] w-[21px] place-items-center rounded-full border-2 border-white bg-brand text-white shadow-sm">
+                  <Icon name="camera" size={11} strokeWidth={2.2} />
+                </span>
+              </button>
+              <div className="min-w-0 flex-1">
+                <div className="truncate text-[17px] font-extrabold tracking-tight3">
+                  {profile.nickname}
+                </div>
+                <div className="mt-[3px] text-[11.5px] font-semibold text-ink-faint">
+                  데모 모드 · 이 브라우저에만 저장돼요
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setProfileOpen(true)}
+                className="flex-none rounded-[11px] bg-brand-50 px-3 py-2 text-[11.5px] font-extrabold text-brand-600"
+              >
+                프로필 설정
+              </button>
+            </div>
+            <p className="rounded-[11px] bg-brand-50 px-3 py-2.5 text-[11.5px] leading-relaxed text-brand">
+              지금은 데모 모드예요. Supabase를 연결하면(SETUP.md 1~4단계) 구글 로그인이
+              활성화되고 프로필도 계정에 저장됩니다.
+            </p>
           </div>
         ) : (
           <div className="flex flex-col items-start gap-2.5">
@@ -380,6 +448,8 @@ export function MyScreen({ onOpenPost, onCompose, onAddGame }: MyScreenProps) {
           label="직관 기록 사진"
         />
       ) : null}
+
+      <ProfileSheet open={profileOpen} onClose={() => setProfileOpen(false)} />
     </div>
   );
 }

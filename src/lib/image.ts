@@ -132,5 +132,54 @@ export async function preparePhoto(file: File): Promise<PreparedPhoto> {
   }
 }
 
+/** 파일 → 프로필 사진용 정사각형 JPEG data URL (가운데를 기준으로 잘라냅니다) */
+export const AVATAR_MAX_EDGE = 320;
+const AVATAR_TARGET_BYTES = 90 * 1024;
+
+export async function prepareAvatar(file: File): Promise<PreparedPhoto> {
+  if (!file.type.startsWith("image/")) {
+    throw new Error("이미지 파일만 프로필 사진으로 쓸 수 있어요");
+  }
+
+  const image = await loadDrawable(file);
+  try {
+    const side = Math.min(image.width, image.height || image.width);
+    const sx = Math.max(0, (image.width - side) / 2);
+    const sy = Math.max(0, (image.height - side) / 2);
+    let edge = Math.max(1, Math.min(AVATAR_MAX_EDGE, side));
+    let quality = 0.86;
+    let dataUrl = "";
+
+    for (let attempt = 0; attempt < 7; attempt += 1) {
+      const canvas = document.createElement("canvas");
+      canvas.width = edge;
+      canvas.height = edge;
+      const ctx = canvas.getContext("2d");
+      if (!ctx) throw new Error("프로필 사진을 처리하지 못했어요");
+      ctx.fillStyle = "#FFFFFF";
+      ctx.fillRect(0, 0, edge, edge);
+      ctx.imageSmoothingEnabled = true;
+      ctx.imageSmoothingQuality = "high";
+      ctx.drawImage(image.source, sx, sy, side, side, 0, 0, edge, edge);
+
+      dataUrl = canvas.toDataURL("image/jpeg", quality);
+      if (approxBytes(dataUrl) <= AVATAR_TARGET_BYTES) break;
+      if (quality > 0.6) quality -= 0.08;
+      else edge = Math.max(64, Math.round(edge * 0.85));
+    }
+
+    return {
+      id: `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+      dataUrl,
+      width: edge,
+      height: edge,
+      bytes: approxBytes(dataUrl),
+      name: file.name || "avatar.jpg",
+    };
+  } finally {
+    image.release();
+  }
+}
+
 /** 시야 후기에서 쓰던 이름 (기존 코드 호환) */
 export const prepareReviewPhoto = preparePhoto;

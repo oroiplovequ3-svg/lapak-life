@@ -9,6 +9,7 @@ import type {
   NewUserFoodInput,
   NewUserParkingInput,
   Post,
+  ProfileUpdate,
   Saves,
   UserFood,
   UserParking,
@@ -26,6 +27,9 @@ export type SaveTargetType = "zone" | "food";
  */
 export interface Repository {
   mode: "demo" | "live";
+  /** 지금 보고 있는 사람의 표시 정보(닉네임·프로필 사진) */
+  loadProfile(viewerId: string | null): Promise<Author>;
+  updateProfile(input: ProfileUpdate, viewerId: string | null): Promise<Author>;
   loadZones(): Promise<Zone[]>;
   loadFoods(): Promise<Food[]>;
   loadPosts(viewerId: string | null): Promise<Post[]>;

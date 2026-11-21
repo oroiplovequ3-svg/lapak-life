@@ -14,6 +14,7 @@ import type {
   NewUserFoodInput,
   NewUserParkingInput,
   Post,
+  ProfileUpdate,
   Saves,
   UserFood,
   UserParking,
@@ -54,7 +55,7 @@ function photoUrlList(value: unknown): string[] {
 }
 
 function mapPost(row: AnyRow, viewerId: string | null, likedIds: Set<string>): Post {
-  const { nickname } = embeddedProfile(row);
+  const { nickname, avatarUrl } = embeddedProfile(row);
   const id = str(row.id);
   const userId = row.user_id ? str(row.user_id) : null;
   const media = row.media === "day" || row.media === "night" ? row.media : null;
@@ -62,6 +63,7 @@ function mapPost(row: AnyRow, viewerId: string | null, likedIds: Set<string>): P
     id,
     userId,
     nickname,
+    avatarUrl,
     badge: viewerId && userId === viewerId ? "나" : "라팍팬",
     category: normalizeCategory(str(row.category) || "review"),
     body: str(row.body),
@@ -77,13 +79,14 @@ function mapPost(row: AnyRow, viewerId: string | null, likedIds: Set<string>): P
 }
 
 function mapComment(row: AnyRow, viewerId: string | null): Comment {
-  const { nickname } = embeddedProfile(row);
+  const { nickname, avatarUrl } = embeddedProfile(row);
   const userId = row.user_id ? str(row.user_id) : null;
   return {
     id: str(row.id),
     postId: str(row.post_id),
     userId,
     nickname,
+    avatarUrl,
     body: str(row.body),
     createdAt: str(row.created_at) || new Date().toISOString(),
     mine: Boolean(viewerId && userId === viewerId),
@@ -91,13 +94,14 @@ function mapComment(row: AnyRow, viewerId: string | null): Comment {
 }
 
 function mapReview(row: AnyRow, viewerId: string | null): ZoneReview {
-  const { nickname } = embeddedProfile(row);
+  const { nickname, avatarUrl } = embeddedProfile(row);
   const userId = row.user_id ? str(row.user_id) : null;
   return {
     id: str(row.id),
     zoneCode: str(row.zone_code),
     userId,
     nickname,
+    avatarUrl,
     badge: viewerId && userId === viewerId ? "나" : "라팍팬",
     seatDetail: str(row.seat_detail),
     stars: num(row.rating, 5),
@@ -141,6 +145,13 @@ const USER_FOOD_PHOTO_BUCKET = "user-food-photos";
 /** 직관 기록 사진 버킷 (supabase/migrations/003_checkin_photos.sql) */
 const CHECKIN_PHOTO_BUCKET = "checkin-photos";
 
+/** 프로필 사진 버킷 (supabase/migrations/009_profile_avatars.sql) */
+const AVATAR_BUCKET = "avatars";
+
+/** 프로필 닉네임 길이 (프로필 설정 시트와 같은 규칙) */
+const NICKNAME_MIN = 2;
+const NICKNAME_MAX = 16;
+
 const GAME_COLUMNS =
   "id, user_id, played_on, opponent, home_away, zone_code, score_for, score_against, note, photo_urls, created_at";
 
@@ -157,12 +168,13 @@ const USER_PARKING_COLUMNS =
   "id, user_id, name, location, is_free, fee_note, walk_time, tip, created_at, profiles(nickname, avatar_url)";
 
 function mapUserFood(row: AnyRow, viewerId: string | null): UserFood {
-  const { nickname } = embeddedProfile(row);
+  const { nickname, avatarUrl } = embeddedProfile(row);
   const userId = row.user_id ? str(row.user_id) : null;
   return {
     id: str(row.id),
     userId,
     nickname,
+    avatarUrl,
     name: str(row.name),
     menu: str(row.menu),
     tip: str(row.tip),
@@ -175,12 +187,13 @@ function mapUserFood(row: AnyRow, viewerId: string | null): UserFood {
 }
 
 function mapUserParking(row: AnyRow, viewerId: string | null): UserParking {
-  const { nickname } = embeddedProfile(row);
+  const { nickname, avatarUrl } = embeddedProfile(row);
   const userId = row.user_id ? str(row.user_id) : null;
   return {
     id: str(row.id),
     userId,
     nickname,
+    avatarUrl,
     name: str(row.name),
     location: str(row.location),
     isFree: typeof row.is_free === "boolean" ? row.is_free : true,
@@ -217,6 +230,111 @@ export class SupabaseRepository implements Repository {
   mode = "live" as const;
 
   constructor(private readonly supabase: SupabaseClient) {}
+
+  /* ── 내 프로필 (닉네임 · 프로필 사진) ─────────────────────── */
+  async loadProfile(viewerId: string | null): Promise<Author> {
+    if (!viewerId) return { id: null, nickname: "라팍팬", avatarUrl: null };
+
+    const { data } = await this.supabase
+      .from("profiles")
+      .select("nickname, avatar_url")
+      .eq("id", viewerId)
+      .maybeSingle();
+
+    const row = (data ?? null) as AnyRow | null;
+    const avatar = row?.avatar_url;
+    return {
+      id: viewerId,
+      nickname: str(row?.nickname) || "라팍팬",
+      avatarUrl: typeof avatar === "string" && avatar ? avatar : null,
+    };
+  }
+
+  /**
+   * 닉네임·프로필 사진을 profiles 에 저장합니다.
+   * 사진은 브라우저에서 정사각형으로 줄인 data URL 을 avatars 버킷에 올리고
+   * 공개 URL 을 avatar_url 에 넣습니다. (null 이면 기본 아바타로 되돌림)
+   */
+  async updateProfile(input: ProfileUpdate, viewerId: string | null): Promise<Author> {
+    if (!viewerId) throw new Error("로그인한 뒤에 프로필을 바꿀 수 있어요");
+
+    const nickname = input.nickname.trim();
+    if (nickname.length < NICKNAME_MIN || nickname.length > NICKNAME_MAX) {
+      throw new Error(`닉네임은 ${NICKNAME_MIN}~${NICKNAME_MAX}자로 정해주세요`);
+    }
+
+    const current = await this.loadProfile(viewerId);
+    let avatarUrl = current.avatarUrl;
+
+    if (input.avatarDataUrl === null) {
+      avatarUrl = null;
+    } else if (typeof input.avatarDataUrl === "string") {
+      avatarUrl = await this.uploadAvatar(input.avatarDataUrl, viewerId);
+    }
+
+    const { data, error } = await this.supabase
+      .from("profiles")
+      .upsert({ id: viewerId, nickname, avatar_url: avatarUrl }, { onConflict: "id" })
+      .select("nickname, avatar_url")
+      .single();
+
+    if (error || !data) fail("프로필을 저장하지 못했습니다", error);
+
+    // 앱 밖(다른 기기·새 로그인)에서도 같은 이름·사진으로 먼저 그릴 수 있게
+    // 세션 메타데이터도 맞춰 둡니다. 실패해도 profiles 가 기준입니다.
+    try {
+      await this.supabase.auth.updateUser({ data: { nickname, avatar_url: avatarUrl } });
+    } catch {
+      // 무시
+    }
+
+    // 사진을 바꿨으면 예전 사진 파일을 정리합니다. (실패해도 그대로 진행)
+    if (current.avatarUrl && current.avatarUrl !== avatarUrl) {
+      await this.removeAvatarFile(current.avatarUrl).catch(() => {});
+    }
+
+    const row = data as AnyRow;
+    return {
+      id: viewerId,
+      nickname: str(row.nickname) || nickname,
+      avatarUrl: typeof row.avatar_url === "string" && row.avatar_url ? row.avatar_url : null,
+    };
+  }
+
+  private async uploadAvatar(dataUrl: string, viewerId: string): Promise<string> {
+    const bucket = this.supabase.storage.from(AVATAR_BUCKET);
+    let blob: Blob;
+    try {
+      blob = await (await fetch(dataUrl)).blob();
+    } catch {
+      throw new Error("프로필 사진을 읽지 못했어요. 다시 선택해 주세요.");
+    }
+
+    const path = `${viewerId}/avatar-${Date.now()}.jpg`;
+    const { error } = await bucket.upload(path, blob, {
+      contentType: blob.type || "image/jpeg",
+      cacheControl: "31536000",
+      upsert: false,
+    });
+
+    if (error) {
+      throw new Error(
+        `프로필 사진을 올리지 못했어요: ${error.message} (프로필 사진 저장소가 준비됐는지 확인해 주세요)`,
+      );
+    }
+
+    return bucket.getPublicUrl(path).data.publicUrl;
+  }
+
+  /** 공개 URL → Storage 경로로 되돌려 예전 프로필 사진을 지웁니다. */
+  private async removeAvatarFile(publicUrl: string): Promise<void> {
+    const marker = `/object/public/${AVATAR_BUCKET}/`;
+    const at = publicUrl.indexOf(marker);
+    if (at < 0) return;
+    const path = decodeURIComponent(publicUrl.slice(at + marker.length).split("?")[0]);
+    if (!path) return;
+    await this.supabase.storage.from(AVATAR_BUCKET).remove([path]);
+  }
 
   async loadZones(): Promise<Zone[]> {
     const { data, error } = await this.supabase

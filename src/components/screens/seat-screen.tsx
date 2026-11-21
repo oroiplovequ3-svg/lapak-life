@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 
+import { Avatar } from "@/components/avatar";
 import { DeleteButton } from "@/components/delete-button";
 import { Icon, Stars } from "@/components/icons";
 import {
@@ -17,7 +18,7 @@ import {
   zoneFamily,
   zoneFullName,
 } from "@/lib/data/zones";
-import { formatRelativeTime, initialOf } from "@/lib/utils";
+import { formatRelativeTime } from "@/lib/utils";
 
 interface SeatScreenProps {
   /** 후기 작성 시트를 열고, 지금 고른 구역을 미리 선택해 둡니다. */
@@ -379,15 +380,16 @@ export function SeatScreen({ onWriteReview }: SeatScreenProps) {
               className="rounded-md2 border border-line bg-white p-[13px] shadow-card"
             >
               <div className="flex items-center gap-2">
-                <div
-                  className={`grid h-8 w-8 flex-none place-items-center rounded-full text-xs font-extrabold ${
+                <Avatar
+                  nickname={review.nickname}
+                  avatarUrl={review.avatarUrl}
+                  size={32}
+                  className={
                     review.mine
-                      ? "bg-gradient-to-br from-brand-500 to-brand text-white"
-                      : "bg-brand-50 text-brand"
-                  }`}
-                >
-                  {initialOf(review.nickname)}
-                </div>
+                      ? "bg-gradient-to-br from-brand-500 to-brand text-xs text-white"
+                      : "bg-brand-50 text-xs text-brand"
+                  }
+                />
                 <div className="min-w-0 flex-1">
                   <div className="flex flex-wrap items-center gap-1">
                     <span className="text-[13.5px] font-extrabold tracking-tight">

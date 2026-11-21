@@ -31,6 +31,7 @@ import type {
   NewUserFoodInput,
   NewUserParkingInput,
   Post,
+  ProfileUpdate,
   Saves,
   UserFood,
   UserParking,
@@ -51,6 +52,8 @@ interface AppContextValue {
   loadError: string | null;
   repoMode: "demo" | "live";
   user: AppUser | null;
+  /** 지금 이 브라우저에서 보이는 내 이름·사진 (데모 모드에서는 저장된 데모 프로필) */
+  profile: Author;
   signingIn: boolean;
   authPrompt: AuthPrompt;
   closeAuthPrompt: () => void;
@@ -68,6 +71,7 @@ interface AppContextValue {
 
   signInWithGoogle: () => Promise<void>;
   signOut: () => Promise<void>;
+  updateProfile: (input: ProfileUpdate) => Promise<boolean>;
 
   createPost: (input: NewPostInput) => Promise<boolean>;
   deletePost: (postId: string) => Promise<void>;
@@ -118,6 +122,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const [ready, setReady] = useState(false);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [user, setUser] = useState<AppUser | null>(null);
+  const [profile, setProfile] = useState<Author>({ ...DEMO_AUTHOR });
   const [signingIn, setSigningIn] = useState(false);
   const [authPrompt, setAuthPrompt] = useState<AuthPrompt>({ open: false, reason: "" });
 
@@ -204,18 +209,29 @@ export function AppProvider({ children }: { children: ReactNode }) {
   /* ── 2. 데이터 로드 (로그인 상태가 바뀌면 다시) ─────────────── */
   const loadAll = useCallback(
     async (repository: Repository, viewerId: string | null) => {
-      const [zoneRows, foodRows, postRows, reviewRows, saveRows, gameRows, userFoodRows, userParkingRows] =
-        await Promise.all([
-          repository.loadZones(),
-          repository.loadFoods(),
-          repository.loadPosts(viewerId),
-          repository.loadReviews(viewerId),
-          repository.loadSaves(viewerId),
-          repository.loadGames(viewerId),
-          repository.loadUserFoods(viewerId),
-          repository.loadUserParkings(viewerId),
-        ]);
+      const [
+        profileRow,
+        zoneRows,
+        foodRows,
+        postRows,
+        reviewRows,
+        saveRows,
+        gameRows,
+        userFoodRows,
+        userParkingRows,
+      ] = await Promise.all([
+        repository.loadProfile(viewerId),
+        repository.loadZones(),
+        repository.loadFoods(),
+        repository.loadPosts(viewerId),
+        repository.loadReviews(viewerId),
+        repository.loadSaves(viewerId),
+        repository.loadGames(viewerId),
+        repository.loadUserFoods(viewerId),
+        repository.loadUserParkings(viewerId),
+      ]);
       return {
+        profileRow,
         zoneRows,
         foodRows,
         postRows,
@@ -238,6 +254,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
       try {
         const result = await loadAll(repo, user?.id ?? null);
         if (!active) return;
+        setProfile(result.profileRow);
         setZones(result.zoneRows);
         setFoods(result.foodRows);
         setPosts(result.postRows);
@@ -284,12 +301,13 @@ export function AppProvider({ children }: { children: ReactNode }) {
     [],
   );
 
-  const author: Author = user ?? DEMO_AUTHOR;
+  const author: Author = user ?? profile;
 
   const reload = useCallback(async () => {
     if (!repo) return;
     try {
       const result = await loadAll(repo, userRef.current?.id ?? null);
+      setProfile(result.profileRow);
       setZones(result.zoneRows);
       setFoods(result.foodRows);
       setPosts(result.postRows);
@@ -337,6 +355,41 @@ export function AppProvider({ children }: { children: ReactNode }) {
     setUser(null);
     toast("로그아웃했어요");
   }, [toast]);
+
+  /* ── 5-1. 프로필 설정 (닉네임 · 프로필 사진) ────────────────── */
+  const updateProfile = useCallback(
+    async (input: ProfileUpdate) => {
+      if (!repo) return false;
+      const nickname = input.nickname.trim();
+      if (nickname.length < 2 || nickname.length > 16) {
+        toast("닉네임은 2~16자로 정해주세요");
+        return false;
+      }
+      if (repo.mode === "live" && !userRef.current) {
+        setAuthPrompt({ open: true, reason: "프로필을 바꾸려면 구글 로그인이 필요해요" });
+        return false;
+      }
+
+      try {
+        const next = await repo.updateProfile(
+          { ...input, nickname },
+          userRef.current?.id ?? null,
+        );
+        setProfile(next);
+        if (userRef.current) {
+          setUser({ ...userRef.current, nickname: next.nickname, avatarUrl: next.avatarUrl });
+        }
+        // 내가 쓴 글·댓글·후기·맛집·주차 팁과 랍톡 피드까지 새 이름·사진으로 다시 그립니다.
+        await reload();
+        toast("프로필을 저장했어요");
+        return true;
+      } catch (error) {
+        toast(errorMessage(error));
+        return false;
+      }
+    },
+    [repo, reload, toast],
+  );
 
   /* ── 6. 피드 ────────────────────────────────────────────────── */
   const createPost = useCallback(
@@ -668,6 +721,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
       loadError,
       repoMode: repo?.mode ?? "demo",
       user,
+      profile,
       signingIn,
       authPrompt,
       closeAuthPrompt: () => setAuthPrompt({ open: false, reason: "" }),
@@ -683,6 +737,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
       userParkings,
       signInWithGoogle,
       signOut,
+      updateProfile,
       createPost,
       deletePost,
       toggleLike,
@@ -706,6 +761,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
       loadError,
       repo,
       user,
+      profile,
       signingIn,
       authPrompt,
       zones,
@@ -720,6 +776,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
       userParkings,
       signInWithGoogle,
       signOut,
+      updateProfile,
       createPost,
       deletePost,
       toggleLike,

@@ -539,23 +539,33 @@ export class SupabaseRepository implements Repository {
   }
 
   async createUserFood(input: NewUserFoodInput, author: Author): Promise<UserFood> {
+    const requested = (input.photoUrls ?? []).length;
     const photoUrls = await this.uploadPhotos(
       USER_FOOD_PHOTO_BUCKET,
       input.photoUrls ?? [],
       author.id,
     );
 
+    // 사진 저장소(user-food-photos 버킷)가 아직 없으면 사진만 조용히 사라지므로 알려줍니다.
+    if (requested > 0 && photoUrls.length === 0) {
+      throw new Error("사진을 저장하지 못했어요. 사진 없이 등록하거나 잠시 후 다시 시도해 주세요.");
+    }
+
+    // 006 이전 스키마(photo_urls 없음)에서도 사진 없는 등록은 되도록,
+    // 사진이 있을 때만 컬럼을 보냅니다.
+    const payload: Record<string, unknown> = {
+      user_id: author.id,
+      name: input.name,
+      menu: input.menu,
+      tip: input.tip,
+      rating: input.rating,
+      is_inside: input.inStadium,
+    };
+    if (photoUrls.length) payload.photo_urls = photoUrls;
+
     const { data, error } = await this.supabase
       .from("user_foods")
-      .insert({
-        user_id: author.id,
-        name: input.name,
-        menu: input.menu,
-        tip: input.tip,
-        rating: input.rating,
-        is_inside: input.inStadium,
-        photo_urls: photoUrls,
-      })
+      .insert(payload)
       .select(USER_FOOD_COLUMNS)
       .single();
 

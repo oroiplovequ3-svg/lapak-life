@@ -7,7 +7,7 @@ import { DeleteButton } from "@/components/delete-button";
 import { Icon } from "@/components/icons";
 import { PostMedia } from "@/components/media-illustration";
 import { useApp } from "@/components/providers/app-provider";
-import { FEED_FILTERS, type FilterId } from "@/lib/data/categories";
+import { categoryOf, FEED_FILTERS, type FilterId } from "@/lib/data/categories";
 import { isSupabaseConfigured } from "@/lib/supabase/config";
 import { formatRelativeTime, initialOf } from "@/lib/utils";
 import type { Comment, Post } from "@/lib/types";
@@ -105,13 +105,7 @@ function PostCard({ post, highlight }: { post: Post; highlight?: boolean }) {
           className="rounded-md px-[7px] py-[2.5px] text-[10.5px] font-extrabold"
           style={{ color: "#0A58CA", background: "#EAF1FD" }}
         >
-          {post.category === "review"
-            ? "직관후기"
-            : post.category === "live"
-              ? "실시간현장"
-              : post.category === "qna"
-                ? "질문"
-                : "굿즈·티켓"}
+          {categoryOf(post.category).label}
         </span>
         {post.mine ? (
           <DeleteButton

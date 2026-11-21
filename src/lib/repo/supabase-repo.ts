@@ -1,5 +1,6 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 
+import { normalizeCategory } from "@/lib/data/categories";
 import { FOODS } from "@/lib/data/foods";
 import { ZONES } from "@/lib/data/zones";
 import type {
@@ -62,7 +63,7 @@ function mapPost(row: AnyRow, viewerId: string | null, likedIds: Set<string>): P
     userId,
     nickname,
     badge: viewerId && userId === viewerId ? "나" : "라팍팬",
-    category: (str(row.category) || "review") as Post["category"],
+    category: normalizeCategory(str(row.category) || "review"),
     body: str(row.body),
     seatZone: row.seat_zone ? str(row.seat_zone) : null,
     seatDetail: row.seat_detail ? str(row.seat_detail) : null,

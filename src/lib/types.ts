@@ -1,4 +1,4 @@
-export type CategoryId = "review" | "live" | "qna" | "market";
+export type CategoryId = "review" | "live" | "talk" | "goods";
 
 export interface Category {
   id: CategoryId;

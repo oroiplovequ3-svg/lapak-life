@@ -316,6 +316,9 @@ export function AppProvider({ children }: { children: ReactNode }) {
       setGames(result.gameRows);
       setUserFoods(result.userFoodRows);
       setUserParkings(result.userParkingRows);
+      // 닉네임·사진이 바뀌었을 수 있으니 펼쳐 둔 댓글은 다음에 열 때 다시 읽습니다.
+      setCommentsByPost({});
+      setCommentsLoaded({});
       setLoadError(null);
     } catch (error) {
       setLoadError(errorMessage(error));

@@ -1,6 +1,7 @@
 "use client";
 
 import Image from "next/image";
+import Link from "next/link";
 import { useMemo, useState } from "react";
 
 import { Avatar } from "@/components/avatar";
@@ -439,6 +440,16 @@ export function MyScreen({ onOpenPost, onCompose, onAddGame }: MyScreenProps) {
       <p className="break-keep px-2.5 pt-1 text-center text-[10.5px] leading-relaxed text-[#AEB6C2]">
         직관 성적은 이 앱에 저장한 기록만 계산됩니다.
       </p>
+
+      <div className="flex items-center justify-center gap-2 pb-0.5 text-[10.5px] font-semibold text-[#9AA3B0]">
+        <Link href="/privacy" className="underline underline-offset-2">
+          개인정보처리방침
+        </Link>
+        <span aria-hidden="true" className="text-[#CBD2DC]">
+          ·
+        </span>
+        <span>인블루 (INBLUE)</span>
+      </div>
 
       {lightbox ? (
         <PhotoLightbox

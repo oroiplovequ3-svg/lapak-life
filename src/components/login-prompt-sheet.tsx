@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useState } from "react";
 
 import { Icon } from "@/components/icons";
@@ -41,6 +42,17 @@ export function LoginPromptSheet() {
       >
         나중에 할게요
       </button>
+      <p className="text-center text-[10.5px] leading-relaxed text-ink-faint">
+        구글 계정 정보(이메일·프로필)는 회원 식별에만 쓰입니다.{" "}
+        <Link
+          href="/privacy"
+          target="_blank"
+          rel="noopener noreferrer"
+          className="font-extrabold text-brand-600 underline underline-offset-2"
+        >
+          개인정보처리방침
+        </Link>
+      </p>
     </Sheet>
   );
 }

@@ -195,6 +195,23 @@ function fail(context: string, error: { message: string } | null): never {
   throw new Error(`${context}: ${error?.message ?? "알 수 없는 오류"}`);
 }
 
+/**
+ * 내가 쓴 행만 지우는 공통 경로.
+ * RLS 가 막으면 에러 없이 0건이 지워지므로, 실제로 지워졌는지 확인까지 합니다.
+ */
+async function deleteOwnRow(
+  supabase: SupabaseClient,
+  table: string,
+  id: string,
+  context: string,
+): Promise<void> {
+  const { data, error } = await supabase.from(table).delete().eq("id", id).select("id");
+  if (error) fail(context, error);
+  if (!data?.length) {
+    throw new Error(`${context}: 내가 쓴 글만 삭제할 수 있어요. 이미 지워졌는지 확인해 주세요.`);
+  }
+}
+
 export class SupabaseRepository implements Repository {
   mode = "live" as const;
 
@@ -306,8 +323,7 @@ export class SupabaseRepository implements Repository {
   }
 
   async deletePost(postId: string): Promise<void> {
-    const { error } = await this.supabase.from("posts").delete().eq("id", postId);
-    if (error) fail("글을 삭제하지 못했습니다", error);
+    await deleteOwnRow(this.supabase, "posts", postId, "글을 삭제하지 못했습니다");
   }
 
   async toggleLike(
@@ -358,6 +374,10 @@ export class SupabaseRepository implements Repository {
 
     if (error || !data) fail("댓글을 등록하지 못했습니다", error);
     return { ...mapComment(data as AnyRow, author.id), mine: true };
+  }
+
+  async deleteComment(commentId: string): Promise<void> {
+    await deleteOwnRow(this.supabase, "comments", commentId, "댓글을 삭제하지 못했습니다");
   }
 
   async loadReviews(viewerId: string | null): Promise<ZoneReview[]> {
@@ -427,6 +447,10 @@ export class SupabaseRepository implements Repository {
 
     if (error || !data) fail("시야 후기를 등록하지 못했습니다", error);
     return { ...mapReview(data as AnyRow, author.id), mine: true };
+  }
+
+  async deleteReview(reviewId: string): Promise<void> {
+    await deleteOwnRow(this.supabase, "zone_reviews", reviewId, "시야 후기를 삭제하지 못했습니다");
   }
 
   async loadSaves(viewerId: string | null): Promise<Saves> {
@@ -513,8 +537,7 @@ export class SupabaseRepository implements Repository {
   }
 
   async deleteGame(gameId: string): Promise<void> {
-    const { error } = await this.supabase.from("games").delete().eq("id", gameId);
-    if (error) fail("직관 기록을 삭제하지 못했습니다", error);
+    await deleteOwnRow(this.supabase, "games", gameId, "직관 기록을 삭제하지 못했습니다");
   }
 
   /* ── 직관러 맛집 ──────────────────────────────────────────── */
@@ -576,8 +599,7 @@ export class SupabaseRepository implements Repository {
   }
 
   async deleteUserFood(foodId: string): Promise<void> {
-    const { error } = await this.supabase.from("user_foods").delete().eq("id", foodId);
-    if (error) fail("맛집을 삭제하지 못했습니다", error);
+    await deleteOwnRow(this.supabase, "user_foods", foodId, "맛집을 삭제하지 못했습니다");
   }
 
   /* ── 직관러 주차 팁 ──────────────────────────────────────── */
@@ -615,10 +637,6 @@ export class SupabaseRepository implements Repository {
   }
 
   async deleteUserParking(parkingId: string): Promise<void> {
-    const { error } = await this.supabase
-      .from("user_parkings")
-      .delete()
-      .eq("id", parkingId);
-    if (error) fail("주차 팁을 삭제하지 못했습니다", error);
+    await deleteOwnRow(this.supabase, "user_parkings", parkingId, "주차 팁을 삭제하지 못했습니다");
   }
 }

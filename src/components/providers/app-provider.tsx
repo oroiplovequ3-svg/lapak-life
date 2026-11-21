@@ -74,8 +74,10 @@ interface AppContextValue {
   toggleLike: (postId: string) => Promise<void>;
   loadComments: (postId: string) => Promise<void>;
   addComment: (postId: string, body: string) => Promise<boolean>;
+  deleteComment: (postId: string, commentId: string) => Promise<void>;
 
   createReview: (input: NewReviewInput) => Promise<boolean>;
+  deleteReview: (reviewId: string) => Promise<void>;
   toggleSaveZone: (code: string) => Promise<void>;
   toggleSaveFood: (id: string) => Promise<void>;
   addGame: (input: NewGameInput) => Promise<boolean>;
@@ -454,6 +456,30 @@ export function AppProvider({ children }: { children: ReactNode }) {
   );
 
   /* ── 7. 시야 후기 ───────────────────────────────────────────── */
+  const deleteComment = useCallback(
+    async (postId: string, commentId: string) => {
+      if (!repo) return;
+      try {
+        await repo.deleteComment(commentId);
+        setCommentsByPost((prev) => {
+          const nextList = (prev[postId] ?? []).filter((comment) => comment.id !== commentId);
+          return { ...prev, [postId]: nextList };
+        });
+        setPosts((prev) =>
+          prev.map((post) =>
+            post.id === postId
+              ? { ...post, commentCount: Math.max(0, post.commentCount - 1) }
+              : post,
+          ),
+        );
+        toast("댓글을 삭제했어요");
+      } catch (error) {
+        toast(errorMessage(error));
+      }
+    },
+    [repo, toast],
+  );
+
   const createReview = useCallback(
     async (input: NewReviewInput) => {
       if (!repo) return false;
@@ -472,6 +498,20 @@ export function AppProvider({ children }: { children: ReactNode }) {
   );
 
   /* ── 8. 저장(북마크) ────────────────────────────────────────── */
+  const deleteReview = useCallback(
+    async (reviewId: string) => {
+      if (!repo) return;
+      try {
+        await repo.deleteReview(reviewId);
+        setReviews((prev) => prev.filter((review) => review.id !== reviewId));
+        toast("시야 후기를 삭제했어요");
+      } catch (error) {
+        toast(errorMessage(error));
+      }
+    },
+    [repo, toast],
+  );
+
   const toggleSave = useCallback(
     async (targetType: SaveTargetType, targetId: string, label: string) => {
       if (!repo) return;
@@ -648,7 +688,9 @@ export function AppProvider({ children }: { children: ReactNode }) {
       toggleLike,
       loadComments,
       addComment,
+      deleteComment,
       createReview,
+      deleteReview,
       toggleSaveZone,
       toggleSaveFood,
       addGame,
@@ -683,7 +725,9 @@ export function AppProvider({ children }: { children: ReactNode }) {
       toggleLike,
       loadComments,
       addComment,
+      deleteComment,
       createReview,
+      deleteReview,
       toggleSaveZone,
       toggleSaveFood,
       addGame,

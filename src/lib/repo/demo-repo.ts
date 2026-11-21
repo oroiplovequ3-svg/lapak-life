@@ -233,6 +233,8 @@ export class DemoRepository implements Repository {
 
   async deletePost(postId: string): Promise<void> {
     this.persist.posts = this.persist.posts.filter((p) => p.id !== postId);
+    // 글과 함께 달린 내 댓글도 같이 정리합니다. (샘플 글은 그대로)
+    delete this.persist.extraComments[postId];
     if (!this.persist.deletedPosts.includes(postId)) {
       this.persist.deletedPosts.push(postId);
     }
@@ -277,6 +279,14 @@ export class DemoRepository implements Repository {
     return comment;
   }
 
+  async deleteComment(commentId: string): Promise<void> {
+    for (const [postId, list] of Object.entries(this.persist.extraComments)) {
+      const next = list.filter((comment) => comment.id !== commentId);
+      if (next.length !== list.length) this.persist.extraComments[postId] = next;
+    }
+    this.save();
+  }
+
   async loadReviews(): Promise<ZoneReview[]> {
     const seeded: ZoneReview[] = SEED_REVIEWS.map((r) => ({
       id: r.id,
@@ -316,6 +326,11 @@ export class DemoRepository implements Repository {
       this.save();
     }
     return review;
+  }
+
+  async deleteReview(reviewId: string): Promise<void> {
+    this.persist.reviews = this.persist.reviews.filter((review) => review.id !== reviewId);
+    this.save();
   }
 
   async loadSaves(): Promise<Saves> {

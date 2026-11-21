@@ -3,6 +3,7 @@
 import Image from "next/image";
 import { useMemo, useState } from "react";
 
+import { DeleteButton } from "@/components/delete-button";
 import { Icon } from "@/components/icons";
 import { PostMedia } from "@/components/media-illustration";
 import { useApp } from "@/components/providers/app-provider";
@@ -11,22 +12,40 @@ import { isSupabaseConfigured } from "@/lib/supabase/config";
 import { formatRelativeTime, initialOf } from "@/lib/utils";
 import type { Comment, Post } from "@/lib/types";
 
-function CommentRow({ comment }: { comment: Comment }) {
+function CommentRow({ comment, onDelete }: { comment: Comment; onDelete: () => void }) {
   return (
-    <div className="flex gap-[7px]">
+    <div className="flex items-start gap-[7px]">
       <div className="grid h-[25px] w-[25px] flex-none place-items-center rounded-full bg-brand-50 text-[10.5px] font-extrabold text-brand">
         {initialOf(comment.nickname)}
       </div>
-      <p className="break-keep pt-px text-[12.5px] leading-relaxed text-ink-2">
-        <span className="mr-[5px] text-xs font-extrabold text-ink">{comment.nickname}</span>
-        {comment.body}
-      </p>
+      <div className="flex min-w-0 flex-1 items-start gap-1">
+        <p className="min-w-0 flex-1 break-keep pt-px text-[12.5px] leading-relaxed text-ink-2">
+          <span className="mr-[5px] text-xs font-extrabold text-ink">{comment.nickname}</span>
+          {comment.body}
+        </p>
+        {comment.mine ? (
+          <DeleteButton
+            what="댓글"
+            size={12}
+            onDelete={onDelete}
+            className="mt-[-4px]"
+          />
+        ) : null}
+      </div>
     </div>
   );
 }
 
 function PostCard({ post, highlight }: { post: Post; highlight?: boolean }) {
-  const { toggleLike, loadComments, addComment, commentsByPost, commentsLoaded } = useApp();
+  const {
+    toggleLike,
+    loadComments,
+    addComment,
+    deletePost,
+    deleteComment,
+    commentsByPost,
+    commentsLoaded,
+  } = useApp();
   const [open, setOpen] = useState(false);
   const [draft, setDraft] = useState("");
   const [sending, setSending] = useState(false);
@@ -94,6 +113,14 @@ function PostCard({ post, highlight }: { post: Post; highlight?: boolean }) {
                 ? "질문"
                 : "굿즈·티켓"}
         </span>
+        {post.mine ? (
+          <DeleteButton
+            what="글"
+            size={14}
+            onDelete={() => deletePost(post.id)}
+            className="ml-[-2px]"
+          />
+        ) : null}
       </div>
 
       <p className="mt-[9px] whitespace-pre-wrap break-keep text-sm leading-[1.65] text-[#1D2939]">
@@ -138,7 +165,11 @@ function PostCard({ post, highlight }: { post: Post; highlight?: boolean }) {
             <p className="py-1 text-[11.5px] text-ink-faint">첫 댓글을 남겨보세요.</p>
           ) : null}
           {comments.map((comment) => (
-            <CommentRow key={comment.id} comment={comment} />
+            <CommentRow
+              key={comment.id}
+              comment={comment}
+              onDelete={() => void deleteComment(post.id, comment.id)}
+            />
           ))}
           <div className="flex items-center gap-[7px]">
             <input

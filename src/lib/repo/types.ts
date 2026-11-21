@@ -38,8 +38,10 @@ export interface Repository {
   ): Promise<{ liked: boolean; likeCount: number }>;
   loadComments(postId: string, viewerId: string | null): Promise<Comment[]>;
   addComment(postId: string, body: string, author: Author): Promise<Comment>;
+  deleteComment(commentId: string): Promise<void>;
   loadReviews(viewerId: string | null): Promise<ZoneReview[]>;
   createReview(input: NewReviewInput, author: Author): Promise<ZoneReview>;
+  deleteReview(reviewId: string): Promise<void>;
   loadSaves(viewerId: string | null): Promise<Saves>;
   setSave(
     targetType: SaveTargetType,

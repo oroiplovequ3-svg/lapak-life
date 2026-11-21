@@ -3,6 +3,7 @@
 import Image from "next/image";
 import { useMemo, useState } from "react";
 
+import { DeleteButton } from "@/components/delete-button";
 import { Icon } from "@/components/icons";
 import {
   PhotoLightbox,
@@ -32,6 +33,7 @@ export function MyScreen({ onOpenPost, onCompose, onAddGame }: MyScreenProps) {
     saves,
     posts,
     deleteGame,
+    deletePost,
     ready,
     toggleSaveZone,
     toggleSaveFood,
@@ -151,7 +153,7 @@ export function MyScreen({ onOpenPost, onCompose, onAddGame }: MyScreenProps) {
           <span className="pb-[3px] text-[11.5px] font-bold text-white/70">
             {summary.win}승 {summary.lose}패
             {summary.draw ? ` ${summary.draw}무` : ""} · 승률{" "}
-            {(summary.rate / 100).toFixed(3).replace("0.", ".")}
+            {summary.total ? `${summary.rate}%` : "-"}
           </span>
         </div>
         <div className="relative mt-3.5 h-[7px] overflow-hidden rounded-full bg-white/20">
@@ -218,14 +220,11 @@ export function MyScreen({ onOpenPost, onCompose, onAddGame }: MyScreenProps) {
                   <span className="text-[13px] font-extrabold tracking-tight text-ink-2">
                     {game.scoreFor} : {game.scoreAgainst}
                   </span>
-                  <button
-                    type="button"
-                    aria-label="기록 삭제"
-                    onClick={() => void deleteGame(game.id)}
-                    className="flex-none rounded-lg p-1.5 text-[#C4CBD6]"
-                  >
-                    <Icon name="trash" size={15} />
-                  </button>
+                  <DeleteButton
+                    what="직관 기록"
+                    size={15}
+                    onDelete={() => deleteGame(game.id)}
+                  />
                 </div>
                 <PhotoTiles
                   urls={game.photoUrls ?? []}
@@ -325,8 +324,21 @@ export function MyScreen({ onOpenPost, onCompose, onAddGame }: MyScreenProps) {
               onClick={() => onOpenPost?.(post.id)}
               className="cursor-pointer rounded-[13px] border border-line bg-white px-3 py-[11px]"
             >
-              <div className="text-[12.5px] font-extrabold text-brand-600">
-                {categoryOf(post.category).label}
+              <div className="flex items-start gap-1.5">
+                <div className="min-w-0 flex-1 text-[12.5px] font-extrabold text-brand-600">
+                  {categoryOf(post.category).label}
+                </div>
+                <span
+                  className="flex-none"
+                  onClick={(event) => event.stopPropagation()}
+                >
+                  <DeleteButton
+                    what="글"
+                    size={13}
+                    onDelete={() => deletePost(post.id)}
+                    className="mt-[-5px]"
+                  />
+                </span>
               </div>
               <p className="mt-[5px] line-clamp-2 break-keep text-[13px] leading-relaxed text-[#1D2939]">
                 {post.body}

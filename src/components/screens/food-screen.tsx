@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 
+import { DeleteButton } from "@/components/delete-button";
 import { Icon, Stars } from "@/components/icons";
 import {
   PhotoLightbox,
@@ -68,7 +69,7 @@ function UserFoodCard({
           🦁
         </div>
         <div className="min-w-0 flex-1">
-          <div className="flex flex-wrap items-baseline gap-x-[7px] gap-y-0.5 pr-5">
+          <div className="flex flex-wrap items-baseline gap-x-[7px] gap-y-0.5">
             <h3 className="text-[13.5px] font-extrabold tracking-tight2">{food.name}</h3>
             <span className="rounded-md bg-[#F2F8FF] px-1.5 py-[1px] text-[10px] font-extrabold text-[#0B4A96]">
               {food.inStadium ? "구장 안" : "구장 밖"}
@@ -90,14 +91,7 @@ function UserFoodCard({
           ) : null}
         </div>
         {food.mine ? (
-          <button
-            type="button"
-            aria-label="맛집 삭제"
-            onClick={onDelete}
-            className="absolute right-[7px] top-[7px] rounded-lg p-1.5 text-[#C4CBD6]"
-          >
-            <Icon name="trash" size={13} />
-          </button>
+          <DeleteButton what="맛집" size={13} onDelete={onDelete} />
         ) : null}
       </div>
       <PhotoTiles
@@ -124,7 +118,7 @@ function UserParkingCard({
           🅿️
         </div>
         <div className="min-w-0 flex-1">
-          <div className="flex flex-wrap items-baseline gap-x-[7px] gap-y-0.5 pr-5">
+          <div className="flex flex-wrap items-baseline gap-x-[7px] gap-y-0.5">
             <h3 className="text-[13.5px] font-extrabold tracking-tight2">{parking.name}</h3>
             <span
               className={`rounded-md px-1.5 py-[1px] text-[10px] font-extrabold ${
@@ -144,14 +138,7 @@ function UserParkingCard({
           ) : null}
         </div>
         {parking.mine ? (
-          <button
-            type="button"
-            aria-label="주차 팁 삭제"
-            onClick={onDelete}
-            className="absolute right-[7px] top-[7px] rounded-lg p-1.5 text-[#C4CBD6]"
-          >
-            <Icon name="trash" size={13} />
-          </button>
+          <DeleteButton what="주차 팁" size={13} onDelete={onDelete} />
         ) : null}
       </div>
     </article>

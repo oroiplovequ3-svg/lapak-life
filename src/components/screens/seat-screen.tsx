@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 
+import { DeleteButton } from "@/components/delete-button";
 import { Icon, Stars } from "@/components/icons";
 import {
   PhotoLightbox,
@@ -19,7 +20,7 @@ import {
 import { formatRelativeTime, initialOf } from "@/lib/utils";
 
 export function SeatScreen() {
-  const { zones, reviews, saves, toggleSaveZone } = useApp();
+  const { zones, reviews, saves, toggleSaveZone, deleteReview } = useApp();
   const [selected, setSelected] = useState<string>("all");
   const [pickerOpen, setPickerOpen] = useState(false);
   const [lightbox, setLightbox] = useState<PhotoLightboxState | null>(null);
@@ -384,6 +385,14 @@ export function SeatScreen() {
                   </div>
                 </div>
                 <Stars value={review.stars} />
+                {review.mine ? (
+                  <DeleteButton
+                    what="후기"
+                    size={14}
+                    onDelete={() => deleteReview(review.id)}
+                    className="ml-[-2px]"
+                  />
+                ) : null}
               </div>
               <p className="mt-[9px] break-keep text-[13.5px] leading-relaxed text-[#1D2939]">
                 {review.body}

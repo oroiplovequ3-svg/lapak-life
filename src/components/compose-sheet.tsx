@@ -98,7 +98,7 @@ export function ComposeSheet({ open, onClose, onPosted }: ComposeSheetProps) {
 
       {configured && !user && (
         <p className="rounded-[11px] bg-brand-50 px-3 py-2.5 text-[11.5px] leading-relaxed text-brand">
-          등록하면 카카오 로그인을 먼저 요청해요. 지금 데모 모드라면 바로 등록됩니다.
+          등록하면 구글 로그인을 먼저 요청해요. 지금 데모 모드라면 바로 등록됩니다.
         </p>
       )}
 

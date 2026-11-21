@@ -28,8 +28,12 @@ import type {
   NewGameInput,
   NewPostInput,
   NewReviewInput,
+  NewUserFoodInput,
+  NewUserParkingInput,
   Post,
   Saves,
+  UserFood,
+  UserParking,
   Zone,
   ZoneReview,
 } from "@/lib/types";
@@ -59,8 +63,10 @@ interface AppContextValue {
   saves: Saves;
   commentsByPost: Record<string, Comment[]>;
   commentsLoaded: Record<string, boolean>;
+  userFoods: UserFood[];
+  userParkings: UserParking[];
 
-  signInWithKakao: () => Promise<void>;
+  signInWithGoogle: () => Promise<void>;
   signOut: () => Promise<void>;
 
   createPost: (input: NewPostInput) => Promise<boolean>;
@@ -74,6 +80,10 @@ interface AppContextValue {
   toggleSaveFood: (id: string) => Promise<void>;
   addGame: (input: NewGameInput) => Promise<boolean>;
   deleteGame: (gameId: string) => Promise<void>;
+  addUserFood: (input: NewUserFoodInput) => Promise<boolean>;
+  deleteUserFood: (foodId: string) => Promise<void>;
+  addUserParking: (input: NewUserParkingInput) => Promise<boolean>;
+  deleteUserParking: (parkingId: string) => Promise<void>;
   reload: () => Promise<void>;
 }
 
@@ -117,6 +127,8 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const [saves, setSaves] = useState<Saves>({ zones: [], foods: [] });
   const [commentsByPost, setCommentsByPost] = useState<Record<string, Comment[]>>({});
   const [commentsLoaded, setCommentsLoaded] = useState<Record<string, boolean>>({});
+  const [userFoods, setUserFoods] = useState<UserFood[]>([]);
+  const [userParkings, setUserParkings] = useState<UserParking[]>([]);
 
   const userRef = useRef<AppUser | null>(null);
   userRef.current = user;
@@ -190,15 +202,27 @@ export function AppProvider({ children }: { children: ReactNode }) {
   /* ── 2. 데이터 로드 (로그인 상태가 바뀌면 다시) ─────────────── */
   const loadAll = useCallback(
     async (repository: Repository, viewerId: string | null) => {
-      const [zoneRows, foodRows, postRows, reviewRows, saveRows, gameRows] = await Promise.all([
-        repository.loadZones(),
-        repository.loadFoods(),
-        repository.loadPosts(viewerId),
-        repository.loadReviews(viewerId),
-        repository.loadSaves(viewerId),
-        repository.loadGames(viewerId),
-      ]);
-      return { zoneRows, foodRows, postRows, reviewRows, saveRows, gameRows };
+      const [zoneRows, foodRows, postRows, reviewRows, saveRows, gameRows, userFoodRows, userParkingRows] =
+        await Promise.all([
+          repository.loadZones(),
+          repository.loadFoods(),
+          repository.loadPosts(viewerId),
+          repository.loadReviews(viewerId),
+          repository.loadSaves(viewerId),
+          repository.loadGames(viewerId),
+          repository.loadUserFoods(viewerId),
+          repository.loadUserParkings(viewerId),
+        ]);
+      return {
+        zoneRows,
+        foodRows,
+        postRows,
+        reviewRows,
+        saveRows,
+        gameRows,
+        userFoodRows,
+        userParkingRows,
+      };
     },
     [],
   );
@@ -218,6 +242,8 @@ export function AppProvider({ children }: { children: ReactNode }) {
         setReviews(result.reviewRows);
         setSaves(result.saveRows);
         setGames(result.gameRows);
+        setUserFoods(result.userFoodRows);
+        setUserParkings(result.userParkingRows);
         setCommentsByPost({});
         setCommentsLoaded({});
         setLoadError(null);
@@ -250,7 +276,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
     (action: string): boolean => {
       if (!isSupabaseConfigured) return true; // 데모 모드: 로컬 체험 허용
       if (userRef.current) return true;
-      setAuthPrompt({ open: true, reason: `${action}려면 카카오 로그인이 필요해요` });
+      setAuthPrompt({ open: true, reason: `${action}려면 구글 로그인이 필요해요` });
       return false;
     },
     [],
@@ -268,6 +294,8 @@ export function AppProvider({ children }: { children: ReactNode }) {
       setReviews(result.reviewRows);
       setSaves(result.saveRows);
       setGames(result.gameRows);
+      setUserFoods(result.userFoodRows);
+      setUserParkings(result.userParkingRows);
       setLoadError(null);
     } catch (error) {
       setLoadError(errorMessage(error));
@@ -275,7 +303,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
   }, [repo, loadAll]);
 
   /* ── 5. 인증 ────────────────────────────────────────────────── */
-  const signInWithKakao = useCallback(async () => {
+  const signInWithGoogle = useCallback(async () => {
     const supabase = getSupabaseBrowserClient();
     if (!supabase) {
       toast("Supabase가 아직 연결되지 않았어요. 지금은 데모 모드로 동작합니다.");
@@ -284,14 +312,14 @@ export function AppProvider({ children }: { children: ReactNode }) {
     setSigningIn(true);
     try {
       const { error } = await supabase.auth.signInWithOAuth({
-        provider: "kakao",
+        provider: "google",
         options: {
           redirectTo: `${getSiteUrl()}/auth/callback?next=/`,
         },
       });
       if (error) throw error;
     } catch (error) {
-      toast(`카카오 로그인을 시작하지 못했어요: ${errorMessage(error)}`);
+      toast(`구글 로그인을 시작하지 못했어요: ${errorMessage(error)}`);
       setSigningIn(false);
     }
   }, [toast]);
@@ -530,6 +558,69 @@ export function AppProvider({ children }: { children: ReactNode }) {
     [repo, toast],
   );
 
+  /* ── 10. 직관러 맛집 · 주차 팁 ─────────────────────────────── */
+  const addUserFood = useCallback(
+    async (input: NewUserFoodInput) => {
+      if (!repo) return false;
+      if (!ensureCanWrite("맛집을 추가하")) return false;
+      try {
+        const food = await repo.createUserFood(input, author);
+        setUserFoods((prev) => [food, ...prev]);
+        toast("직관러 맛집에 등록했어요");
+        return true;
+      } catch (error) {
+        toast(errorMessage(error));
+        return false;
+      }
+    },
+    [repo, ensureCanWrite, author, toast],
+  );
+
+  const deleteUserFood = useCallback(
+    async (foodId: string) => {
+      if (!repo) return;
+      try {
+        await repo.deleteUserFood(foodId);
+        setUserFoods((prev) => prev.filter((food) => food.id !== foodId));
+        toast("맛집을 삭제했어요");
+      } catch (error) {
+        toast(errorMessage(error));
+      }
+    },
+    [repo, toast],
+  );
+
+  const addUserParking = useCallback(
+    async (input: NewUserParkingInput) => {
+      if (!repo) return false;
+      if (!ensureCanWrite("주차 팁을 추가하")) return false;
+      try {
+        const parking = await repo.createUserParking(input, author);
+        setUserParkings((prev) => [parking, ...prev]);
+        toast("직관러 주차 팁에 등록했어요");
+        return true;
+      } catch (error) {
+        toast(errorMessage(error));
+        return false;
+      }
+    },
+    [repo, ensureCanWrite, author, toast],
+  );
+
+  const deleteUserParking = useCallback(
+    async (parkingId: string) => {
+      if (!repo) return;
+      try {
+        await repo.deleteUserParking(parkingId);
+        setUserParkings((prev) => prev.filter((parking) => parking.id !== parkingId));
+        toast("주차 팁을 삭제했어요");
+      } catch (error) {
+        toast(errorMessage(error));
+      }
+    },
+    [repo, toast],
+  );
+
   const value = useMemo<AppContextValue>(
     () => ({
       configured: isSupabaseConfigured,
@@ -548,7 +639,9 @@ export function AppProvider({ children }: { children: ReactNode }) {
       saves,
       commentsByPost,
       commentsLoaded,
-      signInWithKakao,
+      userFoods,
+      userParkings,
+      signInWithGoogle,
       signOut,
       createPost,
       deletePost,
@@ -560,6 +653,10 @@ export function AppProvider({ children }: { children: ReactNode }) {
       toggleSaveFood,
       addGame,
       deleteGame,
+      addUserFood,
+      deleteUserFood,
+      addUserParking,
+      deleteUserParking,
       reload,
     }),
     [
@@ -577,7 +674,9 @@ export function AppProvider({ children }: { children: ReactNode }) {
       saves,
       commentsByPost,
       commentsLoaded,
-      signInWithKakao,
+      userFoods,
+      userParkings,
+      signInWithGoogle,
       signOut,
       createPost,
       deletePost,
@@ -589,6 +688,10 @@ export function AppProvider({ children }: { children: ReactNode }) {
       toggleSaveFood,
       addGame,
       deleteGame,
+      addUserFood,
+      deleteUserFood,
+      addUserParking,
+      deleteUserParking,
       reload,
     ],
   );

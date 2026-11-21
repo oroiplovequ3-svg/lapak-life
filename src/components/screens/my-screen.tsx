@@ -25,7 +25,7 @@ export function MyScreen({ onOpenPost, onCompose, onAddGame }: MyScreenProps) {
   const {
     user,
     configured,
-    signInWithKakao,
+    signInWithGoogle,
     signOut,
     signingIn,
     games,
@@ -75,7 +75,7 @@ export function MyScreen({ onOpenPost, onCompose, onAddGame }: MyScreenProps) {
             <div className="min-w-0 flex-1">
               <div className="text-[17px] font-extrabold tracking-tight3">{user.nickname}</div>
               <div className="mt-[3px] text-[11.5px] font-semibold text-ink-faint">
-                {user.email ?? "카카오 로그인"} · 삼성 라이온즈 팬
+                {user.email ?? "구글 로그인"} · 삼성 라이온즈 팬
               </div>
               <div className="mt-[7px] flex gap-1.5">
                 <span className="rounded-md bg-brand-50 px-[7px] py-[2.5px] text-[10px] font-extrabold text-brand-600">
@@ -116,16 +116,16 @@ export function MyScreen({ onOpenPost, onCompose, onAddGame }: MyScreenProps) {
             {configured ? (
               <button
                 type="button"
-                onClick={() => void signInWithKakao()}
+                onClick={() => void signInWithGoogle()}
                 disabled={signingIn}
-                className="flex w-full items-center justify-center gap-2 rounded-[13px] bg-[#FEE500] px-4 py-3 text-[13.5px] font-extrabold text-[#191919] disabled:opacity-60"
+                className="flex w-full items-center justify-center gap-2 rounded-[13px] bg-white px-4 py-3 text-[13.5px] font-extrabold text-[#1F1F1F] ring-1 ring-[#DADCE0] shadow-[0_1px_2px_rgba(60,64,67,.16)] disabled:opacity-60"
               >
-                <Icon name="kakao" size={18} filled strokeWidth={0} />
-                {signingIn ? "카카오로 이동 중…" : "카카오로 시작하기"}
+                <Icon name="google" size={18} />
+                {signingIn ? "구글로 이동 중…" : "구글로 시작하기"}
               </button>
             ) : (
               <p className="rounded-[11px] bg-brand-50 px-3 py-2.5 text-[11.5px] leading-relaxed text-brand">
-                지금은 데모 모드예요. Supabase를 연결하면(SETUP.md 1~2단계) 카카오 로그인이
+                지금은 데모 모드예요. Supabase를 연결하면(SETUP.md 1~4단계) 구글 로그인이
                 활성화됩니다.
               </p>
             )}

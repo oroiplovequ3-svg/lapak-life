@@ -3,7 +3,7 @@ import { NextResponse, type NextRequest } from "next/server";
 import { getSupabaseServerClient } from "@/lib/supabase/server";
 
 /**
- * 카카오 OAuth 콜백 (PKCE code 교환).
+ * 구글 OAuth 콜백 (PKCE code 교환).
  * Supabase Auth → Redirect URL 로 이 라우트를 지정합니다.
  */
 export async function GET(request: NextRequest) {

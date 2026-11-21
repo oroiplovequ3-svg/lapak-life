@@ -228,7 +228,7 @@ export default function PrivacyPage() {
               href={`mailto:${CONTACT_EMAIL}`}
               className="flex items-center gap-2 rounded-[11px] bg-brand-50 px-3 py-2.5 text-[12.5px] font-extrabold text-brand-600"
             >
-              <Icon name="share" size={14} strokeWidth={2} />
+              <Icon name="comment" size={14} strokeWidth={2} />
               <span className="min-w-0 flex-1 truncate">{CONTACT_EMAIL}</span>
               <span className="text-[11px] font-bold text-brand-500">메일 보내기</span>
             </a>

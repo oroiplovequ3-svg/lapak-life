@@ -323,8 +323,30 @@ function FoodPicker({
 /** 기본 상태(전체 매장)에서 14개 카드 대신 보여주는 한눈에 요약 카드 */
 function FoodOverview({ foods }: { foods: Food[] }) {
   const inside = foods.filter((food) => food.inStadium).length;
+  const outside = foods.length - inside;
   const fast = foods.filter((food) => food.wait === 0).length;
   const groups = groupedFoods(foods);
+  const guides: [string, string, string][] = [
+    ...(inside
+      ? ([
+          [
+            "🏟️",
+            "구장 안",
+            "2F 푸드스트리트·외야석, 3F 내야석, 5F SKY에 매장이 나뉘어 있어요. 좌석이 있는 층에서 먹는 게 가장 빠릅니다.",
+          ],
+        ] as [string, string, string][])
+      : []),
+    ...(outside
+      ? ([
+          [
+            "🚪",
+            "구장 밖",
+            "Gate 1과 외야 매표소 밖은 입장 전에 들르기 좋아요. 하우스 오브 라이온즈는 티켓 없이도 들어갈 수 있습니다.",
+          ],
+        ] as [string, string, string][])
+      : []),
+    ["👇", "매장 고르기", "위 '푸드 선택'을 눌러 매장을 고르면 메뉴·가격·평점·웨이팅 팁이 바로 나옵니다."],
+  ];
 
   return (
     <>
@@ -332,12 +354,12 @@ function FoodOverview({ foods }: { foods: Food[] }) {
         <div className="pointer-events-none absolute -bottom-[60px] -right-10 h-[150px] w-[150px] rounded-full bg-white/[.07]" />
         <div className="relative text-lg font-extrabold tracking-tight3">🍽️ 라팍 먹거리 한눈에</div>
         <div className="relative mt-[5px] break-keep text-[11.5px] font-semibold text-white/80">
-          구장 안 {inside}곳 · 구장 밖 {foods.length - inside}곳 · 2026 시즌 공개 자료
+          구장 안 {inside}곳 · 구장 밖 {outside}곳 · 2026 시즌 공개 자료
         </div>
         <div className="relative mt-3.5 grid grid-cols-3 gap-[7px]">
           {[
             ["구장 안", `${inside}곳`],
-            ["구장 밖", `${foods.length - inside}곳`],
+            ["구장 밖", `${outside}곳`],
             ["대기 짧음", `${fast}곳`],
           ].map(([key, value]) => (
             <div key={key} className="rounded-[11px] bg-white/[.13] px-[9px] py-2">
@@ -359,23 +381,7 @@ function FoodOverview({ foods }: { foods: Food[] }) {
       </section>
 
       <div className="rounded-md2 border border-line bg-white px-3.5 shadow-card">
-        {[
-          [
-            "🏟️",
-            "구장 안",
-            "2F 푸드스트리트·외야석, 3F 내야석, 5F SKY에 매장이 나뉘어 있어요. 좌석이 있는 층에서 먹는 게 가장 빠릅니다.",
-          ],
-          [
-            "🚪",
-            "구장 밖",
-            "Gate 1과 외야 매표소 밖은 입장 전에 들르기 좋아요. 하우스 오브 라이온즈는 티켓 없이도 들어갈 수 있습니다.",
-          ],
-          [
-            "👇",
-            "매장 고르기",
-            "위 '푸드 선택'을 눌러 매장을 고르면 메뉴·가격·평점·웨이팅 팁이 바로 나옵니다.",
-          ],
-        ].map(([emoji, title, body], index, all) => (
+        {guides.map(([emoji, title, body], index, all) => (
           <div
             key={title}
             className={`flex gap-2.5 py-2.5 ${index < all.length - 1 ? "border-b border-line-soft" : ""}`}

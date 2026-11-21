@@ -169,7 +169,7 @@ export function MyScreen({ onOpenPost, onCompose, onAddGame }: MyScreenProps) {
             <div className="flex items-center gap-3">
               <Image
                 src="/images/lapak-mascot-badge.png"
-                alt="라팍생활 마스코트"
+                alt="인블루 마스코트"
                 width={108}
                 height={108}
                 className="h-[54px] w-[54px] flex-none rounded-full border-2 border-brand-100 bg-brand-50 object-cover shadow-[0_6px_16px_-6px_rgba(7,76,161,.7)]"

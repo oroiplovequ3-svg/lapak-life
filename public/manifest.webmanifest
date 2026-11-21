@@ -1,0 +1,19 @@
+{
+  "name": "인블루 (INBLUE) — 삼성 라이온즈 팬 커뮤니티",
+  "short_name": "인블루",
+  "description": "라팍(대구 삼성라이온즈파크)에 가는 사람이, 가기 전에·있는 동안·다녀온 뒤에 쓰는 팬 커뮤니티. 좌석 시야 후기, 먹거리·주차 정보, 직관 기록.",
+  "lang": "ko",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "background_color": "#E7EBF2",
+  "theme_color": "#074CA1",
+  "icons": [
+    {
+      "src": "/images/lapak-mascot-badge.png",
+      "sizes": "256x256",
+      "type": "image/png",
+      "purpose": "any"
+    }
+  ]
+}

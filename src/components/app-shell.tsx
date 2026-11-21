@@ -23,14 +23,14 @@ const TABS: { id: Tab; label: string; icon: IconName }[] = [
 ];
 
 const TITLES: Record<Tab, string> = {
-  home: "라팍생활",
+  home: "인블루",
   seat: "좌석 시야",
   food: "맛집·주차",
   my: "내 직관",
 };
 
 const SUBS: Record<Tab, string> = {
-  home: "삼성 라이온즈 팬 커뮤니티",
+  home: "삼성 라이온즈 팬 커뮤니티 · INBLUE",
   seat: "구역별 시야와 직관 후기",
   food: "라팍 먹거리와 주차·교통",
   my: "직관 기록과 저장한 것들",

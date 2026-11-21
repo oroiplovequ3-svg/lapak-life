@@ -342,7 +342,7 @@ export function HomeScreen({ onCompose, highlightedPostId, onGoSeat, onGoFood }:
       </div>
 
       <p className="break-keep px-2.5 pt-1 text-center text-[10.5px] leading-relaxed text-[#AEB6C2]">
-        라팍생활 · 실시간으로 글이 올라가는 삼성 라이온즈 팬 커뮤니티입니다.
+        인블루 · 실시간으로 글이 올라가는 삼성 라이온즈 팬 커뮤니티입니다.
       </p>
 
       <button

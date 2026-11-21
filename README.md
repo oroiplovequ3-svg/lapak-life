@@ -1,6 +1,6 @@
-# 라팍생활 🦁
+# 인블루 (INBLUE) 🦁
 
-**라팍(대구 삼성라이온즈파크)에 가는 사람이, 가기 전에·있는 동안·다녀온 뒤에 쓰는 앱.**
+**인블루(INBLUE) — 라팍(대구 삼성라이온즈파크)에 가는 사람이, 가기 전에·있는 동안·다녀온 뒤에 쓰는 앱.**
 좌석 시야 후기 · 먹거리/주차 큐레이션 · 직관 기록 승률을 한 곳에.
 
 | 탭 | 내용 |
@@ -15,6 +15,8 @@
 - **Next.js 15 (App Router)** + TypeScript + Tailwind CSS
 - **Supabase** (DB · Auth 구글 OAuth · RLS)
 - 배포: **Vercel** (월 0원 기준, 무료 플랜)
+
+> 저장소·배포 주소(`oroiplovequ3-svg/lapak-life`, `https://lapak-life.vercel.app`)와 `localStorage` 키는 기존 연결을 그대로 쓰기 위해 이름을 유지합니다. 화면에 보이는 서비스 이름만 인블루(INBLUE)입니다.
 
 ## 빠른 시작
 

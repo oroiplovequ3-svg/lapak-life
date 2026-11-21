@@ -2,7 +2,7 @@
   "name": "lapak-life",
   "version": "0.1.0",
   "private": true,
-  "description": "라팍생활 — 대구 삼성라이온즈파크(라팍) 직관 커뮤니티. 좌석 시야·먹거리·주차·직관 기록.",
+  "description": "인블루 (INBLUE) — 대구 삼성라이온즈파크(라팍) 직관 커뮤니티. 좌석 시야·먹거리·주차·직관 기록.",
   "scripts": {
     "dev": "next dev",
     "build": "next build",

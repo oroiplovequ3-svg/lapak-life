@@ -132,14 +132,21 @@ const REVIEW_COLUMNS =
 /** 시야 후기 사진 버킷 (supabase/migrations/002_review_photos.sql) */
 const REVIEW_PHOTO_BUCKET = "review-photos";
 
+/** 직관러 맛집 사진 버킷 (supabase/migrations/006_user_food_photos.sql) */
+const USER_FOOD_PHOTO_BUCKET = "user-food-photos";
+
 /** 직관 기록 사진 버킷 (supabase/migrations/003_checkin_photos.sql) */
 const CHECKIN_PHOTO_BUCKET = "checkin-photos";
 
 const GAME_COLUMNS =
   "id, user_id, played_on, opponent, home_away, zone_code, score_for, score_against, note, photo_urls, created_at";
 
-/** 직관러 맛집 (supabase/migrations/004_user_foods.sql) */
+/** 직관러 맛집 (supabase/migrations/004_user_foods.sql · 사진은 006) */
 const USER_FOOD_COLUMNS =
+  "id, user_id, name, menu, tip, rating, is_inside, photo_urls, created_at, profiles(nickname, avatar_url)";
+
+/** 006 마이그레이션 전 스키마(사진 컬럼 없음) 대체 목록 */
+const USER_FOOD_COLUMNS_LEGACY =
   "id, user_id, name, menu, tip, rating, is_inside, created_at, profiles(nickname, avatar_url)";
 
 /** 직관러 주차 팁 (supabase/migrations/005_user_parkings.sql) */
@@ -158,6 +165,7 @@ function mapUserFood(row: AnyRow, viewerId: string | null): UserFood {
     tip: str(row.tip),
     rating: num(row.rating, 5),
     inStadium: typeof row.is_inside === "boolean" ? row.is_inside : true,
+    photoUrls: photoUrlList(row.photo_urls),
     createdAt: str(row.created_at) || new Date().toISOString(),
     mine: Boolean(viewerId && userId === viewerId),
   };
@@ -509,18 +517,34 @@ export class SupabaseRepository implements Repository {
 
   /* ── 직관러 맛집 ──────────────────────────────────────────── */
   async loadUserFoods(viewerId: string | null): Promise<UserFood[]> {
-    const { data, error } = await this.supabase
+    const primary = await this.supabase
       .from("user_foods")
       .select(USER_FOOD_COLUMNS)
       .order("created_at", { ascending: false })
       .limit(200);
 
-    // 마이그레이션 004 를 아직 실행하지 않았어도 화면은 비지 않게 둡니다.
-    if (error) return [];
-    return ((data ?? []) as AnyRow[]).map((row) => mapUserFood(row, viewerId));
+    let rows = (primary.data ?? []) as AnyRow[];
+    if (primary.error) {
+      // 006(사진 컬럼)을 아직 실행하지 않았으면 사진 없이 한 번 더 시도합니다.
+      const retry = await this.supabase
+        .from("user_foods")
+        .select(USER_FOOD_COLUMNS_LEGACY)
+        .order("created_at", { ascending: false })
+        .limit(200);
+      // 마이그레이션 004 를 아직 실행하지 않았어도 화면은 비지 않게 둡니다.
+      if (retry.error) return [];
+      rows = (retry.data ?? []) as AnyRow[];
+    }
+    return rows.map((row) => mapUserFood(row, viewerId));
   }
 
   async createUserFood(input: NewUserFoodInput, author: Author): Promise<UserFood> {
+    const photoUrls = await this.uploadPhotos(
+      USER_FOOD_PHOTO_BUCKET,
+      input.photoUrls ?? [],
+      author.id,
+    );
+
     const { data, error } = await this.supabase
       .from("user_foods")
       .insert({
@@ -530,6 +554,7 @@ export class SupabaseRepository implements Repository {
         tip: input.tip,
         rating: input.rating,
         is_inside: input.inStadium,
+        photo_urls: photoUrls,
       })
       .select(USER_FOOD_COLUMNS)
       .single();

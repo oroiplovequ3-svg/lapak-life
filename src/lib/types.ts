@@ -65,6 +65,8 @@ export interface UserFood {
   tip: string;
   rating: number;
   inStadium: boolean;
+  /** 맛집에 첨부한 사진 (최대 3장 · 데모는 축소된 data URL, 연동 시 Storage 공개 URL) */
+  photoUrls: string[];
   createdAt: string;
   mine: boolean;
 }
@@ -189,6 +191,7 @@ export interface NewUserFoodInput {
   tip: string;
   rating: number;
   inStadium: boolean;
+  photoUrls?: string[];
 }
 
 export interface NewUserParkingInput {

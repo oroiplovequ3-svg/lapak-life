@@ -3,6 +3,11 @@
 import { useState } from "react";
 
 import { Icon, Stars } from "@/components/icons";
+import {
+  PhotoLightbox,
+  PhotoTiles,
+  type PhotoLightboxState,
+} from "@/components/photo-gallery";
 import { useApp } from "@/components/providers/app-provider";
 import { UserFoodSheet } from "@/components/user-food-sheet";
 import { UserParkingSheet } from "@/components/user-parking-sheet";
@@ -45,7 +50,17 @@ function SectionHead({
   );
 }
 
-function UserFoodCard({ food, onDelete }: { food: UserFood; onDelete: () => void }) {
+function UserFoodCard({
+  food,
+  onDelete,
+  onOpenPhoto,
+}: {
+  food: UserFood;
+  onDelete: () => void;
+  onOpenPhoto: (index: number) => void;
+}) {
+  const photoUrls = food.photoUrls ?? [];
+
   return (
     <article className="relative rounded-md2 border border-line bg-white p-3 shadow-card">
       <div className="flex items-start gap-2.5">
@@ -85,6 +100,12 @@ function UserFoodCard({ food, onDelete }: { food: UserFood; onDelete: () => void
           </button>
         ) : null}
       </div>
+      <PhotoTiles
+        urls={photoUrls}
+        onOpen={onOpenPhoto}
+        singleHeight={150}
+        label="맛집 사진"
+      />
     </article>
   );
 }
@@ -198,17 +219,17 @@ export function FoodScreen() {
   const [filter, setFilter] = useState<FoodFilter>("all");
   const [foodSheetOpen, setFoodSheetOpen] = useState(false);
   const [parkingSheetOpen, setParkingSheetOpen] = useState(false);
+  const [lightbox, setLightbox] = useState<PhotoLightboxState | null>(null);
 
   const insideCount = foods.filter((food) => food.inStadium).length;
+
+  // 소분류(전체·구장 안·구장 밖) 필터는 '야구장 푸드' 탭에서만 씁니다.
+  // '전체' 탭은 구장 안/밖 구분 없이 야구장 푸드와 직관러 맛집을 모두 보여줍니다.
+  const showFilters = tab === "stadium";
   const filtered =
-    filter === "all" ? foods : foods.filter((food) => (filter === "in" ? food.inStadium : !food.inStadium));
-
-  const filteredUserFoods =
-    filter === "all"
-      ? userFoods
-      : userFoods.filter((food) => (filter === "in" ? food.inStadium : !food.inStadium));
-
-  const visibleUserFoods = tab === "all" ? filteredUserFoods : userFoods;
+    !showFilters || filter === "all"
+      ? foods
+      : foods.filter((food) => (filter === "in" ? food.inStadium : !food.inStadium));
 
   const tabs: [FoodTab, string, number][] = [
     ["all", "전체", foods.length + userFoods.length],
@@ -357,38 +378,38 @@ export function FoodScreen() {
             </div>
           ) : null}
 
-          {tab !== "user" ? (
-            <>
-              <div className="-mx-4 flex gap-[7px] overflow-x-auto px-4 pb-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
-                {(
-                  [
-                    ["all", "전체", foods.length],
-                    ["in", "구장 안", insideCount],
-                    ["out", "구장 밖(입장 전)", foods.length - insideCount],
-                  ] as [FoodFilter, string, number][]
-                ).map(([id, label, count]) => (
-                  <button
-                    key={id}
-                    type="button"
-                    onClick={() => setFilter(id)}
-                    className={`inline-flex flex-none items-center gap-[5px] rounded-full border px-[13px] py-2 text-[12.5px] font-bold transition ${
-                      filter === id
-                        ? "border-brand bg-brand text-white shadow-[0_3px_10px_-2px_rgba(7,76,161,.5)]"
-                        : "border-line bg-white text-[#475467]"
-                    }`}
-                  >
-                    {label}
-                    <span className="ml-px text-[10.5px] font-extrabold opacity-70">{count}</span>
-                  </button>
-                ))}
-              </div>
+          {showFilters ? (
+            <div className="-mx-4 flex gap-[7px] overflow-x-auto px-4 pb-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+              {(
+                [
+                  ["all", "전체", foods.length],
+                  ["in", "구장 안", insideCount],
+                  ["out", "구장 밖(입장 전)", foods.length - insideCount],
+                ] as [FoodFilter, string, number][]
+              ).map(([id, label, count]) => (
+                <button
+                  key={id}
+                  type="button"
+                  onClick={() => setFilter(id)}
+                  className={`inline-flex flex-none items-center gap-[5px] rounded-full border px-[13px] py-2 text-[12.5px] font-bold transition ${
+                    filter === id
+                      ? "border-brand bg-brand text-white shadow-[0_3px_10px_-2px_rgba(7,76,161,.5)]"
+                      : "border-line bg-white text-[#475467]"
+                  }`}
+                >
+                  {label}
+                  <span className="ml-px text-[10.5px] font-extrabold opacity-70">{count}</span>
+                </button>
+              ))}
+            </div>
+          ) : null}
 
-              <div className="flex flex-col gap-2.5">
-                {filtered.map((food) => (
-                  <FoodCard key={food.id} food={food} />
-                ))}
-              </div>
-            </>
+          {tab !== "user" ? (
+            <div className="flex flex-col gap-2.5">
+              {filtered.map((food) => (
+                <FoodCard key={food.id} food={food} />
+              ))}
+            </div>
           ) : null}
 
           {tab !== "stadium" ? (
@@ -396,18 +417,21 @@ export function FoodScreen() {
               <SectionHead
                 title="🦁 직관러 맛집"
                 sub="직접 다녀온 직관러가 올린 맛집이에요. 나도 한 곳 올려보세요."
-                count={visibleUserFoods.length}
+                count={userFoods.length}
                 onAdd={() => setFoodSheetOpen(true)}
                 addLabel="맛집 추가"
               />
 
-              {visibleUserFoods.length ? (
+              {userFoods.length ? (
                 <div className="flex flex-col gap-2.5">
-                  {visibleUserFoods.map((food) => (
+                  {userFoods.map((food) => (
                     <UserFoodCard
                       key={food.id}
                       food={food}
                       onDelete={() => void deleteUserFood(food.id)}
+                      onOpenPhoto={(index) =>
+                        setLightbox({ urls: food.photoUrls ?? [], index })
+                      }
                     />
                   ))}
                 </div>
@@ -456,6 +480,15 @@ export function FoodScreen() {
         open={parkingSheetOpen}
         onClose={() => setParkingSheetOpen(false)}
       />
+
+      {lightbox ? (
+        <PhotoLightbox
+          state={lightbox}
+          onClose={() => setLightbox(null)}
+          onPick={(index) => setLightbox({ ...lightbox, index })}
+          label="맛집 사진"
+        />
+      ) : null}
     </div>
   );
 }

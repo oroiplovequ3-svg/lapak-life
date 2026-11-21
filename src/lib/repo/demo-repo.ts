@@ -25,6 +25,7 @@ import type {
   ZoneReview,
 } from "@/lib/types";
 import { minutesAgoISO } from "@/lib/utils";
+import { MAX_USER_FOOD_PHOTOS } from "@/lib/image";
 
 import type { Repository, SaveTargetType } from "./types";
 
@@ -146,6 +147,10 @@ export class DemoRepository implements Repository {
     for (const game of this.persist.games) {
       if (!game.photoUrls?.length) continue;
       targets.push({ createdAt: game.createdAt, clear: () => (game.photoUrls = []) });
+    }
+    for (const food of this.persist.userFoods) {
+      if (!food.photoUrls?.length) continue;
+      targets.push({ createdAt: food.createdAt, clear: () => (food.photoUrls = []) });
     }
     targets.sort((a, b) => (a.createdAt < b.createdAt ? -1 : 1));
 
@@ -382,7 +387,10 @@ export class DemoRepository implements Repository {
 
   /* ── 직관러 맛집 ──────────────────────────────────────────── */
   async loadUserFoods(): Promise<UserFood[]> {
-    return [...this.persist.userFoods, ...SEED_USER_FOODS];
+    return [...this.persist.userFoods, ...SEED_USER_FOODS].map((food) => ({
+      ...food,
+      photoUrls: food.photoUrls ?? [],
+    }));
   }
 
   async createUserFood(input: NewUserFoodInput, author: Author): Promise<UserFood> {
@@ -395,11 +403,17 @@ export class DemoRepository implements Repository {
       tip: input.tip,
       rating: Math.min(5, Math.max(1, Math.round(input.rating))),
       inStadium: input.inStadium,
+      photoUrls: (input.photoUrls ?? []).filter(Boolean).slice(0, MAX_USER_FOOD_PHOTOS),
       createdAt: new Date().toISOString(),
       mine: true,
     };
     this.persist.userFoods.unshift(food);
-    this.save();
+
+    if (this.save() === "failed") {
+      // 사진을 다 비워도 저장 공간이 없으면 사진 없는 맛집으로 남깁니다.
+      food.photoUrls = [];
+      this.save();
+    }
     return food;
   }
 

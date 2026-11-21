@@ -221,6 +221,88 @@ export const FOOD_BY_ID: Record<string, Food> = Object.fromEntries(
   FOODS.map((f) => [f.id, f]),
 );
 
+export interface FoodGroup {
+  id: string;
+  /** 목록 그룹 제목 (층·구역) */
+  label: string;
+  /** 한눈에 카드의 칩에 쓰는 짧은 이름 */
+  short: string;
+  /** 그룹 제목 옆에 붙는 힌트 */
+  hint: string;
+  /** 구장 안(true) / 구장 밖(false) */
+  inside: boolean;
+  codes: string[];
+}
+
+/** '푸드 선택' 스크롤 목록에서 매장을 묶는 순서 (구장 안 → 구장 밖) */
+export const FOOD_GROUPS: FoodGroup[] = [
+  {
+    id: "f2",
+    label: "2F · 푸드스트리트·외야",
+    short: "2F",
+    hint: "연막창·만재네·하바네로",
+    inside: true,
+    codes: ["yeon", "havanero", "manjae", "cheese"],
+  },
+  {
+    id: "f3",
+    label: "3F · 내야석",
+    short: "3F",
+    hint: "치킨·빙수",
+    inside: true,
+    codes: ["bingsu", "tongdak"],
+  },
+  {
+    id: "f5",
+    label: "5F · SKY",
+    short: "5F",
+    hint: "치킨·튀김·디저트",
+    inside: true,
+    codes: ["cream", "jackson", "yogurt"],
+  },
+  {
+    id: "outside",
+    label: "Gate 1 · 외야 매표소 밖",
+    short: "구장 밖",
+    hint: "입장 전에 들르기",
+    inside: false,
+    codes: ["house", "moms", "brussel", "shaomala", "butterwood"],
+  },
+];
+
+/**
+ * 매장을 층·구장 안팎 그룹으로 나눕니다.
+ * FOOD_GROUPS 에 아직 없는 매장(새로 추가된 매장)은 '그 외 매장'으로 빠지지 않고 뒤에 붙습니다.
+ */
+export function groupedFoods(
+  foods: Food[],
+): { id: string; label: string; short: string; hint: string; inside: boolean; items: Food[] }[] {
+  const byId = new Map(foods.map((food) => [food.id, food]));
+  const used = new Set<string>();
+  const groups = FOOD_GROUPS.map((group) => {
+    const items = group.codes
+      .map((code) => byId.get(code))
+      .filter((food): food is Food => Boolean(food));
+    group.codes.forEach((code) => used.add(code));
+    return { ...group, items };
+  }).filter((group) => group.items.length > 0);
+
+  const rest = foods.filter((food) => !used.has(food.id));
+  if (rest.length) {
+    groups.push({
+      id: "etc",
+      label: "그 외 매장",
+      short: "그 외",
+      hint: "새로 추가된 매장",
+      inside: rest.some((food) => food.inStadium),
+      codes: [],
+      items: rest,
+    });
+  }
+
+  return groups;
+}
+
 export const FLOOR_GUIDE: { title: string; items: string }[] = [
   {
     title: "2F 푸드스트리트",

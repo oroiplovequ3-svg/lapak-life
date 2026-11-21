@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 
 import { DeleteButton } from "@/components/delete-button";
 import { Icon, Stars } from "@/components/icons";
@@ -12,7 +12,7 @@ import {
 import { useApp } from "@/components/providers/app-provider";
 import { UserFoodSheet } from "@/components/user-food-sheet";
 import { UserParkingSheet } from "@/components/user-parking-sheet";
-import { FLOOR_GUIDE } from "@/lib/data/foods";
+import { groupedFoods } from "@/lib/data/foods";
 import { PARKING } from "@/lib/data/parking";
 import type { Food, UserFood, UserParking } from "@/lib/types";
 
@@ -144,6 +144,256 @@ function UserParkingCard({
     </article>
   );
 }
+function shortLoc(loc: string) {
+  return loc.replace(/\s*\(.*?\)/g, "").split(" · ")[0].trim();
+}
+
+/** 좌석 화면의 '좌석 선택'과 같은 톤의 매장 스크롤 선택기 */
+function FoodPicker({
+  foods,
+  selected,
+  onSelect,
+}: {
+  foods: Food[];
+  selected: string;
+  onSelect: (id: string) => void;
+}) {
+  const [open, setOpen] = useState(false);
+  const pickerRef = useRef<HTMLElement | null>(null);
+  const listRef = useRef<HTMLDivElement | null>(null);
+  const selectedRowRef = useRef<HTMLButtonElement | null>(null);
+  const groups = useMemo(() => groupedFoods(foods), [foods]);
+  const current = selected === "all" ? null : foods.find((food) => food.id === selected) ?? null;
+
+  // 목록을 열면 선택기가 화면 안에 들어오게 올리고,
+  // 지금 고른 매장이 스크롤 가운데에 오도록 맞춰요.
+  useEffect(() => {
+    if (!open) return;
+    const picker = pickerRef.current;
+    const list = listRef.current;
+    const row = selectedRowRef.current;
+    const screen = document.getElementById("screen");
+    if (picker && screen) {
+      const pickerRect = picker.getBoundingClientRect();
+      const screenRect = screen.getBoundingClientRect();
+      screen.scrollTop += pickerRect.top - screenRect.top - 8;
+    }
+    if (!list || !row) return;
+    const listRect = list.getBoundingClientRect();
+    const rowRect = row.getBoundingClientRect();
+    list.scrollTop += rowRect.top - listRect.top - list.clientHeight / 2 + rowRect.height / 2;
+  }, [open]);
+
+  function choose(id: string) {
+    onSelect(id);
+    setOpen(false);
+  }
+
+  return (
+    <section
+      ref={pickerRef}
+      className="overflow-hidden rounded-md2 border border-line bg-white shadow-card"
+    >
+      <button
+        type="button"
+        onClick={() => setOpen((value) => !value)}
+        aria-expanded={open}
+        aria-controls="food-picker"
+        className={`flex w-full items-center gap-2 px-3 py-[11px] text-left transition ${
+          open ? "bg-[#F7FAFF]" : "bg-white"
+        }`}
+      >
+        <span className="grid h-[26px] w-[26px] flex-none place-items-center rounded-[9px] bg-brand-50 text-[13px]">
+          🍔
+        </span>
+        <span className="flex-none text-[12.5px] font-extrabold tracking-tight2 text-ink-muted">
+          푸드 선택
+        </span>
+        <span className="ml-auto flex min-w-0 items-center gap-[5px] rounded-[10px] bg-brand-50 py-[5px] pl-2.5 pr-2">
+          <span className="truncate text-[11.5px] font-extrabold tracking-tight2 text-brand-600">
+            {current ? `${current.emoji} ${current.name}` : `전체 매장 (${foods.length}곳)`}
+          </span>
+          <Icon
+            name="chevron"
+            size={11}
+            strokeWidth={2.8}
+            className={`flex-none text-brand-600 transition-transform duration-200 ${
+              open ? "-rotate-90" : "rotate-90"
+            }`}
+          />
+        </span>
+      </button>
+
+      {open ? (
+        <div className="animate-fadeIn border-t border-line-soft bg-[#FBFCFE] px-2 pb-2 pt-1.5">
+          <div
+            id="food-picker"
+            ref={listRef}
+            className="max-h-[280px] overflow-y-auto overscroll-contain"
+          >
+            <button
+              type="button"
+              ref={selected === "all" ? selectedRowRef : undefined}
+              onClick={() => choose("all")}
+              className={`flex w-full items-center gap-2 rounded-[11px] border px-2 py-[9px] text-left transition active:scale-[.99] ${
+                selected === "all"
+                  ? "border-brand-600 bg-white shadow-[0_1px_2px_rgba(16,24,40,.06)]"
+                  : "border-transparent hover:bg-white"
+              }`}
+            >
+              <span className="w-[18px] flex-none text-center text-[13px] leading-none">🍽️</span>
+              <span className="min-w-0 flex-1">
+                <span className="block text-[12.5px] font-extrabold leading-tight tracking-tight2 text-ink">
+                  전체 매장 한눈에
+                </span>
+                <span className="mt-[2px] block truncate text-[10px] font-semibold text-ink-faint">
+                  {foods.length}곳 요약 보기
+                </span>
+              </span>
+              {selected === "all" ? (
+                <span className="flex-none text-[11px] font-black text-brand">✓</span>
+              ) : null}
+            </button>
+
+            {groups.map((group, index) => (
+              <div key={group.id}>
+                {index === 0 || groups[index - 1].inside !== group.inside ? (
+                  <div className="flex items-center gap-1.5 px-2 pb-0.5 pt-3">
+                    <span className="flex-none text-[10px] font-extrabold tracking-tight2 text-brand-600">
+                      {group.inside ? "🏟️ 구장 안" : "🚪 구장 밖 · 입장 전"}
+                    </span>
+                    <span className="h-px flex-1 bg-line-soft" />
+                  </div>
+                ) : null}
+                <div className="flex items-baseline gap-1.5 px-2 pb-1 pt-2">
+                  <span className="text-[10.5px] font-extrabold tracking-tight2 text-ink-2">
+                    {group.label}
+                  </span>
+                  <span className="truncate text-[9.5px] font-semibold text-[#B9C0CB]">
+                    {group.hint}
+                  </span>
+                </div>
+                {group.items.map((food) => {
+                  const on = selected === food.id;
+                  return (
+                    <button
+                      key={food.id}
+                      type="button"
+                      ref={on ? selectedRowRef : undefined}
+                      onClick={() => choose(food.id)}
+                      className={`flex w-full items-center gap-2 rounded-[11px] border px-2 py-[7px] text-left transition active:scale-[.99] ${
+                        on
+                          ? "border-brand-600 bg-white shadow-[0_1px_2px_rgba(16,24,40,.06)]"
+                          : "border-transparent hover:bg-white"
+                      }`}
+                    >
+                      <span className="w-[18px] flex-none text-center text-[13px] leading-none">
+                        {food.emoji}
+                      </span>
+                      <span className="min-w-0 flex-1">
+                        <span
+                          className={`block truncate text-[12.5px] font-extrabold leading-tight tracking-tight2 ${
+                            on ? "text-brand-600" : "text-ink"
+                          }`}
+                        >
+                          {food.name}
+                        </span>
+                        <span className="mt-[2px] block truncate text-[10px] font-semibold text-ink-faint">
+                          {[shortLoc(food.loc), food.price].filter(Boolean).join(" · ")}
+                        </span>
+                      </span>
+                      {on ? (
+                        <span className="flex-none text-[11px] font-black text-brand">✓</span>
+                      ) : null}
+                    </button>
+                  );
+                })}
+              </div>
+            ))}
+          </div>
+          <p className="px-2 pt-1.5 text-center text-[9.5px] font-bold text-[#B9C0CB]">
+            위아래로 넘겨 매장을 고르면 바로 아래에 메뉴·팁이 나와요
+          </p>
+        </div>
+      ) : null}
+    </section>
+  );
+}
+
+/** 기본 상태(전체 매장)에서 14개 카드 대신 보여주는 한눈에 요약 카드 */
+function FoodOverview({ foods }: { foods: Food[] }) {
+  const inside = foods.filter((food) => food.inStadium).length;
+  const fast = foods.filter((food) => food.wait === 0).length;
+  const groups = groupedFoods(foods);
+
+  return (
+    <>
+      <section className="relative overflow-hidden rounded-lg2 bg-gradient-to-br from-brand via-brand-600 to-brand-500 px-4 py-4 text-white shadow-brand">
+        <div className="pointer-events-none absolute -bottom-[60px] -right-10 h-[150px] w-[150px] rounded-full bg-white/[.07]" />
+        <div className="relative text-lg font-extrabold tracking-tight3">🍽️ 라팍 먹거리 한눈에</div>
+        <div className="relative mt-[5px] break-keep text-[11.5px] font-semibold text-white/80">
+          구장 안 {inside}곳 · 구장 밖 {foods.length - inside}곳 · 2026 시즌 공개 자료
+        </div>
+        <div className="relative mt-3.5 grid grid-cols-3 gap-[7px]">
+          {[
+            ["구장 안", `${inside}곳`],
+            ["구장 밖", `${foods.length - inside}곳`],
+            ["대기 짧음", `${fast}곳`],
+          ].map(([key, value]) => (
+            <div key={key} className="rounded-[11px] bg-white/[.13] px-[9px] py-2">
+              <div className="text-[9.5px] font-bold text-white/70">{key}</div>
+              <div className="mt-[3px] text-xs font-extrabold tracking-tight">{value}</div>
+            </div>
+          ))}
+        </div>
+        <div className="relative mt-2.5 flex flex-wrap gap-1.5">
+          {groups.map((group) => (
+            <span
+              key={group.id}
+              className="rounded-full bg-white/[.14] px-2.5 py-[5px] text-[10.5px] font-extrabold text-white/85"
+            >
+              {group.short} <span className="font-bold text-white/55">{group.items.length}</span>
+            </span>
+          ))}
+        </div>
+      </section>
+
+      <div className="rounded-md2 border border-line bg-white px-3.5 shadow-card">
+        {[
+          [
+            "🏟️",
+            "구장 안",
+            "2F 푸드스트리트·외야석, 3F 내야석, 5F SKY에 매장이 나뉘어 있어요. 좌석이 있는 층에서 먹는 게 가장 빠릅니다.",
+          ],
+          [
+            "🚪",
+            "구장 밖",
+            "Gate 1과 외야 매표소 밖은 입장 전에 들르기 좋아요. 하우스 오브 라이온즈는 티켓 없이도 들어갈 수 있습니다.",
+          ],
+          [
+            "👇",
+            "매장 고르기",
+            "위 '푸드 선택'을 눌러 매장을 고르면 메뉴·가격·평점·웨이팅 팁이 바로 나옵니다.",
+          ],
+        ].map(([emoji, title, body], index, all) => (
+          <div
+            key={title}
+            className={`flex gap-2.5 py-2.5 ${index < all.length - 1 ? "border-b border-line-soft" : ""}`}
+          >
+            <span className="w-[22px] flex-none text-sm leading-[1.4]">{emoji}</span>
+            <div>
+              <div className="text-[10.5px] font-extrabold text-ink-faint">{title}</div>
+              <div className="mt-0.5 break-keep text-[12.5px] leading-relaxed text-ink-2">
+                {body}
+              </div>
+            </div>
+          </div>
+        ))}
+      </div>
+    </>
+  );
+}
+
 function FoodCard({ food }: { food: Food }) {
   const { saves, toggleSaveFood } = useApp();
   const saved = saves.foods.includes(food.id);
@@ -204,6 +454,7 @@ export function FoodScreen() {
   const [segment, setSegment] = useState<"food" | "parking">("food");
   const [tab, setTab] = useState<FoodTab>("all");
   const [filter, setFilter] = useState<FoodFilter>("all");
+  const [picked, setPicked] = useState<string>("all");
   const [foodSheetOpen, setFoodSheetOpen] = useState(false);
   const [parkingSheetOpen, setParkingSheetOpen] = useState(false);
   const [lightbox, setLightbox] = useState<PhotoLightboxState | null>(null);
@@ -213,10 +464,19 @@ export function FoodScreen() {
   // 소분류(전체·구장 안·구장 밖) 필터는 '야구장 푸드' 탭에서만 씁니다.
   // '전체' 탭은 구장 안/밖 구분 없이 야구장 푸드와 직관러 맛집을 모두 보여줍니다.
   const showFilters = tab === "stadium";
-  const filtered =
-    !showFilters || filter === "all"
-      ? foods
-      : foods.filter((food) => (filter === "in" ? food.inStadium : !food.inStadium));
+  const filtered = useMemo(
+    () =>
+      !showFilters || filter === "all"
+        ? foods
+        : foods.filter((food) => (filter === "in" ? food.inStadium : !food.inStadium)),
+    [foods, showFilters, filter],
+  );
+  const pickedFood = picked === "all" ? null : filtered.find((food) => food.id === picked) ?? null;
+
+  // 선택한 매장이 필터(구장 안·밖)와 어긋나면 '전체 매장'으로 돌려놓습니다.
+  useEffect(() => {
+    if (picked !== "all" && !filtered.some((food) => food.id === picked)) setPicked("all");
+  }, [picked, filtered]);
 
   const tabs: [FoodTab, string, number][] = [
     ["all", "전체", foods.length + userFoods.length],
@@ -438,35 +698,21 @@ export function FoodScreen() {
             <div className="mt-1.5 flex items-center gap-2.5 px-0.5">
               <h2 className="text-[13px] font-extrabold tracking-tight2 text-ink-2">🏟️ 야구장 푸드</h2>
               <span className="h-px flex-1 bg-line" />
-              <span className="text-[10.5px] font-extrabold text-ink-faint">{foods.length}</span>
+              <span className="text-[10.5px] font-extrabold text-ink-faint">{filtered.length}</span>
             </div>
           ) : null}
 
           {tab !== "user" ? (
             <div className="flex flex-col gap-2.5">
-              {filtered.map((food) => (
-                <FoodCard key={food.id} food={food} />
-              ))}
+              <FoodPicker foods={filtered} selected={picked} onSelect={setPicked} />
+              {pickedFood ? <FoodCard food={pickedFood} /> : <FoodOverview foods={filtered} />}
             </div>
           ) : null}
 
           {tab !== "user" ? (
-            <>
-              <div className="rounded-md2 border border-line bg-[#F8FAFC] p-3.5 shadow-card">
-                <div className="mb-1.5 text-[12.5px] font-extrabold">🍽️ 층별로 빠르게 찾기</div>
-                <div className="text-[11.5px] leading-[1.75] text-ink-faint">
-                  {FLOOR_GUIDE.map((guide) => (
-                    <span key={guide.title} className="block">
-                      {guide.title} · {guide.items}
-                    </span>
-                  ))}
-                </div>
-              </div>
-
-              <p className="break-keep px-2.5 pt-1 text-center text-[10.5px] leading-relaxed text-[#AEB6C2]">
-                매장·메뉴는 2026 시즌 공개 자료를 참고한 샘플입니다. 실제 운영은 구단 공지로 확인하세요.
-              </p>
-            </>
+            <p className="break-keep px-2.5 pt-1 text-center text-[10.5px] leading-relaxed text-[#AEB6C2]">
+              매장·메뉴는 2026 시즌 공개 자료를 참고한 샘플입니다. 실제 운영은 구단 공지로 확인하세요.
+            </p>
           ) : null}
         </>
       )}

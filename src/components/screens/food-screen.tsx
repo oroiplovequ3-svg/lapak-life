@@ -391,14 +391,7 @@ export function FoodScreen() {
             </div>
           ) : null}
 
-          {tab !== "user" ? (
-            <div className="flex flex-col gap-2.5">
-              {filtered.map((food) => (
-                <FoodCard key={food.id} food={food} />
-              ))}
-            </div>
-          ) : null}
-
+          {/* '전체' 탭에서는 직관러 맛집을 먼저 보여주고, 그 아래에 야구장 푸드가 이어집니다. */}
           {tab !== "stadium" ? (
             <>
               <SectionHead
@@ -439,6 +432,22 @@ export function FoodScreen() {
                 </button>
               )}
             </>
+          ) : null}
+
+          {tab === "all" ? (
+            <div className="mt-1.5 flex items-center gap-2.5 px-0.5">
+              <h2 className="text-[13px] font-extrabold tracking-tight2 text-ink-2">🏟️ 야구장 푸드</h2>
+              <span className="h-px flex-1 bg-line" />
+              <span className="text-[10.5px] font-extrabold text-ink-faint">{foods.length}</span>
+            </div>
+          ) : null}
+
+          {tab !== "user" ? (
+            <div className="flex flex-col gap-2.5">
+              {filtered.map((food) => (
+                <FoodCard key={food.id} food={food} />
+              ))}
+            </div>
           ) : null}
 
           {tab !== "user" ? (

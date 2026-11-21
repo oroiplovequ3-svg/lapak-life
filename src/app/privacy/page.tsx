@@ -12,7 +12,7 @@ export const metadata: Metadata = {
   alternates: { canonical: "/privacy" },
 };
 
-const SERVICE_URL = "lapak-life.vercel.app";
+const SERVICE_URL = "inblue-fan.vercel.app";
 const CONTACT_EMAIL = "oroiplovequ3@gmail.com";
 const EFFECTIVE_DATE = "2026년 11월 21일";
 

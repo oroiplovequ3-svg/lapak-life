@@ -8,10 +8,15 @@ export const SUPABASE_ANON_KEY = (process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ?? "
 export const isSupabaseConfigured =
   SUPABASE_URL.startsWith("http") && SUPABASE_ANON_KEY.length > 20;
 
-/** 구글 OAuth redirectTo 계산용. 빌드 시 값이 없으면 런타임 origin을 씁니다. */
+/**
+ * 구글 OAuth redirectTo 계산용.
+ * 브라우저에서는 지금 열린 주소(origin)를 그대로 씁니다.
+ * inblue-fan.vercel.app 과 lapak-life.vercel.app 처럼 주소가 둘 이상일 때
+ * 로그인을 시작한 주소로 되돌아와야 PKCE code verifier 가 맞습니다.
+ */
 export function getSiteUrl(): string {
+  if (typeof window !== "undefined") return window.location.origin;
   const fromEnv = (process.env.NEXT_PUBLIC_SITE_URL ?? "").trim();
   if (fromEnv) return fromEnv.replace(/\/+$/, "");
-  if (typeof window !== "undefined") return window.location.origin;
   return "http://localhost:3000";
 }

@@ -8,7 +8,7 @@ import { Sheet } from "@/components/sheet";
 import { categoryOf } from "@/lib/data/categories";
 import { PARKING } from "@/lib/data/parking";
 import { ZONE_GROUPS, zoneGroupOf } from "@/lib/data/zones";
-import type { FoodFocusKind } from "@/lib/types";
+import type { Food, FoodFocusKind, UserFood, UserParking, Zone } from "@/lib/types";
 import { formatRelativeTime } from "@/lib/utils";
 
 /** 검색어가 비어 있을 때 한 번만 눌러도 바로 찾아지는 추천 검색어 */
@@ -29,6 +29,70 @@ function matches(haystack: string, tokens: string[]): boolean {
 
 function escapeRegExp(value: string): string {
   return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
+/** 빈 값을 빼고 ' · '로 이어 붙입니다. */
+function joinDot(...parts: (string | null | undefined)[]): string {
+  return parts.filter((part): part is string => Boolean(part && part.trim())).join(" · ");
+}
+
+/** 이름·위치에는 없고 설명에서 걸린 결과는, 걸린 문장을 짧게 보여 줍니다. */
+function excerpt(text: string, tokens: string[], max = 46): string {
+  const lower = text.toLowerCase();
+  let index = -1;
+  for (const token of tokens) {
+    const found = lower.indexOf(token);
+    if (found >= 0 && (index < 0 || found < index)) index = found;
+  }
+  if (index < 0) return text.slice(0, max);
+  const start = Math.max(0, index - 10);
+  const slice = text.slice(start, start + max);
+  return `${start > 0 ? "…" : ""}${slice}${start + max < text.length ? "…" : ""}`;
+}
+
+/** 제목·부제에서 바로 걸린 항목을 앞으로 올립니다. */
+function rankFirst<T>(items: T[], primary: (item: T) => string, tokens: string[]): T[] {
+  return [
+    ...items.filter((item) => matches(primary(item), tokens)),
+    ...items.filter((item) => !matches(primary(item), tokens)),
+  ];
+}
+
+/* 이름·위치에는 없이 설명에서만 걸린 결과는, 걸린 문장을 부제로 대신 보여 줍니다. */
+function zoneSub(zone: Zone, tokens: string[]): string {
+  const detail = joinDot(zone.side, zone.price);
+  if (matches(detail, tokens)) return detail;
+  const source = [zone.good, zone.cheer, zone.sun, zone.rain, zone.tip].find((text) =>
+    matches(text, tokens),
+  );
+  return source ? excerpt(source, tokens) : detail;
+}
+
+function foodSub(food: Food, tokens: string[]): string {
+  const detail = joinDot(food.loc, food.price);
+  if (matches(detail, tokens)) return detail;
+  if (matches(food.menu, tokens)) return food.menu;
+  return matches(food.tip, tokens) ? excerpt(food.tip, tokens) : detail;
+}
+
+function userFoodSub(food: UserFood, tokens: string[]): string {
+  const detail = joinDot(food.menu, food.nickname);
+  if (matches(detail, tokens)) return detail;
+  return matches(food.tip, tokens) ? excerpt(food.tip, tokens) : detail;
+}
+
+function parkingSub(card: (typeof PARKING)[number], tokens: string[]): string {
+  if (matches(card.sub, tokens)) return card.sub;
+  const kv = card.kvs.find(([, value]) => matches(value, tokens));
+  if (kv) return joinDot(kv[0], kv[1]);
+  const source = [card.tip ?? "", card.warn ?? ""].find((text) => matches(text, tokens));
+  return source ? excerpt(source, tokens) : card.sub;
+}
+
+function userParkingSub(parking: UserParking, tokens: string[]): string {
+  const detail = joinDot(parking.location, parking.isFree ? "무료" : parking.feeNote);
+  if (matches(detail, tokens)) return detail;
+  return matches(parking.tip, tokens) ? excerpt(parking.tip, tokens) : detail;
 }
 
 /** 결과 안에서 검색어를 노랗게 표시 */
@@ -159,27 +223,31 @@ export function SearchSheet({ open, onClose, onOpenPost, onOpenZone, onOpenFood 
       return group ? `${group.label} ${group.hint}` : "";
     };
 
-    const zoneHits = zones.filter((zone) =>
-      matches(
-        [
-          zone.name,
-          zone.short,
-          zone.sub ?? "",
-          zone.side,
-          zone.grade,
-          zone.price,
-          zone.dist,
-          zone.block,
-          zone.roof,
-          zone.sun,
-          zone.rain,
-          zone.cheer,
-          zone.good,
-          zone.tip,
-          groupText(zone.code),
-        ].join(" "),
-        tokens,
+    const zoneHits = rankFirst(
+      zones.filter((zone) =>
+        matches(
+          [
+            zone.name,
+            zone.short,
+            zone.sub ?? "",
+            zone.side,
+            zone.grade,
+            zone.price,
+            zone.dist,
+            zone.block,
+            zone.roof,
+            zone.sun,
+            zone.rain,
+            zone.cheer,
+            zone.good,
+            zone.tip,
+            groupText(zone.code),
+          ].join(" "),
+          tokens,
+        ),
       ),
+      (zone) => joinDot(zone.name, zone.short, zone.side, zone.price),
+      tokens,
     );
 
     const postHits = posts.filter((post) => {
@@ -197,20 +265,30 @@ export function SearchSheet({ open, onClose, onOpenPost, onOpenZone, onOpenFood 
       );
     });
 
-    const foodHits = foods.filter((food) =>
-      matches([food.name, food.menu, food.loc, food.price, food.tip].join(" "), tokens),
+    const foodHits = rankFirst(
+      foods.filter((food) =>
+        matches([food.name, food.menu, food.loc, food.price, food.tip].join(" "), tokens),
+      ),
+      (food) => joinDot(food.name, food.loc, food.menu, food.price),
+      tokens,
     );
 
     const userFoodHits = userFoods.filter((food) =>
       matches([food.name, food.menu, food.tip, food.nickname].join(" "), tokens),
     );
 
-    const parkingHits = PARKING.map((card, index) => ({ card, index })).filter(({ card }) =>
-      matches(
-        [card.title, card.sub, card.tip ?? "", card.warn ?? "", ...card.kvs.flat()].join(" "),
-        tokens,
-      ),
-    );
+    const parkingHits = PARKING.map((card, index) => ({ card, index }))
+      .filter(({ card }) =>
+        matches(
+          [card.title, card.sub, card.tip ?? "", card.warn ?? "", ...card.kvs.flat()].join(" "),
+          tokens,
+        ),
+      )
+      .sort((a, b) => {
+        const rank = (card: (typeof PARKING)[number]) =>
+          matches(joinDot(card.title, card.sub), tokens) ? 0 : 1;
+        return rank(a.card) - rank(b.card);
+      });
 
     const userParkingHits = userParkings.filter((parking) =>
       matches(
@@ -314,7 +392,7 @@ export function SearchSheet({ open, onClose, onOpenPost, onOpenZone, onOpenFood 
                 key={zone.code}
                 emoji={zone.emoji}
                 title={zone.name}
-                sub={`${zone.side} · ${zone.price}`}
+                sub={zoneSub(zone, tokens)}
                 badge={zone.grade}
                 tokens={tokens}
                 onClick={() => go(() => onOpenZone(zone.code))}
@@ -332,7 +410,7 @@ export function SearchSheet({ open, onClose, onOpenPost, onOpenZone, onOpenFood 
                 key={`stadium-${food.id}`}
                 emoji={food.emoji}
                 title={food.name}
-                sub={`${food.loc} · ${food.price}`}
+                sub={foodSub(food, tokens)}
                 badge={food.inStadium ? "구장 안" : "구장 밖"}
                 tokens={tokens}
                 onClick={() => go(() => onOpenFood("stadium", food.id))}
@@ -345,7 +423,7 @@ export function SearchSheet({ open, onClose, onOpenPost, onOpenZone, onOpenFood 
                   key={`user-${food.id}`}
                   emoji="🦁"
                   title={food.name}
-                  sub={[food.menu, food.nickname].filter(Boolean).join(" · ")}
+                  sub={userFoodSub(food, tokens)}
                   badge="직관러"
                   tokens={tokens}
                   onClick={() => go(() => onOpenFood("user-food", food.id))}
@@ -366,7 +444,7 @@ export function SearchSheet({ open, onClose, onOpenPost, onOpenZone, onOpenFood 
                 key={`guide-${index}`}
                 emoji={card.ic}
                 title={card.title}
-                sub={card.sub}
+                sub={parkingSub(card, tokens)}
                 tokens={tokens}
                 onClick={() => go(() => onOpenFood("parking-guide", String(index)))}
               />
@@ -378,9 +456,7 @@ export function SearchSheet({ open, onClose, onOpenPost, onOpenZone, onOpenFood 
                   key={`parking-${parking.id}`}
                   emoji="🅿️"
                   title={parking.name}
-                  sub={[parking.location, parking.isFree ? "무료" : parking.feeNote]
-                    .filter(Boolean)
-                    .join(" · ")}
+                  sub={userParkingSub(parking, tokens)}
                   badge="직관러"
                   tokens={tokens}
                   onClick={() => go(() => onOpenFood("user-parking", parking.id))}

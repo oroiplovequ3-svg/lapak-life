@@ -9,6 +9,9 @@ import { WRITE_CATEGORIES } from "@/lib/data/categories";
 import { zoneFullName, ZONE_ORDER } from "@/lib/data/zones";
 import type { CategoryId } from "@/lib/types";
 
+/** 좌석을 함께 남기는 카테고리 — 직관후기 · 실시간현장만 */
+const SEAT_CATEGORY_IDS: CategoryId[] = ["review", "live"];
+
 interface ComposeSheetProps {
   open: boolean;
   onClose: () => void;
@@ -23,6 +26,10 @@ export function ComposeSheet({ open, onClose, onPosted }: ComposeSheetProps) {
   const [body, setBody] = useState("");
   const [submitting, setSubmitting] = useState(false);
 
+  /** 소통해요·굿즈에서는 좌석 항목을 숨기고 저장도 하지 않는다 */
+  const withSeat = SEAT_CATEGORY_IDS.includes(category);
+  const seatCode = withSeat ? seatZone || null : null;
+
   const submit = async () => {
     const text = body.trim();
     if (!text) return;
@@ -30,8 +37,8 @@ export function ComposeSheet({ open, onClose, onPosted }: ComposeSheetProps) {
     const ok = await createPost({
       category,
       body: text,
-      seatZone: seatZone || null,
-      seatDetail: seatZone ? zoneFullName(seatZone) : null,
+      seatZone: seatCode,
+      seatDetail: seatCode ? zoneFullName(seatCode) : null,
     });
     setSubmitting(false);
     if (ok) {
@@ -62,26 +69,30 @@ export function ComposeSheet({ open, onClose, onPosted }: ComposeSheetProps) {
         ))}
       </div>
 
-      <span className="text-xs font-extrabold text-ink-2">
-        좌석 <span className="text-[10.5px] font-bold text-ink-faint">(선택)</span>
-      </span>
-      <div className="relative">
-        <select
-          value={seatZone}
-          onChange={(event) => setSeatZone(event.target.value)}
-          className="w-full appearance-none rounded-[13px] border border-line bg-[#FAFBFC] px-3 py-[11px] pr-9 text-[13px] font-bold text-ink-2 outline-none"
-        >
-          <option value="">좌석을 선택하지 않음</option>
-          {ZONE_ORDER.map((code) => (
-            <option key={code} value={code}>
-              {zoneFullName(code)}
-            </option>
-          ))}
-        </select>
-        <span className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-ink-muted">
-          <Icon name="chevron" size={15} />
-        </span>
-      </div>
+      {withSeat && (
+        <>
+          <span className="text-xs font-extrabold text-ink-2">
+            좌석 <span className="text-[10.5px] font-bold text-ink-faint">(선택)</span>
+          </span>
+          <div className="relative">
+            <select
+              value={seatZone}
+              onChange={(event) => setSeatZone(event.target.value)}
+              className="w-full appearance-none rounded-[13px] border border-line bg-[#FAFBFC] px-3 py-[11px] pr-9 text-[13px] font-bold text-ink-2 outline-none"
+            >
+              <option value="">좌석을 선택하지 않음</option>
+              {ZONE_ORDER.map((code) => (
+                <option key={code} value={code}>
+                  {zoneFullName(code)}
+                </option>
+              ))}
+            </select>
+            <span className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-ink-muted">
+              <Icon name="chevron" size={15} />
+            </span>
+          </div>
+        </>
+      )}
 
       <span className="text-xs font-extrabold text-ink-2">내용</span>
       <textarea

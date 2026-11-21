@@ -11,17 +11,20 @@ import { PARKING } from "@/lib/data/parking";
 import type { Food, UserFood, UserParking } from "@/lib/types";
 
 type FoodFilter = "all" | "in" | "out";
+type FoodTab = "all" | "user" | "stadium";
 
 function SectionHead({
   title,
   sub,
   count,
   onAdd,
+  addLabel = "추가",
 }: {
   title: string;
   sub: string;
   count: number;
   onAdd: () => void;
+  addLabel?: string;
 }) {
   return (
     <div className="mt-1 flex items-end justify-between gap-2 px-0.5">
@@ -36,7 +39,7 @@ function SectionHead({
         onClick={onAdd}
         className="flex flex-none items-center gap-1 rounded-full bg-brand px-[11px] py-[7px] text-[11.5px] font-extrabold text-white shadow-[0_3px_10px_-2px_rgba(7,76,161,.5)]"
       >
-        <Icon name="plus" size={12} strokeWidth={2.6} /> 추가
+        <Icon name="plus" size={12} strokeWidth={2.6} /> {addLabel}
       </button>
     </div>
   );
@@ -191,6 +194,7 @@ function FoodCard({ food }: { food: Food }) {
 export function FoodScreen() {
   const { foods, userFoods, userParkings, deleteUserFood, deleteUserParking } = useApp();
   const [segment, setSegment] = useState<"food" | "parking">("food");
+  const [tab, setTab] = useState<FoodTab>("all");
   const [filter, setFilter] = useState<FoodFilter>("all");
   const [foodSheetOpen, setFoodSheetOpen] = useState(false);
   const [parkingSheetOpen, setParkingSheetOpen] = useState(false);
@@ -203,6 +207,14 @@ export function FoodScreen() {
     filter === "all"
       ? userFoods
       : userFoods.filter((food) => (filter === "in" ? food.inStadium : !food.inStadium));
+
+  const visibleUserFoods = tab === "all" ? filteredUserFoods : userFoods;
+
+  const tabs: [FoodTab, string, number][] = [
+    ["all", "전체", foods.length + userFoods.length],
+    ["user", "직관러 맛집", userFoods.length],
+    ["stadium", "야구장 푸드", foods.length],
+  ];
 
   return (
     <div className="flex flex-col gap-3.5 px-4 pb-[30px] pt-3.5">
@@ -310,77 +322,132 @@ export function FoodScreen() {
         </>
       ) : (
         <>
-          <div className="-mx-4 flex gap-[7px] overflow-x-auto px-4 pb-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
-            {(
-              [
-                ["all", "전체", foods.length],
-                ["in", "구장 안", insideCount],
-                ["out", "구장 밖(입장 전)", foods.length - insideCount],
-              ] as [FoodFilter, string, number][]
-            ).map(([id, label, count]) => (
+          <div className="-mx-4 flex border-b border-line px-3">
+            {tabs.map(([id, label, count]) => (
               <button
                 key={id}
                 type="button"
-                onClick={() => setFilter(id)}
-                className={`inline-flex flex-none items-center gap-[5px] rounded-full border px-[13px] py-2 text-[12.5px] font-bold transition ${
-                  filter === id
-                    ? "border-brand bg-brand text-white shadow-[0_3px_10px_-2px_rgba(7,76,161,.5)]"
-                    : "border-line bg-white text-[#475467]"
+                onClick={() => setTab(id)}
+                className={`relative flex-1 whitespace-nowrap py-[10px] text-[13px] font-extrabold tracking-tight2 transition ${
+                  tab === id ? "text-brand" : "text-ink-faint"
                 }`}
               >
                 {label}
-                <span className="ml-px text-[10.5px] font-extrabold opacity-70">{count}</span>
+                <span className="ml-[3px] text-[10.5px] font-extrabold opacity-70">{count}</span>
+                {tab === id ? (
+                  <span className="absolute inset-x-3 bottom-[-1px] h-[2.5px] rounded-full bg-brand" />
+                ) : null}
               </button>
             ))}
           </div>
 
-          <div className="flex flex-col gap-2.5">
-            {filtered.map((food) => (
-              <FoodCard key={food.id} food={food} />
-            ))}
-          </div>
-
-          <SectionHead
-            title="🦁 직관러 맛집"
-            sub="직접 다녀온 직관러가 올린 맛집이에요. 나도 한 곳 올려보세요."
-            count={filteredUserFoods.length}
-            onAdd={() => setFoodSheetOpen(true)}
-          />
-
-          {filteredUserFoods.length ? (
-            <div className="flex flex-col gap-2.5">
-              {filteredUserFoods.map((food) => (
-                <UserFoodCard
-                  key={food.id}
-                  food={food}
-                  onDelete={() => void deleteUserFood(food.id)}
-                />
-              ))}
+          {tab === "user" ? (
+            <div className="flex items-center gap-2.5 rounded-md2 border border-[#D7E6FA] bg-[#F2F8FF] p-3.5">
+              <div className="grid h-[38px] w-[38px] flex-none place-items-center rounded-xl bg-[#DCEAFF] text-lg">
+                🦁
+              </div>
+              <div>
+                <div className="text-[13px] font-extrabold text-[#0B4A96]">
+                  직관러가 직접 다녀온 맛집
+                </div>
+                <div className="mt-[3px] break-keep text-[11.5px] leading-relaxed text-ink-faint">
+                  구장 안팎에서 먹어본 메뉴와 팁을 남겨주세요. 직접 올린 글은 내가 삭제할 수 있어요.
+                </div>
+              </div>
             </div>
-          ) : (
-            <div className="rounded-md2 border border-dashed border-[#D9DEE7] bg-[#FBFCFE] px-4 py-[18px] text-center">
-              <div className="mb-[6px] text-[24px]">🍗</div>
-              <p className="text-[12.5px] font-extrabold text-ink-2">아직 올라온 맛집이 없어요</p>
-              <p className="mt-1 text-[11px] leading-relaxed text-ink-faint">
-                첫 직관러 맛집을 남겨주세요.
+          ) : null}
+
+          {tab !== "user" ? (
+            <>
+              <div className="-mx-4 flex gap-[7px] overflow-x-auto px-4 pb-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+                {(
+                  [
+                    ["all", "전체", foods.length],
+                    ["in", "구장 안", insideCount],
+                    ["out", "구장 밖(입장 전)", foods.length - insideCount],
+                  ] as [FoodFilter, string, number][]
+                ).map(([id, label, count]) => (
+                  <button
+                    key={id}
+                    type="button"
+                    onClick={() => setFilter(id)}
+                    className={`inline-flex flex-none items-center gap-[5px] rounded-full border px-[13px] py-2 text-[12.5px] font-bold transition ${
+                      filter === id
+                        ? "border-brand bg-brand text-white shadow-[0_3px_10px_-2px_rgba(7,76,161,.5)]"
+                        : "border-line bg-white text-[#475467]"
+                    }`}
+                  >
+                    {label}
+                    <span className="ml-px text-[10.5px] font-extrabold opacity-70">{count}</span>
+                  </button>
+                ))}
+              </div>
+
+              <div className="flex flex-col gap-2.5">
+                {filtered.map((food) => (
+                  <FoodCard key={food.id} food={food} />
+                ))}
+              </div>
+            </>
+          ) : null}
+
+          {tab !== "stadium" ? (
+            <>
+              <SectionHead
+                title="🦁 직관러 맛집"
+                sub="직접 다녀온 직관러가 올린 맛집이에요. 나도 한 곳 올려보세요."
+                count={visibleUserFoods.length}
+                onAdd={() => setFoodSheetOpen(true)}
+                addLabel="맛집 추가"
+              />
+
+              {visibleUserFoods.length ? (
+                <div className="flex flex-col gap-2.5">
+                  {visibleUserFoods.map((food) => (
+                    <UserFoodCard
+                      key={food.id}
+                      food={food}
+                      onDelete={() => void deleteUserFood(food.id)}
+                    />
+                  ))}
+                </div>
+              ) : (
+                <button
+                  type="button"
+                  onClick={() => setFoodSheetOpen(true)}
+                  className="w-full rounded-md2 border border-dashed border-[#D9DEE7] bg-[#FBFCFE] px-4 py-[18px] text-center"
+                >
+                  <div className="mb-[6px] text-[24px]">🍗</div>
+                  <p className="text-[12.5px] font-extrabold text-ink-2">아직 올라온 맛집이 없어요</p>
+                  <p className="mt-1 text-[11px] leading-relaxed text-ink-faint">
+                    첫 직관러 맛집을 남겨주세요.
+                  </p>
+                  <span className="mt-2.5 inline-flex items-center gap-1 rounded-full bg-brand px-[13px] py-[7px] text-[11.5px] font-extrabold text-white shadow-[0_3px_10px_-2px_rgba(7,76,161,.5)]">
+                    <Icon name="plus" size={12} strokeWidth={2.6} /> 맛집 추가
+                  </span>
+                </button>
+              )}
+            </>
+          ) : null}
+
+          {tab !== "user" ? (
+            <>
+              <div className="rounded-md2 border border-line bg-[#F8FAFC] p-3.5 shadow-card">
+                <div className="mb-1.5 text-[12.5px] font-extrabold">🍽️ 층별로 빠르게 찾기</div>
+                <div className="text-[11.5px] leading-[1.75] text-ink-faint">
+                  {FLOOR_GUIDE.map((guide) => (
+                    <span key={guide.title} className="block">
+                      {guide.title} · {guide.items}
+                    </span>
+                  ))}
+                </div>
+              </div>
+
+              <p className="break-keep px-2.5 pt-1 text-center text-[10.5px] leading-relaxed text-[#AEB6C2]">
+                매장·메뉴는 2026 시즌 공개 자료를 참고한 샘플입니다. 실제 운영은 구단 공지로 확인하세요.
               </p>
-            </div>
-          )}
-
-          <div className="rounded-md2 border border-line bg-[#F8FAFC] p-3.5 shadow-card">
-            <div className="mb-1.5 text-[12.5px] font-extrabold">🍽️ 층별로 빠르게 찾기</div>
-            <div className="text-[11.5px] leading-[1.75] text-ink-faint">
-              {FLOOR_GUIDE.map((guide) => (
-                <span key={guide.title} className="block">
-                  {guide.title} · {guide.items}
-                </span>
-              ))}
-            </div>
-          </div>
-
-          <p className="break-keep px-2.5 pt-1 text-center text-[10.5px] leading-relaxed text-[#AEB6C2]">
-            매장·메뉴는 2026 시즌 공개 자료를 참고한 샘플입니다. 실제 운영은 구단 공지로 확인하세요.
-          </p>
+            </>
+          ) : null}
         </>
       )}
 

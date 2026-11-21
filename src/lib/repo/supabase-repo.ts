@@ -208,7 +208,7 @@ async function deleteOwnRow(
   const { data, error } = await supabase.from(table).delete().eq("id", id).select("id");
   if (error) fail(context, error);
   if (!data?.length) {
-    throw new Error(`${context}: 내가 쓴 글만 삭제할 수 있어요. 이미 지워졌는지 확인해 주세요.`);
+    throw new Error(`${context}: 이미 지워졌거나 내가 쓴 항목이 아니에요.`);
   }
 }
 

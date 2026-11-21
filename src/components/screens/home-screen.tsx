@@ -1,7 +1,7 @@
 "use client";
 
 import Image from "next/image";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 
 import { Avatar } from "@/components/avatar";
 import { DeleteButton } from "@/components/delete-button";
@@ -209,6 +209,12 @@ export function HomeScreen({ onCompose, highlightedPostId, onGoSeat, onGoFood }:
   const { posts, ready, loadError } = useApp();
   const [filter, setFilter] = useState<FilterId>("all");
   const [bannerClosed, setBannerClosed] = useState(false);
+
+  // 검색·내 글에서 특정 글로 들어오면, 지금 고른 카테고리에 가려 보이지 않는 일이 없도록
+  // 전체 필터로 돌려 놓습니다.
+  useEffect(() => {
+    if (highlightedPostId) setFilter("all");
+  }, [highlightedPostId]);
 
   const counts = useMemo(() => {
     const result: Record<string, number> = { all: posts.length };

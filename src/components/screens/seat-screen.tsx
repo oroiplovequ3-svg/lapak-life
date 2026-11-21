@@ -21,6 +21,11 @@ import {
 import { formatRelativeTime } from "@/lib/utils";
 
 interface SeatScreenProps {
+  /** 지금 고른 구역 코드 ('all' 이면 전체 구역 · 검색에서도 같은 값을 씁니다) */
+  selectedZone: string;
+  onSelectZone: (code: string) => void;
+  /** 검색에서 구역을 골라 들어올 때마다 올라가는 값 — 그 구역 카드로 스크롤합니다. */
+  focusNonce?: number;
   /** 후기 작성 시트를 열고, 지금 고른 구역을 미리 선택해 둡니다. */
   onWriteReview?: (zoneCode: string) => void;
 }
@@ -28,14 +33,20 @@ interface SeatScreenProps {
 /** '전체 구역'에서 후기를 쓸 때 미리 골라 둘 기본 구역 (홈 응원 3루 테이블) */
 const DEFAULT_REVIEW_ZONE = "T3";
 
-export function SeatScreen({ onWriteReview }: SeatScreenProps) {
+export function SeatScreen({
+  selectedZone,
+  onSelectZone,
+  focusNonce = 0,
+  onWriteReview,
+}: SeatScreenProps) {
   const { zones, reviews, saves, toggleSaveZone, deleteReview } = useApp();
-  const [selected, setSelected] = useState<string>("all");
+  const selected = selectedZone;
   const [pickerOpen, setPickerOpen] = useState(false);
   const [lightbox, setLightbox] = useState<PhotoLightboxState | null>(null);
   const pickerRef = useRef<HTMLElement | null>(null);
   const listRef = useRef<HTMLDivElement | null>(null);
   const selectedRowRef = useRef<HTMLButtonElement | null>(null);
+  const detailRef = useRef<HTMLElement | null>(null);
   const zone =
     selected === "all" ? null : zones.find((z) => z.code === selected) ?? ZONE_BY_CODE[selected];
   const filteredReviews = useMemo(
@@ -66,13 +77,22 @@ export function SeatScreen({ onWriteReview }: SeatScreenProps) {
     list.scrollTop += rowRect.top - listRect.top - list.clientHeight / 2 + rowRect.height / 2;
   }, [pickerOpen]);
 
+  // 검색에서 구역을 골라 들어오면 그 구역의 시야·후기 카드가 바로 보이게 맞춰요.
+  useEffect(() => {
+    if (!focusNonce) return;
+    const timer = window.setTimeout(() => {
+      detailRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+    }, 180);
+    return () => window.clearTimeout(timer);
+  }, [focusNonce]);
+
   function choose(code: string) {
-    setSelected(code);
+    onSelectZone(code);
     setPickerOpen(false);
   }
 
   function pickFromMap(code: string) {
-    setSelected(code);
+    onSelectZone(code);
     setPickerOpen(false);
   }
 
@@ -220,7 +240,10 @@ export function SeatScreen({ onWriteReview }: SeatScreenProps) {
 
       {zone ? (
         <>
-          <section className="relative overflow-hidden rounded-lg2 bg-gradient-to-br from-brand via-brand-600 to-brand-500 px-4 py-4 text-white shadow-brand">
+          <section
+            ref={detailRef}
+            className="relative overflow-hidden rounded-lg2 bg-gradient-to-br from-brand via-brand-600 to-brand-500 px-4 py-4 text-white shadow-brand"
+          >
             <div className="pointer-events-none absolute -bottom-[60px] -right-10 h-[150px] w-[150px] rounded-full bg-white/[.07]" />
             <div className="relative text-lg font-extrabold tracking-tight3">
               {zone.emoji} {zone.name}

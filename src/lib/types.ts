@@ -208,6 +208,16 @@ export interface NewUserFoodInput {
   photoUrls?: string[];
 }
 
+/** 통합 검색에서 '맛집·주차' 탭의 특정 항목으로 바로 이동할 때 쓰는 목표 */
+export type FoodFocusKind = "stadium" | "user-food" | "user-parking" | "parking-guide";
+
+export interface FoodFocus {
+  kind: FoodFocusKind;
+  id: string;
+  /** 같은 항목을 다시 눌러도 이동이 다시 일어나도록 올려 주는 값 */
+  nonce: number;
+}
+
 export interface NewUserParkingInput {
   name: string;
   location: string;

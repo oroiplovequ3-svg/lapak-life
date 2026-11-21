@@ -15,7 +15,7 @@ import { UserFoodSheet } from "@/components/user-food-sheet";
 import { UserParkingSheet } from "@/components/user-parking-sheet";
 import { groupedFoods } from "@/lib/data/foods";
 import { PARKING } from "@/lib/data/parking";
-import type { Food, UserFood, UserParking } from "@/lib/types";
+import type { Food, FoodFocus, UserFood, UserParking } from "@/lib/types";
 
 type FoodFilter = "all" | "in" | "out";
 type FoodTab = "all" | "user" | "stadium";
@@ -64,7 +64,10 @@ function UserFoodCard({
   const photoUrls = food.photoUrls ?? [];
 
   return (
-    <article className="relative rounded-md2 border border-line bg-white p-3 shadow-card">
+    <article
+      data-user-food-id={food.id}
+      className="relative rounded-md2 border border-line bg-white p-3 shadow-card"
+    >
       <div className="flex items-start gap-2.5">
         <div className="grid h-[34px] w-[34px] flex-none place-items-center rounded-[11px] bg-brand-50 text-base">
           🦁
@@ -119,7 +122,10 @@ function UserParkingCard({
   onDelete: () => void;
 }) {
   return (
-    <article className="relative rounded-md2 border border-line bg-white p-3 shadow-card">
+    <article
+      data-user-parking-id={parking.id}
+      className="relative rounded-md2 border border-line bg-white p-3 shadow-card"
+    >
       <div className="flex items-start gap-2.5">
         <div className="grid h-[34px] w-[34px] flex-none place-items-center rounded-[11px] bg-brand-50 text-base">
           🅿️
@@ -421,7 +427,10 @@ function FoodCard({ food }: { food: Food }) {
   ];
 
   return (
-    <article className="relative rounded-md2 border border-line bg-white p-3 shadow-card">
+    <article
+      data-food-id={food.id}
+      className="relative rounded-md2 border border-line bg-white p-3 shadow-card"
+    >
       <button
         type="button"
         aria-label={saved ? "저장 해제" : "저장"}
@@ -468,7 +477,7 @@ function FoodCard({ food }: { food: Food }) {
   );
 }
 
-export function FoodScreen() {
+export function FoodScreen({ focus }: { focus?: FoodFocus | null }) {
   const { foods, userFoods, userParkings, deleteUserFood, deleteUserParking } = useApp();
   const [segment, setSegment] = useState<"food" | "parking">("food");
   const [tab, setTab] = useState<FoodTab>("all");
@@ -477,6 +486,42 @@ export function FoodScreen() {
   const [foodSheetOpen, setFoodSheetOpen] = useState(false);
   const [parkingSheetOpen, setParkingSheetOpen] = useState(false);
   const [lightbox, setLightbox] = useState<PhotoLightboxState | null>(null);
+
+  // 검색에서 특정 매장·맛집·주차 항목을 골라 들어오면 그 카드가 바로 보이게 맞춰요.
+  useEffect(() => {
+    if (!focus) return;
+
+    if (focus.kind === "stadium") {
+      setSegment("food");
+      setTab("stadium");
+      setFilter("all");
+      setPicked(focus.id);
+    } else if (focus.kind === "user-food") {
+      setSegment("food");
+      setTab("user");
+    } else {
+      setSegment("parking");
+    }
+
+    const selector =
+      focus.kind === "stadium"
+        ? `[data-food-id="${focus.id}"]`
+        : focus.kind === "user-food"
+          ? `[data-user-food-id="${focus.id}"]`
+          : focus.kind === "user-parking"
+            ? `[data-user-parking-id="${focus.id}"]`
+            : `[data-parking-guide="${focus.id}"]`;
+
+    const scroll = () =>
+      document.querySelector(selector)?.scrollIntoView({ behavior: "smooth", block: "center" });
+    // 탭·세그먼트가 바뀌며 목록이 다시 그려진 뒤에 찾도록 한 박자 기다렸다가 두 번 맞춰요.
+    const first = window.setTimeout(scroll, 220);
+    const second = window.setTimeout(scroll, 560);
+    return () => {
+      window.clearTimeout(first);
+      window.clearTimeout(second);
+    };
+  }, [focus]);
 
   const insideCount = foods.filter((food) => food.inStadium).length;
 
@@ -542,8 +587,12 @@ export function FoodScreen() {
             </div>
           </div>
 
-          {PARKING.map((card) => (
-            <article key={card.title} className="rounded-md2 border border-line bg-white p-3.5 shadow-card">
+          {PARKING.map((card, cardIndex) => (
+            <article
+              key={card.title}
+              data-parking-guide={cardIndex}
+              className="rounded-md2 border border-line bg-white p-3.5 shadow-card"
+            >
               <div className="mb-1 flex items-center gap-2.5">
                 <div className="grid h-[38px] w-[38px] flex-none place-items-center rounded-xl bg-brand-50 text-lg">
                   {card.ic}

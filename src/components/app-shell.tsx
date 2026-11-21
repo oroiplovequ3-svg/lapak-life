@@ -8,10 +8,13 @@ import { GameSheet } from "@/components/game-sheet";
 import { Icon, type IconName } from "@/components/icons";
 import { LoginPromptSheet } from "@/components/login-prompt-sheet";
 import { ReviewSheet } from "@/components/review-sheet";
+import { SearchSheet } from "@/components/search-sheet";
+import { SettingsSheet } from "@/components/settings-sheet";
 import { FoodScreen } from "@/components/screens/food-screen";
 import { HomeScreen } from "@/components/screens/home-screen";
 import { MyScreen } from "@/components/screens/my-screen";
 import { SeatScreen } from "@/components/screens/seat-screen";
+import type { FoodFocus, FoodFocusKind } from "@/lib/types";
 
 type Tab = "home" | "seat" | "food" | "my";
 
@@ -43,6 +46,16 @@ export function AppShell() {
   const [reviewZone, setReviewZone] = useState<string>("T3");
   const [gameOpen, setGameOpen] = useState(false);
   const [highlightId, setHighlightId] = useState<string | null>(null);
+  const [searchOpen, setSearchOpen] = useState(false);
+  const [settingsOpen, setSettingsOpen] = useState(false);
+  // 좌석 시야 탭에서 지금 고른 구역 (검색에서도 같은 상태를 씁니다)
+  const [seatZone, setSeatZone] = useState<string>("all");
+  const [seatFocusNonce, setSeatFocusNonce] = useState(0);
+  const [foodFocus, setFoodFocus] = useState<FoodFocus | null>(null);
+
+  const scrollScreenTop = () => {
+    document.getElementById("screen")?.scrollTo({ top: 0 });
+  };
 
   const openMyPost = (postId: string) => {
     setHighlightId(postId);
@@ -51,7 +64,26 @@ export function AppShell() {
       document
         .querySelector(`[data-post-id="${postId}"]`)
         ?.scrollIntoView({ behavior: "smooth", block: "center" });
-    }, 120);
+    }, 220);
+  };
+
+  /* 검색 결과에서 바로 이동 */
+  const openZoneFromSearch = (zoneCode: string) => {
+    setSeatZone(zoneCode);
+    setSeatFocusNonce((value) => value + 1);
+    setTab("seat");
+    scrollScreenTop();
+  };
+
+  const openFoodFromSearch = (kind: FoodFocusKind, id: string) => {
+    const nonce = Date.now();
+    setFoodFocus({ kind, id, nonce });
+    setTab("food");
+    scrollScreenTop();
+    // 잠시 뒤 목표를 비워, 탭을 다시 열 때 엉뚱한 곳으로 또 스크롤하지 않게 합니다.
+    window.setTimeout(() => {
+      setFoodFocus((current) => (current?.nonce === nonce ? null : current));
+    }, 1000);
   };
 
   return (
@@ -79,23 +111,14 @@ export function AppShell() {
         </div>
         <div className="ml-auto flex gap-0.5">
           {tab === "home" ? (
-            <>
-              <button
-                type="button"
-                aria-label="검색"
-                className="grid h-9 w-9 place-items-center rounded-xl text-[#475467]"
-              >
-                <Icon name="search" />
-              </button>
-              <button
-                type="button"
-                aria-label="알림"
-                className="relative grid h-9 w-9 place-items-center rounded-xl text-[#475467]"
-              >
-                <Icon name="bell" />
-                <span className="absolute right-[9px] top-2 h-1.5 w-1.5 rounded-full border-[1.5px] border-white bg-[#F04438]" />
-              </button>
-            </>
+            <button
+              type="button"
+              aria-label="검색"
+              onClick={() => setSearchOpen(true)}
+              className="grid h-9 w-9 place-items-center rounded-xl text-[#475467] transition active:bg-[#F3F5F9]"
+            >
+              <Icon name="search" />
+            </button>
           ) : null}
           {tab === "seat" ? (
             <button
@@ -114,7 +137,8 @@ export function AppShell() {
             <button
               type="button"
               aria-label="설정"
-              className="grid h-9 w-9 place-items-center rounded-xl text-[#475467]"
+              onClick={() => setSettingsOpen(true)}
+              className="grid h-9 w-9 place-items-center rounded-xl text-[#475467] transition active:bg-[#F3F5F9]"
             >
               <Icon name="gear" size={20} strokeWidth={1.7} />
             </button>
@@ -134,13 +158,16 @@ export function AppShell() {
         ) : null}
         {tab === "seat" ? (
           <SeatScreen
+            selectedZone={seatZone}
+            onSelectZone={setSeatZone}
+            focusNonce={seatFocusNonce}
             onWriteReview={(zoneCode) => {
               setReviewZone(zoneCode);
               setReviewOpen(true);
             }}
           />
         ) : null}
-        {tab === "food" ? <FoodScreen /> : null}
+        {tab === "food" ? <FoodScreen focus={foodFocus} /> : null}
         {tab === "my" ? (
           <MyScreen
             onOpenPost={openMyPost}
@@ -189,6 +216,14 @@ export function AppShell() {
         onPosted={(zone) => setReviewZone(zone)}
       />
       <GameSheet open={gameOpen} onClose={() => setGameOpen(false)} />
+      <SearchSheet
+        open={searchOpen}
+        onClose={() => setSearchOpen(false)}
+        onOpenPost={openMyPost}
+        onOpenZone={openZoneFromSearch}
+        onOpenFood={openFoodFromSearch}
+      />
+      <SettingsSheet open={settingsOpen} onClose={() => setSettingsOpen(false)} />
       <LoginPromptSheet />
     </div>
   );

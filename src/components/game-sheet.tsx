@@ -10,8 +10,16 @@ import {
   preparePhoto,
   type PreparedPhoto,
 } from "@/lib/image";
-import { todayISO } from "@/lib/utils";
-import { useRef, useState, type ChangeEvent } from "react";
+import {
+  gameResult,
+  gamesOnDate,
+  lastPlayedGame,
+  stageLabel,
+  venueLabel,
+  type Samsung2026Game,
+} from "@/lib/data/samsung-2026-schedule";
+import { formatDotDate, todayISO } from "@/lib/utils";
+import { useEffect, useRef, useState, type ChangeEvent } from "react";
 
 interface GameSheetProps {
   open: boolean;
@@ -24,6 +32,8 @@ export function GameSheet({ open, onClose }: GameSheetProps) {
   const toast = useToast();
   const fileRef = useRef<HTMLInputElement>(null);
   const [playedOn, setPlayedOn] = useState(todayISO());
+  // 같은 날 더블헤더가 편성되면 몇 번째 경기인지 (지금 2026 시즌 데이터에는 없음)
+  const [gameIndex, setGameIndex] = useState(0);
   const [opponent, setOpponent] = useState("");
   const [homeAway, setHomeAway] = useState<"home" | "away">("home");
   const [scoreFor, setScoreFor] = useState("");
@@ -34,6 +44,42 @@ export function GameSheet({ open, onClose }: GameSheetProps) {
   const [submitting, setSubmitting] = useState(false);
 
   const valid = opponent.trim() && scoreFor !== "" && scoreAgainst !== "";
+
+  const dayGames = gamesOnDate(playedOn);
+  const matchedGame: Samsung2026Game | null = dayGames[gameIndex] ?? dayGames[0] ?? null;
+  const result = matchedGame ? gameResult(matchedGame) : null;
+  const latestPlayed = lastPlayedGame();
+
+  /** 일정에 있는 경기 값으로 상대·홈/원정·스코어를 채웁니다. 취소 경기는 스코어를 비워 둡니다. */
+  const applyGame = (game: Samsung2026Game | null) => {
+    if (!game) {
+      setOpponent("");
+      setHomeAway("home");
+      setScoreFor("");
+      setScoreAgainst("");
+      return;
+    }
+    setOpponent(game.opponent);
+    setHomeAway(game.homeAway);
+    setScoreFor(game.scoreFor === null ? "" : String(game.scoreFor));
+    setScoreAgainst(game.scoreAgainst === null ? "" : String(game.scoreAgainst));
+  };
+
+  /** 날짜를 바꾸면 그날 경기로 다시 채웁니다. (이전 자동 입력값이 남지 않도록 초기화) */
+  const selectDate = (next: string) => {
+    setPlayedOn(next);
+    setGameIndex(0);
+    applyGame(gamesOnDate(next)[0] ?? null);
+  };
+
+  // 시트를 열 때마다 현재 날짜 기준으로 다시 맞춥니다.
+  useEffect(() => {
+    if (!open) return;
+    setGameIndex(0);
+    applyGame(gamesOnDate(playedOn)[0] ?? null);
+    // playedOn 은 열 때의 값만 씁니다 (열려 있는 동안 날짜 변경은 selectDate 가 처리).
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open]);
 
   const reset = () => {
     setOpponent("");
@@ -104,9 +150,96 @@ export function GameSheet({ open, onClose }: GameSheetProps) {
         type="date"
         value={playedOn}
         max={todayISO()}
-        onChange={(event) => setPlayedOn(event.target.value)}
+        onChange={(event) => selectDate(event.target.value)}
         className="w-full rounded-[13px] border border-line bg-[#FAFBFC] px-3 py-[11px] text-[13px] font-bold text-ink outline-none"
       />
+
+      {matchedGame ? (
+        <div className="-mt-0.5 rounded-[13px] border border-brand-100 bg-brand-50 px-3 py-2">
+          <div className="flex items-center justify-between gap-2">
+            <span className="text-[10.5px] font-extrabold text-brand-600">
+              {stageLabel(matchedGame)} · {venueLabel(matchedGame)}
+            </span>
+            <span className="rounded-full bg-white px-1.5 py-[1px] text-[9.5px] font-extrabold text-brand-500 shadow-[0_1px_2px_rgba(16,24,40,.06)]">
+              자동 입력
+            </span>
+          </div>
+          <div className="mt-[3px] flex items-center gap-1.5">
+            <span className="text-[13px] font-extrabold tracking-tight text-ink">
+              vs {matchedGame.opponent}
+            </span>
+            {matchedGame.canceled ? (
+              <span className="rounded-md bg-white px-1.5 py-[1px] text-[10.5px] font-extrabold text-[#B54708]">
+                {matchedGame.canceled}
+              </span>
+            ) : (
+              <>
+                <span className="text-[13px] font-extrabold tracking-tight text-ink-2">
+                  {matchedGame.scoreFor} : {matchedGame.scoreAgainst}
+                </span>
+                {result ? (
+                  <span
+                    className={`rounded-md px-1.5 py-[1px] text-[10.5px] font-extrabold ${
+                      result === "win"
+                        ? "bg-[#ECFDF3] text-[#039855]"
+                        : result === "loss"
+                          ? "bg-[#FEF3F2] text-[#B42318]"
+                          : "bg-[#FFFAEB] text-[#B54708]"
+                    }`}
+                  >
+                    {result === "win" ? "승" : result === "loss" ? "패" : "무"}
+                  </span>
+                ) : null}
+              </>
+            )}
+          </div>
+          {matchedGame.canceled ? (
+            <p className="mt-1 text-[10px] font-semibold leading-relaxed text-[#B54708]">
+              취소된 경기라 스코어는 자동으로 채우지 않았어요 · 기록하려면 직접 입력해 주세요.
+            </p>
+          ) : null}
+        </div>
+      ) : (
+        <p className="-mt-0.5 break-keep text-[10.5px] font-semibold leading-relaxed text-[#AEB6C2]">
+          등록된 2026 시즌 경기가 없는 날짜예요 — 직접 입력할 수 있어요.
+        </p>
+      )}
+
+      {dayGames.length > 1 ? (
+        <div className="flex gap-1.5">
+          {dayGames.map((game, index) => (
+            <button
+              key={`${game.date}-${index}`}
+              type="button"
+              onClick={() => {
+                setGameIndex(index);
+                applyGame(game);
+              }}
+              className={`flex-1 rounded-full border px-3 py-[6px] text-[11px] font-bold transition ${
+                index === gameIndex
+                  ? "border-brand bg-brand text-white"
+                  : "border-line bg-white text-[#475467]"
+              }`}
+            >
+              {index + 1}차전
+            </button>
+          ))}
+        </div>
+      ) : null}
+
+      {!matchedGame && latestPlayed ? (
+        <button
+          type="button"
+          onClick={() => selectDate(latestPlayed.date)}
+          className="-mt-0.5 flex items-center justify-between gap-2 rounded-[13px] border border-dashed border-[#CFD8E5] bg-white px-3 py-2 text-left"
+        >
+          <span className="text-[10.5px] font-bold leading-relaxed text-ink-faint">
+            최근 경기로 채우기 · {formatDotDate(latestPlayed.date)} {stageLabel(latestPlayed)} vs{" "}
+            {latestPlayed.opponent}
+          </span>
+          <span className="flex-none text-[10.5px] font-extrabold text-brand-600">선택</span>
+        </button>
+      ) : null}
 
       <span className="text-xs font-extrabold text-ink-2">상대팀</span>
       <input
@@ -120,7 +253,7 @@ export function GameSheet({ open, onClose }: GameSheetProps) {
       <div className="flex gap-1.5">
         {(
           [
-            ["home", "라팍 (홈)"],
+            ["home", matchedGame?.venue === "포항" ? "포항 (홈)" : "라팍 (홈)"],
             ["away", "원정"],
           ] as const
         ).map(([value, label]) => (

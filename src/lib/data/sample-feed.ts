@@ -475,11 +475,11 @@ export interface SeedGame {
   note: string;
 }
 
-/** 데모용 직관 기록 5건 */
+/** 데모용 직관 기록 5건 — 날짜·상대·스코어는 2026 시즌 실제 경기(samsung-2026-schedule)와 맞춰 둡니다. */
 export const SEED_GAMES: SeedGame[] = [
-  { playedOn: "2026-10-08", opponent: "kt", homeAway: "home", zoneCode: "T3", scoreFor: 12, scoreAgainst: 1, note: "한국시리즈 5차전 · 우승" },
-  { playedOn: "2026-10-07", opponent: "kt", homeAway: "home", zoneCode: "BZ", scoreFor: 7, scoreAgainst: 3, note: "한국시리즈 4차전" },
-  { playedOn: "2026-09-21", opponent: "KIA", homeAway: "home", zoneCode: "BZ", scoreFor: 2, scoreAgainst: 5, note: "주말 3연전" },
-  { playedOn: "2026-08-30", opponent: "롯데", homeAway: "away", zoneCode: "SB", scoreFor: 9, scoreAgainst: 4, note: "가족 직관" },
-  { playedOn: "2026-07-11", opponent: "두산", homeAway: "home", zoneCode: "T1", scoreFor: 6, scoreAgainst: 2, note: "친구와" },
+  { playedOn: "2026-11-08", opponent: "kt", homeAway: "home", zoneCode: "T3", scoreFor: 12, scoreAgainst: 1, note: "한국시리즈 5차전 · 우승" },
+  { playedOn: "2026-11-07", opponent: "kt", homeAway: "home", zoneCode: "BZ", scoreFor: 10, scoreAgainst: 5, note: "한국시리즈 4차전" },
+  { playedOn: "2026-05-16", opponent: "KIA", homeAway: "home", zoneCode: "BZ", scoreFor: 5, scoreAgainst: 2, note: "주말 3연전" },
+  { playedOn: "2026-05-22", opponent: "롯데", homeAway: "away", zoneCode: "SB", scoreFor: 7, scoreAgainst: 5, note: "가족 직관" },
+  { playedOn: "2026-10-03", opponent: "두산", homeAway: "home", zoneCode: "T1", scoreFor: 6, scoreAgainst: 4, note: "친구와" },
 ];

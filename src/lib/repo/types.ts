@@ -6,8 +6,12 @@ import type {
   NewGameInput,
   NewPostInput,
   NewReviewInput,
+  NewUserFoodInput,
+  NewUserParkingInput,
   Post,
   Saves,
+  UserFood,
+  UserParking,
   Zone,
   ZoneReview,
 } from "@/lib/types";
@@ -46,6 +50,14 @@ export interface Repository {
   loadGames(viewerId: string | null): Promise<Game[]>;
   createGame(input: NewGameInput, viewerId: string): Promise<Game>;
   deleteGame(gameId: string): Promise<void>;
+
+  /* ── 직관러 참여 콘텐츠 (맛집 · 주차 팁) ──────────────────── */
+  loadUserFoods(viewerId: string | null): Promise<UserFood[]>;
+  createUserFood(input: NewUserFoodInput, author: Author): Promise<UserFood>;
+  deleteUserFood(foodId: string): Promise<void>;
+  loadUserParkings(viewerId: string | null): Promise<UserParking[]>;
+  createUserParking(input: NewUserParkingInput, author: Author): Promise<UserParking>;
+  deleteUserParking(parkingId: string): Promise<void>;
 }
 
 export const DEMO_AUTHOR: Author = {

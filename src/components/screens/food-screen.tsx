@@ -2,14 +2,137 @@
 
 import { useState } from "react";
 
-import { Icon } from "@/components/icons";
+import { Icon, Stars } from "@/components/icons";
 import { useApp } from "@/components/providers/app-provider";
+import { UserFoodSheet } from "@/components/user-food-sheet";
+import { UserParkingSheet } from "@/components/user-parking-sheet";
 import { FLOOR_GUIDE } from "@/lib/data/foods";
 import { PARKING } from "@/lib/data/parking";
-import type { Food } from "@/lib/types";
+import type { Food, UserFood, UserParking } from "@/lib/types";
 
 type FoodFilter = "all" | "in" | "out";
 
+function SectionHead({
+  title,
+  sub,
+  count,
+  onAdd,
+}: {
+  title: string;
+  sub: string;
+  count: number;
+  onAdd: () => void;
+}) {
+  return (
+    <div className="mt-1 flex items-end justify-between gap-2 px-0.5">
+      <div className="min-w-0">
+        <h2 className="text-[15.5px] font-extrabold tracking-tight2">
+          {title} <span className="text-[11.5px] font-extrabold text-ink-faint">{count}</span>
+        </h2>
+        <p className="mt-[2px] break-keep text-[10.5px] font-semibold text-ink-faint">{sub}</p>
+      </div>
+      <button
+        type="button"
+        onClick={onAdd}
+        className="flex flex-none items-center gap-1 rounded-full bg-brand px-[11px] py-[7px] text-[11.5px] font-extrabold text-white shadow-[0_3px_10px_-2px_rgba(7,76,161,.5)]"
+      >
+        <Icon name="plus" size={12} strokeWidth={2.6} /> 추가
+      </button>
+    </div>
+  );
+}
+
+function UserFoodCard({ food, onDelete }: { food: UserFood; onDelete: () => void }) {
+  return (
+    <article className="relative rounded-md2 border border-line bg-white p-3 shadow-card">
+      <div className="flex items-start gap-2.5">
+        <div className="grid h-[34px] w-[34px] flex-none place-items-center rounded-[11px] bg-brand-50 text-base">
+          🦁
+        </div>
+        <div className="min-w-0 flex-1">
+          <div className="flex flex-wrap items-baseline gap-x-[7px] gap-y-0.5 pr-5">
+            <h3 className="text-[13.5px] font-extrabold tracking-tight2">{food.name}</h3>
+            <span className="rounded-md bg-[#F2F8FF] px-1.5 py-[1px] text-[10px] font-extrabold text-[#0B4A96]">
+              {food.inStadium ? "구장 안" : "구장 밖"}
+            </span>
+          </div>
+          <div className="mt-[3px] flex items-center gap-1 text-[10.5px] font-semibold text-ink-faint">
+            <Stars value={food.rating} size={10} />
+            <span className="ml-0.5">{food.nickname}</span>
+          </div>
+          {food.menu ? (
+            <p className="mt-1.5 break-keep text-[11.5px] font-extrabold text-brand-600">
+              {food.menu}
+            </p>
+          ) : null}
+          {food.tip ? (
+            <div className="mt-1.5 break-keep rounded-[9px] bg-[#F8FAFC] px-[9px] py-[7px] text-[11.5px] leading-[1.5] text-[#475467]">
+              💡 {food.tip}
+            </div>
+          ) : null}
+        </div>
+        {food.mine ? (
+          <button
+            type="button"
+            aria-label="맛집 삭제"
+            onClick={onDelete}
+            className="absolute right-[7px] top-[7px] rounded-lg p-1.5 text-[#C4CBD6]"
+          >
+            <Icon name="trash" size={13} />
+          </button>
+        ) : null}
+      </div>
+    </article>
+  );
+}
+
+function UserParkingCard({
+  parking,
+  onDelete,
+}: {
+  parking: UserParking;
+  onDelete: () => void;
+}) {
+  return (
+    <article className="relative rounded-md2 border border-line bg-white p-3 shadow-card">
+      <div className="flex items-start gap-2.5">
+        <div className="grid h-[34px] w-[34px] flex-none place-items-center rounded-[11px] bg-brand-50 text-base">
+          🅿️
+        </div>
+        <div className="min-w-0 flex-1">
+          <div className="flex flex-wrap items-baseline gap-x-[7px] gap-y-0.5 pr-5">
+            <h3 className="text-[13.5px] font-extrabold tracking-tight2">{parking.name}</h3>
+            <span
+              className={`rounded-md px-1.5 py-[1px] text-[10px] font-extrabold ${
+                parking.isFree ? "bg-[#ECFDF3] text-[#027A48]" : "bg-[#FFFAEB] text-[#B54708]"
+              }`}
+            >
+              {parking.isFree ? "무료" : parking.feeNote || "유료"}
+            </span>
+          </div>
+          <div className="mt-[3px] break-keep text-[10.5px] font-semibold text-ink-faint">
+            {[parking.location, parking.walkTime, parking.nickname].filter(Boolean).join(" · ")}
+          </div>
+          {parking.tip ? (
+            <div className="mt-1.5 break-keep rounded-[9px] bg-[#F8FAFC] px-[9px] py-[7px] text-[11.5px] leading-[1.5] text-[#475467]">
+              💡 {parking.tip}
+            </div>
+          ) : null}
+        </div>
+        {parking.mine ? (
+          <button
+            type="button"
+            aria-label="주차 팁 삭제"
+            onClick={onDelete}
+            className="absolute right-[7px] top-[7px] rounded-lg p-1.5 text-[#C4CBD6]"
+          >
+            <Icon name="trash" size={13} />
+          </button>
+        ) : null}
+      </div>
+    </article>
+  );
+}
 function FoodCard({ food }: { food: Food }) {
   const { saves, toggleSaveFood } = useApp();
   const saved = saves.foods.includes(food.id);
@@ -66,13 +189,20 @@ function FoodCard({ food }: { food: Food }) {
 }
 
 export function FoodScreen() {
-  const { foods } = useApp();
+  const { foods, userFoods, userParkings, deleteUserFood, deleteUserParking } = useApp();
   const [segment, setSegment] = useState<"food" | "parking">("food");
   const [filter, setFilter] = useState<FoodFilter>("all");
+  const [foodSheetOpen, setFoodSheetOpen] = useState(false);
+  const [parkingSheetOpen, setParkingSheetOpen] = useState(false);
 
   const insideCount = foods.filter((food) => food.inStadium).length;
   const filtered =
     filter === "all" ? foods : foods.filter((food) => (filter === "in" ? food.inStadium : !food.inStadium));
+
+  const filteredUserFoods =
+    filter === "all"
+      ? userFoods
+      : userFoods.filter((food) => (filter === "in" ? food.inStadium : !food.inStadium));
 
   return (
     <div className="flex flex-col gap-3.5 px-4 pb-[30px] pt-3.5">
@@ -146,6 +276,33 @@ export function FoodScreen() {
             </article>
           ))}
 
+          <SectionHead
+            title="🦁 직관러 주차 팁"
+            sub="직접 주차해 본 직관러의 장소·요금·도보 시간이에요."
+            count={userParkings.length}
+            onAdd={() => setParkingSheetOpen(true)}
+          />
+
+          {userParkings.length ? (
+            <div className="flex flex-col gap-2.5">
+              {userParkings.map((parking) => (
+                <UserParkingCard
+                  key={parking.id}
+                  parking={parking}
+                  onDelete={() => void deleteUserParking(parking.id)}
+                />
+              ))}
+            </div>
+          ) : (
+            <div className="rounded-md2 border border-dashed border-[#D9DEE7] bg-[#FBFCFE] px-4 py-[18px] text-center">
+              <div className="mb-[6px] text-[24px]">🚗</div>
+              <p className="text-[12.5px] font-extrabold text-ink-2">아직 올라온 주차 팁이 없어요</p>
+              <p className="mt-1 text-[11px] leading-relaxed text-ink-faint">
+                자주 쓰는 주차장을 첫 번째로 남겨주세요.
+              </p>
+            </div>
+          )}
+
           <p className="break-keep px-2.5 pt-1 text-center text-[10.5px] leading-relaxed text-[#AEB6C2]">
             주차 요금·운영 시간은 2026 시즌 구단 공지 기준입니다. 방문 전 구단 앱 공지와 티켓링크 예약
             페이지를 다시 확인하세요.
@@ -183,6 +340,33 @@ export function FoodScreen() {
             ))}
           </div>
 
+          <SectionHead
+            title="🦁 직관러 맛집"
+            sub="직접 다녀온 직관러가 올린 맛집이에요. 나도 한 곳 올려보세요."
+            count={filteredUserFoods.length}
+            onAdd={() => setFoodSheetOpen(true)}
+          />
+
+          {filteredUserFoods.length ? (
+            <div className="flex flex-col gap-2.5">
+              {filteredUserFoods.map((food) => (
+                <UserFoodCard
+                  key={food.id}
+                  food={food}
+                  onDelete={() => void deleteUserFood(food.id)}
+                />
+              ))}
+            </div>
+          ) : (
+            <div className="rounded-md2 border border-dashed border-[#D9DEE7] bg-[#FBFCFE] px-4 py-[18px] text-center">
+              <div className="mb-[6px] text-[24px]">🍗</div>
+              <p className="text-[12.5px] font-extrabold text-ink-2">아직 올라온 맛집이 없어요</p>
+              <p className="mt-1 text-[11px] leading-relaxed text-ink-faint">
+                첫 직관러 맛집을 남겨주세요.
+              </p>
+            </div>
+          )}
+
           <div className="rounded-md2 border border-line bg-[#F8FAFC] p-3.5 shadow-card">
             <div className="mb-1.5 text-[12.5px] font-extrabold">🍽️ 층별로 빠르게 찾기</div>
             <div className="text-[11.5px] leading-[1.75] text-ink-faint">
@@ -199,6 +383,12 @@ export function FoodScreen() {
           </p>
         </>
       )}
+
+      <UserFoodSheet open={foodSheetOpen} onClose={() => setFoodSheetOpen(false)} />
+      <UserParkingSheet
+        open={parkingSheetOpen}
+        onClose={() => setParkingSheetOpen(false)}
+      />
     </div>
   );
 }

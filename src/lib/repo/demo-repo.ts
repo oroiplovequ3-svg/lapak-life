@@ -5,6 +5,7 @@ import {
   SEED_REVIEWS,
   type SeedPost,
 } from "@/lib/data/sample-feed";
+import { SEED_USER_FOODS, SEED_USER_PARKINGS } from "@/lib/data/user-community";
 import { ZONES } from "@/lib/data/zones";
 import type {
   Author,
@@ -14,8 +15,12 @@ import type {
   NewGameInput,
   NewPostInput,
   NewReviewInput,
+  NewUserFoodInput,
+  NewUserParkingInput,
   Post,
   Saves,
+  UserFood,
+  UserParking,
   Zone,
   ZoneReview,
 } from "@/lib/types";
@@ -33,6 +38,8 @@ interface DemoPersist {
   saves: Saves;
   games: Game[];
   deletedPosts: string[];
+  userFoods: UserFood[];
+  userParkings: UserParking[];
 }
 
 function emptyPersist(): DemoPersist {
@@ -44,6 +51,8 @@ function emptyPersist(): DemoPersist {
     saves: { zones: [], foods: [] },
     games: [],
     deletedPosts: [],
+    userFoods: [],
+    userParkings: [],
   };
 }
 
@@ -59,6 +68,8 @@ function readPersist(): DemoPersist {
       ...parsed,
       saves: { ...base.saves, ...(parsed.saves ?? {}) },
       extraComments: parsed.extraComments ?? {},
+      userFoods: parsed.userFoods ?? [],
+      userParkings: parsed.userParkings ?? [],
     };
   } catch {
     return emptyPersist();
@@ -366,6 +377,68 @@ export class DemoRepository implements Repository {
 
   async deleteGame(gameId: string): Promise<void> {
     this.persist.games = this.persist.games.filter((g) => g.id !== gameId);
+    this.save();
+  }
+
+  /* ── 직관러 맛집 ──────────────────────────────────────────── */
+  async loadUserFoods(): Promise<UserFood[]> {
+    return [...this.persist.userFoods, ...SEED_USER_FOODS];
+  }
+
+  async createUserFood(input: NewUserFoodInput, author: Author): Promise<UserFood> {
+    const food: UserFood = {
+      id: `demo-ufood-${Date.now()}`,
+      userId: null,
+      nickname: author.nickname,
+      name: input.name,
+      menu: input.menu,
+      tip: input.tip,
+      rating: Math.min(5, Math.max(1, Math.round(input.rating))),
+      inStadium: input.inStadium,
+      createdAt: new Date().toISOString(),
+      mine: true,
+    };
+    this.persist.userFoods.unshift(food);
+    this.save();
+    return food;
+  }
+
+  async deleteUserFood(foodId: string): Promise<void> {
+    this.persist.userFoods = this.persist.userFoods.filter((food) => food.id !== foodId);
+    this.save();
+  }
+
+  /* ── 직관러 주차 팁 ──────────────────────────────────────── */
+  async loadUserParkings(): Promise<UserParking[]> {
+    return [...this.persist.userParkings, ...SEED_USER_PARKINGS];
+  }
+
+  async createUserParking(
+    input: NewUserParkingInput,
+    author: Author,
+  ): Promise<UserParking> {
+    const parking: UserParking = {
+      id: `demo-uparking-${Date.now()}`,
+      userId: null,
+      nickname: author.nickname,
+      name: input.name,
+      location: input.location,
+      isFree: input.isFree,
+      feeNote: input.isFree ? "" : input.feeNote,
+      walkTime: input.walkTime,
+      tip: input.tip,
+      createdAt: new Date().toISOString(),
+      mine: true,
+    };
+    this.persist.userParkings.unshift(parking);
+    this.save();
+    return parking;
+  }
+
+  async deleteUserParking(parkingId: string): Promise<void> {
+    this.persist.userParkings = this.persist.userParkings.filter(
+      (parking) => parking.id !== parkingId,
+    );
     this.save();
   }
 }

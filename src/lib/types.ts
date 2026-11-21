@@ -55,6 +55,35 @@ export interface ParkingCard {
   tip?: string;
 }
 
+/** 직관러가 직접 올린 맛집 (user_foods 테이블과 1:1) */
+export interface UserFood {
+  id: string;
+  userId: string | null;
+  nickname: string;
+  name: string;
+  menu: string;
+  tip: string;
+  rating: number;
+  inStadium: boolean;
+  createdAt: string;
+  mine: boolean;
+}
+
+/** 직관러가 직접 올린 주차 팁 (user_parkings 테이블과 1:1) */
+export interface UserParking {
+  id: string;
+  userId: string | null;
+  nickname: string;
+  name: string;
+  location: string;
+  isFree: boolean;
+  feeNote: string;
+  walkTime: string;
+  tip: string;
+  createdAt: string;
+  mine: boolean;
+}
+
 export interface Post {
   id: string;
   userId: string | null;
@@ -152,4 +181,21 @@ export interface NewGameInput {
   scoreAgainst: number;
   note: string;
   photoUrls?: string[];
+}
+
+export interface NewUserFoodInput {
+  name: string;
+  menu: string;
+  tip: string;
+  rating: number;
+  inStadium: boolean;
+}
+
+export interface NewUserParkingInput {
+  name: string;
+  location: string;
+  isFree: boolean;
+  feeNote: string;
+  walkTime: string;
+  tip: string;
 }

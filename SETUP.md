@@ -2,13 +2,13 @@
 
 처음부터 끝까지 **약 30분**이면 됩니다. 순서대로 따라 하세요.
 
-> 완성되면 이렇게 됩니다: Vercel 주소로 접속 → 라팍생활 앱 → 카카오 로그인 → 글·후기·직관 기록 저장
+> 완성되면 이렇게 됩니다: Vercel 주소로 접속 → 라팍생활 앱 → 구글 로그인 → 글·후기·직관 기록 저장
 
 ---
 
 ## 0. 준비물
 
-- 무료 계정 3개: [Supabase](https://supabase.com) · [Vercel](https://vercel.com) · [Kakao Developers](https://developers.kakao.com)
+- 무료 계정 3개: [Supabase](https://supabase.com) · [Vercel](https://vercel.com) · [Google Cloud Console](https://console.cloud.google.com)
 - 이 저장소가 내 GitHub 계정에 있어야 합니다 (`lapak-life` 빈 저장소 생성 후 푸시 필요)
 
 ---
@@ -25,33 +25,44 @@
 2. 이 저장소의 `supabase/migrations/001_init.sql` 파일 내용 전체를 붙여넣고 **Run**
    - "Success. No rows returned" 가 나오면 성공
 3. 같은 방법으로 `supabase/seed.sql` 내용 전체를 붙여넣고 **Run**
-4. 왼쪽 **Table Editor** 에서 `zones`(8행) · `foods`(14행) 가 채워졌는지 확인합니다.
+4. 같은 방법으로 아래 마이그레이션도 차례로 실행합니다 (직관러가 직접 올리는 맛집·주차 팁)
+   - `supabase/migrations/004_user_foods.sql`
+   - `supabase/migrations/005_user_parkings.sql`
+5. 왼쪽 **Table Editor** 에서 `zones`(8행) · `foods`(14행) 가 채워졌는지 확인합니다.
 
-## 3. 카카오 로그인 앱 등록 (10분, 승인까지 하루 걸릴 수 있어요)
+## 3. 구글 OAuth 클라이언트 만들기 (10분, 무료)
 
-1. <https://developers.kakao.com> → **내 애플리케이션** → **애플리케이션 추가하기**
-   - 앱 이름: `라팍생활` (아무 이름이나 가능)
-2. 왼쪽 **앱 설정 → 플랫폼** → **Web 플랫폼 등록**
-   - 로컬 테스트용: `http://localhost:3000`
-   - 배포 후: `https://<내프로젝트>.vercel.app` (4단계에서 알게 됩니다. 나중에 추가해도 됩니다)
-3. **앱 설정 → 요약** 에서 **네이티브 앱 키(REST API 키 아님, "네이티브 앱 키")** 를 복사해 둡니다.
-4. **제품 설정 → 카카오 로그인 → 일반** 에서:
-   - **활성화 설정**: ON
-   - **OpenID Connect 활성화**: OFF (Supabase는 기본 토큰 방식 사용)
-   - **Redirect URI** 등록:
+1. <https://console.cloud.google.com> → 상단 프로젝트 선택 → **새 프로젝트** → 이름 `lapak-life` → 만들기
+2. 왼쪽 **API 및 서비스 → OAuth 동의 화면**
+   - User Type: **외부(External)** → 만들기
+   - 앱 이름 `라팍생활`, 사용자 지원 이메일·개발자 연락처를 내 구글 주소로 입력 → 저장
+   - **테스트 사용자**에 로그인해 볼 구글 계정을 추가 (게시 전에는 여기 넣은 계정만 로그인됩니다)
+3. 왼쪽 **API 및 서비스 → 사용자 인증 정보 → 사용자 인증 정보 만들기 → OAuth 클라이언트 ID**
+   - 애플리케이션 유형: **웹 애플리케이션**
+   - **승인된 자바스크립트 원본**
+     - `http://localhost:3000`
+     - `https://<내프로젝트>.vercel.app` (7단계에서 확정되면 추가)
+   - **승인된 리디렉션 URI** — Supabase 콜백 주소 하나만 넣습니다
      - `https://<SUPABASE프로젝트ID>.supabase.co/auth/v1/callback`
-     - (Supabase 프로젝트 ID는 5단계의 URL에서 확인)
-5. **카카오 로그인 → 동의항목** 에서 `닉네임`, `프로필 사진` 을 **필수 동의**로 설정 (이메일은 선택 또는 미설정 권장)
-6. 좌측 **보안 → 클라이언트 시크릿** → 코드 발급 후 **활성화 ON**, 시크릿 코드 복사.
+     - (프로젝트 ID는 Supabase → Project Settings → API 의 Project URL에서 확인)
+4. 만들기를 누르면 나오는 **클라이언트 ID** 와 **클라이언트 보안 비밀** 을 복사해 둡니다.
 
-## 4. Supabase에 카카오 Provider 등록 (2분)
+> 나중에 아무 구글 계정이나 로그인할 수 있게 하려면 OAuth 동의 화면에서 **앱 게시**를 누릅니다.
+> 이메일·닉네임·프로필 사진은 기본 범위(openid/email/profile)라 별도 검수 없이 동작합니다.
 
-1. Supabase 대시보드 → **Authentication → Sign In / Up → Auth Providers → Kakao**
-2. **Enable Sign in with Kakao**: ON
+## 4. Supabase에 구글 Provider 등록 (2분)
+
+1. Supabase 대시보드 → **Authentication → Sign In / Up → Auth Providers → Google**
+2. **Enable Sign in with Google**: ON
 3. 붙여넣기:
-   - **Client ID**: 카카오 **네이티브 앱 키**
-   - **Client Secret**: 3-6에서 발급한 **클라이언트 시크릿**
+   - **Client ID (for OAuth)**: 3-4의 **클라이언트 ID**
+   - **Client Secret (for OAuth)**: 3-4의 **클라이언트 보안 비밀**
 4. **Save**
+5. 같은 화면의 **Authentication → URL Configuration**
+   - **Site URL**: `https://<내프로젝트>.vercel.app`
+   - **Redirect URLs** 에 아래를 추가 (앱이 로그인 후 돌아오는 주소)
+     - `http://localhost:3000/auth/callback`
+     - `https://<내프로젝트>.vercel.app/auth/callback`
 
 ## 5. 환경변수 값 복사 (1분)
 
@@ -69,7 +80,7 @@ npm install
 npm run dev                  # http://localhost:3000
 ```
 
-카카오 로그인 버튼을 눌러 로그인이 되면 연동 성공입니다.
+구글 로그인 버튼을 눌러 로그인이 되면 연동 성공입니다.
 
 ## 7. Vercel 배포 (3분)
 
@@ -84,10 +95,11 @@ npm run dev                  # http://localhost:3000
 
 ## 8. 마무리 체크 (2분)
 
-- [ ] 카카오 개발자 콘솔 **Web 플랫폼**에 Vercel 주소 추가
-- [ ] 카카오 **Redirect URI**에 `https://<프로젝트ID>.supabase.co/auth/v1/callback` 이 등록돼 있는지 (이미 3-4에서 했으면 패스)
+- [ ] Google Cloud **승인된 리디렉션 URI** 에 `https://<프로젝트ID>.supabase.co/auth/v1/callback` 이 있는지 (이미 3-3에서 했으면 패스)
+- [ ] Supabase **Redirect URLs** 에 `https://<내프로젝트>.vercel.app/auth/callback` 이 있는지
+- [ ] `004_user_foods.sql` · `005_user_parkings.sql` 까지 실행됐는지 (안 했으면 직관러 섹션은 비어 보입니다)
 - [ ] Vercel의 `NEXT_PUBLIC_SITE_URL`을 최종 주소로 맞추고 **Redeploy**
-- [ ] 폰으로 접속 → 카카오 로그인 → 글쓰기 → 라팍톡에 글 올라오는지 확인
+- [ ] 폰으로 접속 → 구글 로그인 → 글쓰기 → 라팍톡에 글 올라오는지 확인
 
 ---
 
@@ -101,7 +113,9 @@ Supabase 연결 전에 UI를 먼저 확인하는 용도로 쓰세요.
 
 | 증상 | 원인·해결 |
 | --- | --- |
-| 카카오 로그인 버튼을 눌러도 "redirect_uri 미승인" 오류 | 3-4의 Redirect URI 오타. Supabase 콜백 URL과 한 글자까지 같아야 합니다. |
+| 구글 로그인 버튼을 눌러도 "redirect_uri_mismatch" 오류 | Google Cloud의 **승인된 리디렉션 URI** 가 Supabase 콜백 주소와 한 글자까지 같아야 합니다. |
+| 로그인 후 "invalid flow state"·"code verifier" 오류 | Supabase **Redirect URLs** 에 `https://<내프로젝트>.vercel.app/auth/callback` 을 추가하고, `NEXT_PUBLIC_SITE_URL` 이 실제 주소인지 확인하세요. |
+| 구글 계정을 골랐는데 "액세스 차단됨" | OAuth 동의 화면이 **테스트** 상태입니다. 테스트 사용자에 그 계정을 추가하거나 앱을 **게시**하세요. |
 | 로그인은 되는데 글쓰기가 안 돼요 | Supabase SQL Editor에서 `001_init.sql` 실행 여부 확인 (RLS 정책이 없으면 insert가 막힙니다). |
-| 로그인 후에도 게스트로 보여요 | 카카오 동의항목에 '닉네임'이 켜져 있는지 확인하세요. |
+| 로그인 후에도 게스트로 보여요 | 프로필 생성 트리거가 돌았는지 확인하세요 (`001_init.sql` 실행 여부). |
 | 주차 예약 버튼을 만들고 싶어요 | 만들지 마세요. 티켓링크 약관상 **대행·대리 예약은 금지**입니다 (mvp-plan 8절). 안내 링크만 제공하세요. |

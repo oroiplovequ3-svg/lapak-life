@@ -10,8 +10,12 @@ import type {
   NewGameInput,
   NewPostInput,
   NewReviewInput,
+  NewUserFoodInput,
+  NewUserParkingInput,
   Post,
   Saves,
+  UserFood,
+  UserParking,
   Zone,
   ZoneReview,
 } from "@/lib/types";
@@ -133,6 +137,49 @@ const CHECKIN_PHOTO_BUCKET = "checkin-photos";
 
 const GAME_COLUMNS =
   "id, user_id, played_on, opponent, home_away, zone_code, score_for, score_against, note, photo_urls, created_at";
+
+/** 직관러 맛집 (supabase/migrations/004_user_foods.sql) */
+const USER_FOOD_COLUMNS =
+  "id, user_id, name, menu, tip, rating, is_inside, created_at, profiles(nickname, avatar_url)";
+
+/** 직관러 주차 팁 (supabase/migrations/005_user_parkings.sql) */
+const USER_PARKING_COLUMNS =
+  "id, user_id, name, location, is_free, fee_note, walk_time, tip, created_at, profiles(nickname, avatar_url)";
+
+function mapUserFood(row: AnyRow, viewerId: string | null): UserFood {
+  const { nickname } = embeddedProfile(row);
+  const userId = row.user_id ? str(row.user_id) : null;
+  return {
+    id: str(row.id),
+    userId,
+    nickname,
+    name: str(row.name),
+    menu: str(row.menu),
+    tip: str(row.tip),
+    rating: num(row.rating, 5),
+    inStadium: typeof row.is_inside === "boolean" ? row.is_inside : true,
+    createdAt: str(row.created_at) || new Date().toISOString(),
+    mine: Boolean(viewerId && userId === viewerId),
+  };
+}
+
+function mapUserParking(row: AnyRow, viewerId: string | null): UserParking {
+  const { nickname } = embeddedProfile(row);
+  const userId = row.user_id ? str(row.user_id) : null;
+  return {
+    id: str(row.id),
+    userId,
+    nickname,
+    name: str(row.name),
+    location: str(row.location),
+    isFree: typeof row.is_free === "boolean" ? row.is_free : true,
+    feeNote: str(row.fee_note),
+    walkTime: str(row.walk_time),
+    tip: str(row.tip),
+    createdAt: str(row.created_at) || new Date().toISOString(),
+    mine: Boolean(viewerId && userId === viewerId),
+  };
+}
 
 function fail(context: string, error: { message: string } | null): never {
   throw new Error(`${context}: ${error?.message ?? "알 수 없는 오류"}`);
@@ -458,5 +505,83 @@ export class SupabaseRepository implements Repository {
   async deleteGame(gameId: string): Promise<void> {
     const { error } = await this.supabase.from("games").delete().eq("id", gameId);
     if (error) fail("직관 기록을 삭제하지 못했습니다", error);
+  }
+
+  /* ── 직관러 맛집 ──────────────────────────────────────────── */
+  async loadUserFoods(viewerId: string | null): Promise<UserFood[]> {
+    const { data, error } = await this.supabase
+      .from("user_foods")
+      .select(USER_FOOD_COLUMNS)
+      .order("created_at", { ascending: false })
+      .limit(200);
+
+    // 마이그레이션 004 를 아직 실행하지 않았어도 화면은 비지 않게 둡니다.
+    if (error) return [];
+    return ((data ?? []) as AnyRow[]).map((row) => mapUserFood(row, viewerId));
+  }
+
+  async createUserFood(input: NewUserFoodInput, author: Author): Promise<UserFood> {
+    const { data, error } = await this.supabase
+      .from("user_foods")
+      .insert({
+        user_id: author.id,
+        name: input.name,
+        menu: input.menu,
+        tip: input.tip,
+        rating: input.rating,
+        is_inside: input.inStadium,
+      })
+      .select(USER_FOOD_COLUMNS)
+      .single();
+
+    if (error || !data) fail("맛집을 등록하지 못했습니다", error);
+    return { ...mapUserFood(data as AnyRow, author.id), mine: true };
+  }
+
+  async deleteUserFood(foodId: string): Promise<void> {
+    const { error } = await this.supabase.from("user_foods").delete().eq("id", foodId);
+    if (error) fail("맛집을 삭제하지 못했습니다", error);
+  }
+
+  /* ── 직관러 주차 팁 ──────────────────────────────────────── */
+  async loadUserParkings(viewerId: string | null): Promise<UserParking[]> {
+    const { data, error } = await this.supabase
+      .from("user_parkings")
+      .select(USER_PARKING_COLUMNS)
+      .order("created_at", { ascending: false })
+      .limit(200);
+
+    if (error) return [];
+    return ((data ?? []) as AnyRow[]).map((row) => mapUserParking(row, viewerId));
+  }
+
+  async createUserParking(
+    input: NewUserParkingInput,
+    author: Author,
+  ): Promise<UserParking> {
+    const { data, error } = await this.supabase
+      .from("user_parkings")
+      .insert({
+        user_id: author.id,
+        name: input.name,
+        location: input.location,
+        is_free: input.isFree,
+        fee_note: input.isFree ? "" : input.feeNote,
+        walk_time: input.walkTime,
+        tip: input.tip,
+      })
+      .select(USER_PARKING_COLUMNS)
+      .single();
+
+    if (error || !data) fail("주차 팁을 등록하지 못했습니다", error);
+    return { ...mapUserParking(data as AnyRow, author.id), mine: true };
+  }
+
+  async deleteUserParking(parkingId: string): Promise<void> {
+    const { error } = await this.supabase
+      .from("user_parkings")
+      .delete()
+      .eq("id", parkingId);
+    if (error) fail("주차 팁을 삭제하지 못했습니다", error);
   }
 }

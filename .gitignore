@@ -50,3 +50,4 @@ yarn-error.log*
 # scratch build dirs
 /.next-bak-*/
 /.next-old-*/
+/.next-check/

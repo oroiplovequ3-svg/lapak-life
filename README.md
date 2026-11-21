@@ -7,13 +7,13 @@
 | --- | --- |
 | **라팍톡** | 실시간 피드 · 카테고리 필터 · 좋아요 · 댓글 · 글쓰기 |
 | **좌석 시야** | 팔각형 구장 도식 · 8개 구역 상세(햇빛/우천/응원/추천/팁) · 시야 후기 · 북마크 |
-| **맛집·주차** | 먹거리 14곳(구장 안/밖 필터) · 전설로 주차장 사전예약 안내 · 대공원역 · 대안 주차 |
-| **내 직관** | 카카오 로그인 · 직관 성적/승률 · 기록 추가 · 저장한 좌석·맛집 · 내가 쓴 글 |
+| **맛집·주차** | 먹거리 14곳(구장 안/밖 필터) · 전설로 주차장 사전예약 안내 · 대공원역 · 대안 주차 · 직관러가 직접 올리는 맛집·주차 팁 |
+| **내 직관** | 구글 로그인 · 직관 성적/승률 · 기록 추가 · 저장한 좌석·맛집 · 내가 쓴 글 |
 
 ## 기술 스택
 
 - **Next.js 15 (App Router)** + TypeScript + Tailwind CSS
-- **Supabase** (DB · Auth 카카오 OAuth · RLS)
+- **Supabase** (DB · Auth 구글 OAuth · RLS)
 - 배포: **Vercel** (월 0원 기준, 무료 플랜)
 
 ## 빠른 시작
@@ -24,7 +24,7 @@ cp .env.example .env.local   # Supabase 키를 채워 넣기 (비우면 데모 �
 npm run dev
 ```
 
-- Supabase 세팅과 카카오 OAuth 등록은 **[SETUP.md](./SETUP.md)** 를 순서대로 따라 하세요.
+- Supabase 세팅과 구글 OAuth 등록은 **[SETUP.md](./SETUP.md)** 를 순서대로 따라 하세요.
 - DB 스키마: `supabase/migrations/001_init.sql` / 시드: `supabase/seed.sql`
 
 ## 데모 모드
@@ -44,6 +44,8 @@ src/
   lib/supabase/        클라이언트/서버 Supabase 연결
 supabase/
   migrations/001_init.sql   테이블·트리거·RLS
+  migrations/004_user_foods.sql      직관러 맛집 (공개 읽기 · 본인만 쓰기)
+  migrations/005_user_parkings.sql   직관러 주차 팁 (공개 읽기 · 본인만 쓰기)
   seed.sql                  구역 8 · 먹거리 14 시드
 ```
 

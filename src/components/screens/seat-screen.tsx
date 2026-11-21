@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 
 import { Icon, Stars } from "@/components/icons";
 import {
@@ -15,19 +15,16 @@ import {
   ZONE_GROUPS,
   zoneFamily,
   zoneFullName,
-  zoneGroupOf,
-  zoneSubtitle,
-  type ZoneGroupId,
 } from "@/lib/data/zones";
 import { formatRelativeTime, initialOf } from "@/lib/utils";
-
-const ALL_CODES = ZONE_GROUPS.flatMap((group) => group.codes);
 
 export function SeatScreen() {
   const { zones, reviews, saves, toggleSaveZone } = useApp();
   const [selected, setSelected] = useState<string>("all");
-  const [group, setGroup] = useState<ZoneGroupId>("all");
+  const [pickerOpen, setPickerOpen] = useState(false);
   const [lightbox, setLightbox] = useState<PhotoLightboxState | null>(null);
+  const listRef = useRef<HTMLDivElement | null>(null);
+  const selectedRowRef = useRef<HTMLButtonElement | null>(null);
   const zone =
     selected === "all" ? null : zones.find((z) => z.code === selected) ?? ZONE_BY_CODE[selected];
   const filteredReviews = useMemo(
@@ -35,16 +32,27 @@ export function SeatScreen() {
     [reviews, selected],
   );
   const zoneName = selected === "all" ? "전체 구역" : zone?.short ?? selected;
-  const visibleCodes = group === "all" ? ALL_CODES : ZONE_GROUPS.find((g) => g.id === group)?.codes ?? ALL_CODES;
   const family = zoneFamily(zone?.code);
 
-  function pick(code: string) {
+  // 목록을 열면 지금 고른 구역이 스크롤 가운데에 보이게 맞춰요.
+  useEffect(() => {
+    if (!pickerOpen) return;
+    const list = listRef.current;
+    const row = selectedRowRef.current;
+    if (!list || !row) return;
+    const listRect = list.getBoundingClientRect();
+    const rowRect = row.getBoundingClientRect();
+    list.scrollTop += rowRect.top - listRect.top - list.clientHeight / 2 + rowRect.height / 2;
+  }, [pickerOpen]);
+
+  function choose(code: string) {
     setSelected(code);
+    setPickerOpen(false);
   }
 
   function pickFromMap(code: string) {
     setSelected(code);
-    setGroup(zoneGroupOf(code));
+    setPickerOpen(false);
   }
 
   return (
@@ -67,75 +75,124 @@ export function SeatScreen() {
         </p>
       </section>
 
-      <div className="-mx-1 flex gap-1.5 overflow-x-auto px-1 pb-0.5">
+      <section className="overflow-hidden rounded-md2 border border-line bg-white shadow-card">
         <button
           type="button"
-          onClick={() => setGroup("all")}
-          className={`flex-none rounded-full border px-3 py-[7px] text-[11.5px] font-extrabold transition ${
-            group === "all"
-              ? "border-brand-600 bg-brand text-white"
-              : "border-line bg-white text-ink-2"
+          onClick={() => setPickerOpen((open) => !open)}
+          aria-expanded={pickerOpen}
+          aria-controls="seat-zone-picker"
+          className={`flex w-full items-center gap-2 px-3 py-[11px] text-left transition ${
+            pickerOpen ? "bg-[#F7FAFF]" : "bg-white"
           }`}
         >
-          전체
-        </button>
-        {ZONE_GROUPS.map((g) => (
-          <button
-            key={g.id}
-            type="button"
-            onClick={() => setGroup(g.id)}
-            className={`flex-none rounded-full border px-3 py-[7px] text-[11.5px] font-extrabold transition ${
-              group === g.id
-                ? "border-brand-600 bg-brand text-white"
-                : "border-line bg-white text-ink-2"
-            }`}
-          >
-            {g.label}
-          </button>
-        ))}
-      </div>
-
-      <div className="grid grid-cols-3 gap-[7px]">
-        <button
-          type="button"
-          onClick={() => setSelected("all")}
-          className={`rounded-[13px] border bg-white px-2 py-[9px] text-left transition active:scale-[.975] ${
-            selected === "all"
-              ? "border-brand-600 bg-[#F3F8FF] shadow-[0_0_0_2px_rgba(10,88,202,.13)]"
-              : "border-line"
-          }`}
-        >
-          <span className="block text-xs font-extrabold leading-tight tracking-tight2 text-ink">
-            전체 구역
+          <span className="grid h-[26px] w-[26px] flex-none place-items-center rounded-[9px] bg-brand-50 text-brand">
+            <Icon name="seat" size={15} strokeWidth={2} />
           </span>
-          <span className="mt-[3px] block text-[10px] font-semibold text-ink-faint">
-            모든 후기 보기
+          <span className="flex-none text-[12.5px] font-extrabold tracking-tight2 text-ink-muted">
+            좌석 선택
           </span>
-        </button>
-        {visibleCodes.map((code) => {
-          const z = ZONE_BY_CODE[code];
-          if (!z) return null;
-          return (
-            <button
-              key={code}
-              type="button"
-              onClick={() => pick(code)}
-              className={`rounded-[13px] border bg-white px-2 py-[9px] text-left transition active:scale-[.975] ${
-                selected === code
-                  ? "border-brand-600 bg-[#F3F8FF] shadow-[0_0_0_2px_rgba(10,88,202,.13)]"
-                  : "border-line"
+          <span className="ml-auto flex min-w-0 items-center gap-[5px] rounded-[10px] bg-brand-50 py-[5px] pl-2.5 pr-2">
+            <span className="truncate text-[11.5px] font-extrabold tracking-tight2 text-brand-600">
+              {selected === "all" ? "전체 구역" : `${zone?.emoji ?? ""} ${zoneName}`.trim()}
+            </span>
+            <Icon
+              name="chevron"
+              size={11}
+              strokeWidth={2.8}
+              className={`flex-none text-brand-600 transition-transform duration-200 ${
+                pickerOpen ? "-rotate-90" : "rotate-90"
               }`}
+            />
+          </span>
+        </button>
+
+        {pickerOpen ? (
+          <div className="animate-fadeIn border-t border-line-soft bg-[#FBFCFE] px-2 pb-2 pt-1.5">
+            <div
+              id="seat-zone-picker"
+              ref={listRef}
+              className="max-h-[280px] overflow-y-auto overscroll-contain"
             >
-              <span className="block text-xs font-extrabold leading-tight tracking-tight2 text-ink">
-                {z.short}
-              </span>
-              <span className="mt-[3px] block text-[10px] font-semibold leading-snug text-ink-faint">
-                {z.emoji} {zoneSubtitle(z)}
-              </span>
-            </button>
-          );
-        })}
-      </div>
+              <button
+                type="button"
+                ref={selected === "all" ? selectedRowRef : undefined}
+                onClick={() => choose("all")}
+                className={`flex w-full items-center gap-2 rounded-[11px] border px-2 py-[9px] text-left transition active:scale-[.99] ${
+                  selected === "all"
+                    ? "border-brand-600 bg-white shadow-[0_1px_2px_rgba(16,24,40,.06)]"
+                    : "border-transparent hover:bg-white"
+                }`}
+              >
+                <span className="w-[18px] flex-none text-center text-[13px] leading-none">⚾</span>
+                <span className="min-w-0 flex-1">
+                  <span className="block text-[12.5px] font-extrabold leading-tight tracking-tight2 text-ink">
+                    전체 구역
+                  </span>
+                  <span className="mt-[2px] block truncate text-[10px] font-semibold text-ink-faint">
+                    모든 구역의 시야 후기 보기
+                  </span>
+                </span>
+                {selected === "all" ? (
+                  <span className="flex-none text-[11px] font-black text-brand">✓</span>
+                ) : null}
+              </button>
+
+              {ZONE_GROUPS.map((g) => (
+                <div key={g.id}>
+                  <div className="flex items-baseline gap-1.5 px-2 pb-1 pt-3">
+                    <span className="text-[10.5px] font-extrabold tracking-tight2 text-ink-2">
+                      {g.label}
+                    </span>
+                    <span className="truncate text-[9.5px] font-semibold text-[#B9C0CB]">
+                      {g.hint}
+                    </span>
+                  </div>
+                  {g.codes.map((code) => {
+                    const z = ZONE_BY_CODE[code];
+                    if (!z) return null;
+                    const on = selected === code;
+                    return (
+                      <button
+                        key={code}
+                        type="button"
+                        ref={on ? selectedRowRef : undefined}
+                        onClick={() => choose(code)}
+                        className={`flex w-full items-center gap-2 rounded-[11px] border px-2 py-[7px] text-left transition active:scale-[.99] ${
+                          on
+                            ? "border-brand-600 bg-white shadow-[0_1px_2px_rgba(16,24,40,.06)]"
+                            : "border-transparent hover:bg-white"
+                        }`}
+                      >
+                        <span className="w-[18px] flex-none text-center text-[13px] leading-none">
+                          {z.emoji}
+                        </span>
+                        <span className="min-w-0 flex-1">
+                          <span
+                            className={`block truncate text-[12.5px] font-extrabold leading-tight tracking-tight2 ${
+                              on ? "text-brand-600" : "text-ink"
+                            }`}
+                          >
+                            {z.short}
+                          </span>
+                          <span className="mt-[2px] block truncate text-[10px] font-semibold text-ink-faint">
+                            {z.side}
+                          </span>
+                        </span>
+                        {on ? (
+                          <span className="flex-none text-[11px] font-black text-brand">✓</span>
+                        ) : null}
+                      </button>
+                    );
+                  })}
+                </div>
+              ))}
+            </div>
+            <p className="px-2 pt-1.5 text-center text-[9.5px] font-bold text-[#B9C0CB]">
+              위아래로 넘겨 구역을 고르면 바로 아래 시야·후기가 바뀌어요
+            </p>
+          </div>
+        ) : null}
+      </section>
 
       {zone ? (
         <>
@@ -165,7 +222,7 @@ export function SeatScreen() {
                     <button
                       key={code}
                       type="button"
-                      onClick={() => pick(code)}
+                      onClick={() => choose(code)}
                       className={`rounded-full px-2.5 py-[5px] text-[10.5px] font-extrabold transition ${
                         on
                           ? "bg-white text-brand-600"
@@ -256,7 +313,7 @@ export function SeatScreen() {
               ["🦁", "홈 더그아웃이 3루", "다른 구장과 반대예요. 삼성 팬은 3루, 원정 팬은 1루 쪽으로 앉으면 됩니다."],
               ["☀️", "해는 1루 쪽으로", "낮 경기엔 1루 쪽이 햇빛이 강하고 3루 쪽이 그늘이 빨리 옵니다."],
               ["🔭", "지붕은 상층만", "5층 SKY·4층 스윗박스는 지붕이 있고, 내야·외야 일반석은 비를 그대로 맞습니다."],
-              ["👇", "구역을 눌러보세요", "위 탭으로 층을 고르고, 구역을 누르면 시야 특징과 유저 후기가 나옵니다."],
+              ["👇", "구역을 눌러보세요", "위 '좌석 선택'을 눌러 구역을 고르면 시야 특징과 유저 후기가 나옵니다."],
             ].map(([fi, fl, ft], index, all) => (
               <div
                 key={fl}

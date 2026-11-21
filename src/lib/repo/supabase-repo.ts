@@ -124,7 +124,9 @@ function mapGame(row: AnyRow): Game {
 }
 
 const POST_COLUMNS =
-  "id, user_id, category, body, seat_zone, seat_detail, media, created_at, like_count, comment_count, profiles(nickname, avatar_url)";
+  // posts ↔ profiles 는 직접 FK(posts_user_id_fkey)와 post_likes 경유 다대다 경로가 함께 있어
+  // PostgREST 가 임베드를 고르지 못한다(PGRST201). 제약 이름으로 직접 경로를 지정한다.
+  "id, user_id, category, body, seat_zone, seat_detail, media, created_at, like_count, comment_count, profiles!posts_user_id_fkey(nickname, avatar_url)";
 const COMMENT_COLUMNS = "id, post_id, user_id, body, created_at, profiles(nickname, avatar_url)";
 const REVIEW_COLUMNS =
   "id, zone_code, user_id, seat_detail, rating, body, photo_urls, created_at, profiles(nickname, avatar_url)";

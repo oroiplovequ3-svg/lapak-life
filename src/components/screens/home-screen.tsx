@@ -7,6 +7,7 @@ import { Icon } from "@/components/icons";
 import { PostMedia } from "@/components/media-illustration";
 import { useApp } from "@/components/providers/app-provider";
 import { FEED_FILTERS, type FilterId } from "@/lib/data/categories";
+import { isSupabaseConfigured } from "@/lib/supabase/config";
 import { formatRelativeTime, initialOf } from "@/lib/utils";
 import type { Comment, Post } from "@/lib/types";
 
@@ -191,7 +192,7 @@ export function HomeScreen({ onCompose, highlightedPostId, onGoSeat, onGoFood }:
 
   return (
     <div className="flex flex-col gap-3.5 px-4 pb-[30px] pt-3.5">
-      {bannerClosed ? null : (
+      {bannerClosed || isSupabaseConfigured ? null : (
         <div className="flex items-center gap-2 rounded-[14px] bg-[#0F172A] px-3 py-2.5 text-[11.5px] leading-relaxed text-[#E6EDF8] shadow-card">
           <span className="flex-none rounded-md bg-[#2F6FE0] px-1.5 py-[3px] text-[9px] font-extrabold tracking-widest text-white">
             DEMO

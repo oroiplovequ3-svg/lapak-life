@@ -1,6 +1,7 @@
 "use client";
 
 import Image from "next/image";
+import Link from "next/link";
 import { useEffect, useMemo, useRef, useState } from "react";
 
 import { Avatar } from "@/components/avatar";
@@ -700,6 +701,20 @@ export function HomeScreen({ onCompose, highlightedPostId, onGoSeat, onGoFood }:
       <p className="wrap-any px-2.5 pt-1 text-center text-[10.5px] leading-relaxed text-[#AEB6C2]">
         인블루 · 삼성 라이온즈 팬이라면 누구나 글을 남길 수 있는 커뮤니티입니다.
       </p>
+
+      {/* 구글 OAuth 브랜딩 심사처럼 초기 HTML만 보는 크롤러도 찾을 수 있게,
+          개인정보처리방침·이용약관은 홈 화면 하단에 실제 <a href>로 둡니다. */}
+      <div className="flex items-center justify-center gap-2 pb-0.5 text-[10.5px] font-semibold text-[#9AA3B0]">
+        <Link href="/terms" className="underline underline-offset-2">
+          이용약관
+        </Link>
+        <span aria-hidden="true" className="text-[#CBD2DC]">
+          ·
+        </span>
+        <Link href="/privacy" className="underline underline-offset-2">
+          개인정보처리방침
+        </Link>
+      </div>
 
       {/* FAB는 뷰포트가 아니라 앱 컨테이너(최대 430px) 기준으로 앉아야 합니다.
           바깥 레이어를 컨테이너 폭에 맞춰 두어 390·430·데스크톱 모두 오른쪽 안쪽 16px에 놓입니다. */}

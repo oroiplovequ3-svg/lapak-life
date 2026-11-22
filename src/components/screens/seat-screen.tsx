@@ -12,6 +12,7 @@ import {
   type PhotoLightboxState,
 } from "@/components/photo-gallery";
 import { useApp } from "@/components/providers/app-provider";
+import { HiddenBadge, ReportButton, RestoreButton } from "@/components/report-controls";
 import { ReportSheet } from "@/components/report-sheet";
 import { ReviewSheet } from "@/components/review-sheet";
 import { SeatMap } from "@/components/seat-map";
@@ -46,13 +47,16 @@ export function SeatScreen({
   focusNonce = 0,
   onWriteReview,
 }: SeatScreenProps) {
-  const { zones, reviews, saves, toggleSaveZone, deleteReview, isAdmin } = useApp();
+  const { zones, reviews, saves, toggleSaveZone, deleteReview, isAdmin, restoreReportedContent } =
+    useApp();
   const selected = selectedZone;
   const [pickerOpen, setPickerOpen] = useState(false);
   /** 수정 중인 후기 (있으면 수정 시트를 엽니다) */
   const [editingReview, setEditingReview] = useState<ZoneReview | null>(null);
   /** 신고 중인 후기 */
   const [reportReview, setReportReview] = useState<ZoneReview | null>(null);
+  /** 복구 처리 중인 후기 id */
+  const [restoringReview, setRestoringReview] = useState<string | null>(null);
   const [lightbox, setLightbox] = useState<PhotoLightboxState | null>(null);
   /** 후기 목록 페이지 (5개씩) */
   const [reviewPage, setReviewPage] = useState(1);
@@ -223,28 +227,42 @@ export function SeatScreen({
                   </div>
                 </div>
                 <Stars value={review.stars} />
-                {review.mine || isAdmin ? (
-                  <span className="ml-[-2px] flex flex-none items-center">
-                    <button
-                      type="button"
-                      aria-label="후기 수정"
-                      onClick={() => setEditingReview(review)}
-                      className="rounded-lg p-1.5 text-[#C4CBD6] transition hover:text-brand"
-                    >
-                      <Icon name="edit" size={14} />
-                    </button>
-                    <DeleteButton what="후기" size={14} onDelete={() => deleteReview(review.id)} />
-                  </span>
-                ) : (
-                  <button
-                    type="button"
-                    onClick={() => setReportReview(review)}
-                    className="ml-[-2px] flex-none rounded-lg px-1.5 py-1 text-[10px] font-bold text-[#B9C0CB] transition hover:text-[#B42318]"
-                  >
-                    신고
-                  </button>
-                )}
+                <span className="ml-[-2px] flex flex-none items-center gap-0.5">
+                  {review.mine || isAdmin ? (
+                    <>
+                      <button
+                        type="button"
+                        aria-label="후기 수정"
+                        onClick={() => setEditingReview(review)}
+                        className="rounded-lg p-1.5 text-[#C4CBD6] transition hover:text-brand"
+                      >
+                        <Icon name="edit" size={14} />
+                      </button>
+                      <DeleteButton what="후기" size={14} onDelete={() => deleteReview(review.id)} />
+                    </>
+                  ) : null}
+                  <ReportButton
+                    count={review.reportCount ?? 0}
+                    manage={review.mine || isAdmin}
+                    size="sm"
+                    onReport={() => setReportReview(review)}
+                  />
+                </span>
               </div>
+              {review.isHidden && isAdmin ? (
+                <div className="mt-2 flex flex-wrap items-center gap-1.5">
+                  <HiddenBadge className="flex-1" />
+                  <RestoreButton
+                    busy={restoringReview === review.id}
+                    onClick={() => {
+                      setRestoringReview(review.id);
+                      void restoreReportedContent("review", review.id).finally(() =>
+                        setRestoringReview(null),
+                      );
+                    }}
+                  />
+                </div>
+              ) : null}
               <p className="mt-[9px] wrap-any text-[13.5px] leading-relaxed text-[#1D2939]">
                 {review.body}
               </p>

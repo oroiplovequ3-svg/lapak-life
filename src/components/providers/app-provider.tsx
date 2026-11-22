@@ -38,6 +38,7 @@ import type {
   ReportTargetType,
   Saves,
   UserFood,
+  UserFoodComment,
   UserParking,
   Zone,
   ZoneReview,
@@ -72,6 +73,9 @@ interface AppContextValue {
   saves: Saves;
   commentsByPost: Record<string, Comment[]>;
   commentsLoaded: Record<string, boolean>;
+  /** 직관러 맛집 댓글 (foodId → 댓글) */
+  userFoodCommentsByFood: Record<string, UserFoodComment[]>;
+  userFoodCommentsLoaded: Record<string, boolean>;
   userFoods: UserFood[];
   userParkings: UserParking[];
 
@@ -101,6 +105,10 @@ interface AppContextValue {
   addUserFood: (input: NewUserFoodInput) => Promise<boolean>;
   updateUserFood: (foodId: string, input: NewUserFoodInput) => Promise<boolean>;
   deleteUserFood: (foodId: string) => Promise<void>;
+  loadUserFoodComments: (foodId: string) => Promise<void>;
+  addUserFoodComment: (foodId: string, body: string) => Promise<boolean>;
+  updateUserFoodComment: (foodId: string, commentId: string, body: string) => Promise<boolean>;
+  deleteUserFoodComment: (foodId: string, commentId: string) => Promise<void>;
   addUserParking: (input: NewUserParkingInput) => Promise<boolean>;
   updateUserParking: (parkingId: string, input: NewUserParkingInput) => Promise<boolean>;
   deleteUserParking: (parkingId: string) => Promise<void>;
@@ -114,6 +122,8 @@ interface AppContextValue {
     targetType: ReportTargetType,
     targetId: string,
   ) => Promise<ReportTargetPreview>;
+  /** 마스터만 — 신고 누적으로 숨겨진 콘텐츠 복구 (숨김 해제 · 신고 수 초기화) */
+  restoreReportedContent: (targetType: ReportTargetType, targetId: string) => Promise<boolean>;
 
   /* 계정 */
   deleteOwnAccount: () => Promise<boolean>;
@@ -165,6 +175,12 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const [saves, setSaves] = useState<Saves>({ zones: [], foods: [] });
   const [commentsByPost, setCommentsByPost] = useState<Record<string, Comment[]>>({});
   const [commentsLoaded, setCommentsLoaded] = useState<Record<string, boolean>>({});
+  const [userFoodCommentsByFood, setUserFoodCommentsByFood] = useState<
+    Record<string, UserFoodComment[]>
+  >({});
+  const [userFoodCommentsLoaded, setUserFoodCommentsLoaded] = useState<Record<string, boolean>>(
+    {},
+  );
   const [userFoods, setUserFoods] = useState<UserFood[]>([]);
   const [userParkings, setUserParkings] = useState<UserParking[]>([]);
 
@@ -296,6 +312,8 @@ export function AppProvider({ children }: { children: ReactNode }) {
         setUserParkings(result.userParkingRows);
         setCommentsByPost({});
         setCommentsLoaded({});
+        setUserFoodCommentsByFood({});
+        setUserFoodCommentsLoaded({});
         setLoadError(null);
       } catch (error) {
         if (!active) return;
@@ -371,6 +389,8 @@ export function AppProvider({ children }: { children: ReactNode }) {
       // 닉네임·사진이 바뀌었을 수 있으니 펼쳐 둔 댓글은 다음에 열 때 다시 읽습니다.
       setCommentsByPost({});
       setCommentsLoaded({});
+      setUserFoodCommentsByFood({});
+      setUserFoodCommentsLoaded({});
       setLoadError(null);
     } catch (error) {
       setLoadError(errorMessage(error));
@@ -855,7 +875,106 @@ export function AppProvider({ children }: { children: ReactNode }) {
       try {
         await repo.deleteUserFood(foodId);
         setUserFoods((prev) => prev.filter((food) => food.id !== foodId));
+        setUserFoodCommentsByFood((prev) => {
+          const next = { ...prev };
+          delete next[foodId];
+          return next;
+        });
         toast("맛집을 삭제했어요");
+      } catch (error) {
+        toast(errorMessage(error));
+      }
+    },
+    [repo, toast],
+  );
+
+  /* ── 10-1. 직관러 맛집 댓글 ──────────────────────────────── */
+  const loadUserFoodComments = useCallback(
+    async (foodId: string) => {
+      if (!repo || userFoodCommentsLoaded[foodId]) return;
+      try {
+        const list = await repo.loadUserFoodComments(foodId, userRef.current?.id ?? null);
+        setUserFoodCommentsByFood((prev) => ({ ...prev, [foodId]: list }));
+        setUserFoodCommentsLoaded((prev) => ({ ...prev, [foodId]: true }));
+      } catch (error) {
+        toast(errorMessage(error));
+      }
+    },
+    [repo, userFoodCommentsLoaded, toast],
+  );
+
+  const addUserFoodComment = useCallback(
+    async (foodId: string, body: string) => {
+      if (!repo) return false;
+      const text = body.trim();
+      if (!text) return false;
+      if (!ensureCanWrite("댓글을 남기")) return false;
+
+      try {
+        const comment = await repo.addUserFoodComment(foodId, text, author);
+        const nextList = [...(userFoodCommentsByFood[foodId] ?? []), comment];
+        setUserFoodCommentsByFood((prev) => ({ ...prev, [foodId]: nextList }));
+        setUserFoodCommentsLoaded((prev) => ({ ...prev, [foodId]: true }));
+        setUserFoods((prev) =>
+          prev.map((food) =>
+            food.id === foodId ? { ...food, commentCount: nextList.length } : food,
+          ),
+        );
+        return true;
+      } catch (error) {
+        toast(errorMessage(error));
+        return false;
+      }
+    },
+    [repo, ensureCanWrite, author, userFoodCommentsByFood, toast],
+  );
+
+  const updateUserFoodComment = useCallback(
+    async (foodId: string, commentId: string, body: string) => {
+      if (!repo) return false;
+      const text = body.trim();
+      if (!text) return false;
+      try {
+        const updated = await repo.updateUserFoodComment(
+          commentId,
+          text,
+          userRef.current?.id ?? null,
+        );
+        setUserFoodCommentsByFood((prev) => ({
+          ...prev,
+          [foodId]: (prev[foodId] ?? []).map((comment) =>
+            comment.id === commentId
+              ? { ...updated, mine: comment.mine, nickname: comment.nickname }
+              : comment,
+          ),
+        }));
+        toast("댓글을 수정했어요");
+        return true;
+      } catch (error) {
+        toast(errorMessage(error));
+        return false;
+      }
+    },
+    [repo, toast],
+  );
+
+  const deleteUserFoodComment = useCallback(
+    async (foodId: string, commentId: string) => {
+      if (!repo) return;
+      try {
+        await repo.deleteUserFoodComment(commentId);
+        setUserFoodCommentsByFood((prev) => ({
+          ...prev,
+          [foodId]: (prev[foodId] ?? []).filter((comment) => comment.id !== commentId),
+        }));
+        setUserFoods((prev) =>
+          prev.map((food) =>
+            food.id === foodId
+              ? { ...food, commentCount: Math.max(0, (food.commentCount ?? 0) - 1) }
+              : food,
+          ),
+        );
+        toast("댓글을 삭제했어요");
       } catch (error) {
         toast(errorMessage(error));
       }
@@ -931,6 +1050,8 @@ export function AppProvider({ children }: { children: ReactNode }) {
       }
       try {
         await repo.createReport(input, reporterId);
+        // 신고 누적 수(그리고 10건째의 자동 숨김)를 화면에 바로 반영합니다.
+        await reload();
         toast("신고를 접수했어요. 확인 후 처리할게요.");
         return "ok";
       } catch (error) {
@@ -944,7 +1065,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
         return "error";
       }
     },
-    [repo, toast],
+    [repo, reload, toast],
   );
 
   /** 신고 목록 읽기 — 실패를 숨기지 않고 그대로 던져 마스터 화면에 보여 줍니다. */
@@ -977,11 +1098,36 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const loadReportTarget = useCallback(
     async (targetType: ReportTargetType, targetId: string) => {
       if (!repo) {
-        return { found: false, body: "", nickname: "", postId: null, zoneCode: null };
+        return {
+          found: false,
+          body: "",
+          nickname: "",
+          postId: null,
+          foodId: null,
+          zoneCode: null,
+          hidden: false,
+        };
       }
       return repo.loadReportTarget(targetType, targetId);
     },
     [repo],
+  );
+
+  /** 마스터 — 신고 누적으로 숨겨진 콘텐츠를 다시 보이게 합니다. */
+  const restoreReportedContent = useCallback(
+    async (targetType: ReportTargetType, targetId: string) => {
+      if (!repo) return false;
+      try {
+        await repo.restoreReportedContent(targetType, targetId);
+        await reload();
+        toast("숨김을 해제했어요");
+        return true;
+      } catch (error) {
+        toast(errorMessage(error));
+        return false;
+      }
+    },
+    [repo, reload, toast],
   );
 
   /* ── 12. 회원 탈퇴 ─────────────────────────────────────────── */
@@ -1019,6 +1165,8 @@ export function AppProvider({ children }: { children: ReactNode }) {
       saves,
       commentsByPost,
       commentsLoaded,
+      userFoodCommentsByFood,
+      userFoodCommentsLoaded,
       userFoods,
       userParkings,
       signInWithGoogle,
@@ -1044,6 +1192,10 @@ export function AppProvider({ children }: { children: ReactNode }) {
       addUserFood,
       updateUserFood,
       deleteUserFood,
+      loadUserFoodComments,
+      addUserFoodComment,
+      updateUserFoodComment,
+      deleteUserFoodComment,
       addUserParking,
       updateUserParking,
       deleteUserParking,
@@ -1051,6 +1203,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
       loadReports,
       setReportStatus,
       loadReportTarget,
+      restoreReportedContent,
       deleteOwnAccount,
       reload,
     }),
@@ -1071,6 +1224,8 @@ export function AppProvider({ children }: { children: ReactNode }) {
       saves,
       commentsByPost,
       commentsLoaded,
+      userFoodCommentsByFood,
+      userFoodCommentsLoaded,
       userFoods,
       userParkings,
       signInWithGoogle,
@@ -1096,6 +1251,10 @@ export function AppProvider({ children }: { children: ReactNode }) {
       addUserFood,
       updateUserFood,
       deleteUserFood,
+      loadUserFoodComments,
+      addUserFoodComment,
+      updateUserFoodComment,
+      deleteUserFoodComment,
       addUserParking,
       updateUserParking,
       deleteUserParking,
@@ -1103,6 +1262,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
       loadReports,
       setReportStatus,
       loadReportTarget,
+      restoreReportedContent,
       deleteOwnAccount,
       reload,
     ],

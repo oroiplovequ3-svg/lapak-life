@@ -16,6 +16,7 @@ import {
 } from "@/components/photo-gallery";
 import { useApp } from "@/components/providers/app-provider";
 import { useToast } from "@/components/providers/toast-provider";
+import { HiddenBadge, ReportButton, RestoreButton } from "@/components/report-controls";
 import { ReportSheet } from "@/components/report-sheet";
 import { categoryOf, FEED_FILTERS, type FilterId } from "@/lib/data/categories";
 import { ZONE_BY_CODE } from "@/lib/data/zones";
@@ -66,10 +67,13 @@ function CommentRow({
   onSave: (body: string) => Promise<boolean>;
   onDelete: () => void;
 }) {
+  const { isAdmin, restoreReportedContent } = useApp();
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState(comment.body);
   const [saving, setSaving] = useState(false);
   const [reportOpen, setReportOpen] = useState(false);
+  const [restoring, setRestoring] = useState(false);
+  const hidden = comment.isHidden === true;
 
   useEffect(() => {
     if (!editing) setDraft(comment.body);
@@ -85,7 +89,20 @@ function CommentRow({
   };
 
   return (
-    <div className="flex items-start gap-[7px]">
+    <div className="flex flex-col gap-1.5">
+      {hidden && isAdmin ? (
+        <div className="flex flex-wrap items-center gap-1.5">
+          <HiddenBadge className="flex-1" />
+          <RestoreButton
+            busy={restoring}
+            onClick={() => {
+              setRestoring(true);
+              void restoreReportedContent("comment", comment.id).finally(() => setRestoring(false));
+            }}
+          />
+        </div>
+      ) : null}
+      <div className="flex items-start gap-[7px]">
       <Avatar
         nickname={comment.nickname}
         avatarUrl={comment.avatarUrl}
@@ -134,29 +151,31 @@ function CommentRow({
             <span className="mr-[5px] text-xs font-extrabold text-ink">{comment.nickname}</span>
             {comment.body}
           </p>
-          {canManage ? (
-            <span className="flex flex-none items-center">
-              <button
-                type="button"
-                aria-label="댓글 수정"
-                onClick={() => setEditing(true)}
-                className="rounded-lg p-1.5 text-[#C4CBD6] transition hover:text-brand"
-              >
-                <Icon name="edit" size={12} />
-              </button>
-              <DeleteButton what="댓글" size={12} onDelete={onDelete} className="mt-[-4px]" />
-            </span>
-          ) : (
-            <button
-              type="button"
-              onClick={() => setReportOpen(true)}
-              className="flex-none rounded-lg px-1.5 py-1 text-[10px] font-bold text-[#B9C0CB] transition hover:text-[#B42318]"
-            >
-              신고
-            </button>
-          )}
+          <span className="flex flex-none items-center gap-0.5">
+            {canManage ? (
+              <>
+                <button
+                  type="button"
+                  aria-label="댓글 수정"
+                  onClick={() => setEditing(true)}
+                  className="rounded-lg p-1.5 text-[#C4CBD6] transition hover:text-brand"
+                >
+                  <Icon name="edit" size={12} />
+                </button>
+                <DeleteButton what="댓글" size={12} onDelete={onDelete} className="mt-[-4px]" />
+              </>
+            ) : null}
+            <ReportButton
+              count={comment.reportCount ?? 0}
+              manage={canManage}
+              size="sm"
+              onReport={() => setReportOpen(true)}
+            />
+          </span>
         </div>
       )}
+
+      </div>
 
       <ReportSheet
         open={reportOpen}
@@ -188,12 +207,14 @@ function PostCard({
     commentsByPost,
     commentsLoaded,
     isAdmin,
+    restoreReportedContent,
   } = useApp();
   const [open, setOpen] = useState(false);
   const [draft, setDraft] = useState("");
   const [sending, setSending] = useState(false);
   const [pop, setPop] = useState(false);
   const [reportOpen, setReportOpen] = useState(false);
+  const [restoring, setRestoring] = useState(false);
   const [lightbox, setLightbox] = useState<PhotoLightboxState | null>(null);
   const toast = useToast();
 
@@ -297,6 +318,19 @@ function PostCard({
         ) : null}
       </div>
 
+      {post.isHidden && isAdmin ? (
+        <div className="mt-2 flex flex-wrap items-center gap-1.5">
+          <HiddenBadge className="flex-1" />
+          <RestoreButton
+            busy={restoring}
+            onClick={() => {
+              setRestoring(true);
+              void restoreReportedContent("post", post.id).finally(() => setRestoring(false));
+            }}
+          />
+        </div>
+      ) : null}
+
       <p className="mt-[9px] whitespace-pre-wrap wrap-any text-sm leading-[1.65] text-[#1D2939]">
         {post.body}
       </p>
@@ -343,15 +377,13 @@ function PostCard({
           <Icon name="share" size={15} />
           <span>공유</span>
         </button>
-        {canManage ? null : (
-          <button
-            type="button"
-            onClick={() => setReportOpen(true)}
-            className="ml-auto inline-flex items-center gap-1 border-none bg-transparent p-0 text-[11px] font-bold text-[#B9C0CB] transition hover:text-[#B42318]"
-          >
-            신고
-          </button>
-        )}
+        <span className="ml-auto flex flex-none items-center gap-1">
+          <ReportButton
+            count={post.reportCount ?? 0}
+            manage={canManage}
+            onReport={() => setReportOpen(true)}
+          />
+        </span>
       </div>
 
       {open ? (

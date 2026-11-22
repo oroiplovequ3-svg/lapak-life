@@ -138,6 +138,9 @@ export function AppShell() {
       case "user_food":
         openFoodFromSearch("user-food", report.targetId);
         break;
+      case "user_food_comment":
+        if (preview?.foodId) openFoodFromSearch("user-food", preview.foodId);
+        break;
       case "user_parking":
         openFoodFromSearch("user-parking", report.targetId);
         break;

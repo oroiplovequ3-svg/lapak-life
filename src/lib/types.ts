@@ -68,8 +68,30 @@ export interface UserFood {
   inStadium: boolean;
   /** 맛집에 첨부한 사진 (최대 3장 · 데모는 축소된 data URL, 연동 시 Storage 공개 URL) */
   photoUrls: string[];
+  /** 달린 댓글 수 (user_food_comments) */
+  commentCount?: number;
+  /** 누적 신고 수 (10회 이상이면 자동 숨김) */
+  reportCount?: number;
+  /** 신고 누적으로 숨겨진 글 — 마스터에게만 보입니다 */
+  isHidden?: boolean;
   createdAt: string;
   mine: boolean;
+}
+
+/** 직관러 맛집에 달린 댓글 (user_food_comments 테이블과 1:1) */
+export interface UserFoodComment {
+  id: string;
+  foodId: string;
+  userId: string | null;
+  nickname: string;
+  avatarUrl: string | null;
+  body: string;
+  createdAt: string;
+  mine: boolean;
+  /** 누적 신고 수 (10회 이상이면 자동 숨김) */
+  reportCount?: number;
+  /** 신고 누적으로 숨겨진 댓글 — 마스터에게만 보입니다 */
+  isHidden?: boolean;
 }
 
 /** 직관러가 직접 올린 주차 팁 (user_parkings 테이블과 1:1) */
@@ -86,6 +108,10 @@ export interface UserParking {
   tip: string;
   createdAt: string;
   mine: boolean;
+  /** 누적 신고 수 (10회 이상이면 자동 숨김) */
+  reportCount?: number;
+  /** 신고 누적으로 숨겨진 글 — 마스터에게만 보입니다 */
+  isHidden?: boolean;
 }
 
 export interface Post {
@@ -106,6 +132,10 @@ export interface Post {
   commentCount: number;
   liked: boolean;
   mine: boolean;
+  /** 누적 신고 수 (10회 이상이면 자동 숨김) */
+  reportCount?: number;
+  /** 신고 누적으로 숨겨진 글 — 마스터에게만 보입니다 */
+  isHidden?: boolean;
 }
 
 export interface Comment {
@@ -117,6 +147,10 @@ export interface Comment {
   body: string;
   createdAt: string;
   mine: boolean;
+  /** 누적 신고 수 (10회 이상이면 자동 숨김) */
+  reportCount?: number;
+  /** 신고 누적으로 숨겨진 댓글 — 마스터에게만 보입니다 */
+  isHidden?: boolean;
 }
 
 export interface ZoneReview {
@@ -133,6 +167,10 @@ export interface ZoneReview {
   photoUrls: string[];
   createdAt: string;
   mine: boolean;
+  /** 누적 신고 수 (10회 이상이면 자동 숨김) */
+  reportCount?: number;
+  /** 신고 누적으로 숨겨진 후기 — 마스터에게만 보입니다 */
+  isHidden?: boolean;
 }
 
 export interface Game {
@@ -235,7 +273,13 @@ export interface NewUserParkingInput {
 }
 
 /** 신고할 수 있는 콘텐츠 종류 (reports.target_type) */
-export type ReportTargetType = "post" | "comment" | "review" | "user_food" | "user_parking";
+export type ReportTargetType =
+  | "post"
+  | "comment"
+  | "review"
+  | "user_food"
+  | "user_food_comment"
+  | "user_parking";
 
 /** 직관러가 접수한 신고 (reports 테이블과 1:1) */
 export interface Report {
@@ -261,8 +305,12 @@ export interface ReportTargetPreview {
   nickname: string;
   /** 댓글이면 부모 글 id (글로 바로 이동할 때) */
   postId: string | null;
+  /** 직관러 맛집 댓글이면 부모 맛집 id (맛집·주차 탭으로 이동할 때) */
+  foodId?: string | null;
   /** 시야 후기면 구역 코드 (좌석 시야 탭으로 이동할 때) */
   zoneCode: string | null;
+  /** 신고 누적으로 숨김 처리된 대상인지 (마스터만 복구·삭제 결정) */
+  hidden?: boolean;
 }
 
 export interface NewReportInput {

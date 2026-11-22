@@ -24,6 +24,7 @@ import type {
   ReportTargetPreview,
   Saves,
   UserFood,
+  UserFoodComment,
   UserParking,
   Zone,
   ZoneReview,
@@ -46,6 +47,8 @@ interface DemoPersist {
   games: Game[];
   deletedPosts: string[];
   userFoods: UserFood[];
+  /** 직관러 맛집 댓글 (foodId → 댓글) */
+  userFoodComments: Record<string, UserFoodComment[]>;
   userParkings: UserParking[];
   /** 데모 모드에서 접수한 신고 (마스터가 없어 목록은 열리지 않습니다) */
   reports: Report[];
@@ -62,6 +65,7 @@ function emptyPersist(): DemoPersist {
     games: [],
     deletedPosts: [],
     userFoods: [],
+    userFoodComments: {},
     userParkings: [],
     reports: [],
   };
@@ -81,6 +85,7 @@ function readPersist(): DemoPersist {
       profile: { ...base.profile, ...(parsed.profile ?? {}), id: null },
       extraComments: parsed.extraComments ?? {},
       userFoods: parsed.userFoods ?? [],
+      userFoodComments: parsed.userFoodComments ?? {},
       userParkings: parsed.userParkings ?? [],
       reports: parsed.reports ?? [],
     };
@@ -118,6 +123,8 @@ function seedPostToPost(sp: SeedPost, liked: boolean, commentCount: number): Pos
     createdAt: minutesAgoISO(sp.minutesAgo),
     likeCount: sp.likes + (liked ? 1 : 0),
     commentCount,
+    reportCount: 0,
+    isHidden: false,
     liked,
     mine: false,
   };
@@ -247,6 +254,13 @@ export class DemoRepository implements Repository {
     return seed ? seed.comments.length : 0;
   }
 
+  /** 데모 모드의 신고 누적 수 — 마스터가 없어 숨김은 일어나지 않습니다. */
+  private reportCountOf(targetType: string, targetId: string): number {
+    return this.persist.reports.filter(
+      (report) => report.targetType === targetType && report.targetId === targetId,
+    ).length;
+  }
+
   async loadZones(): Promise<Zone[]> {
     return ZONES;
   }
@@ -278,6 +292,8 @@ export class DemoRepository implements Repository {
         likeCount: p.likeCount + (liked.has(p.id) ? 1 : 0),
         commentCount: extra[p.id]?.length ?? 0,
         mine: true,
+        reportCount: this.reportCountOf("post", p.id),
+        isHidden: false,
       }));
 
     return [...mine, ...seeded].sort(
@@ -303,6 +319,8 @@ export class DemoRepository implements Repository {
       commentCount: 0,
       liked: false,
       mine: true,
+      reportCount: 0,
+      isHidden: false,
     };
     this.persist.posts.unshift(post);
     this.save();
@@ -353,14 +371,14 @@ export class DemoRepository implements Repository {
     const seeded = SEED_POSTS.find((p) => p.id === postId);
     const base = seeded ? seedComments(seeded) : [];
     const extra = this.persist.extraComments[postId] ?? [];
-    return [
-      ...base,
-      ...extra.map((comment) =>
-        comment.mine
-          ? { ...comment, nickname: this.me.nickname, avatarUrl: this.me.avatarUrl }
-          : comment,
-      ),
-    ];
+    const decorate = (comment: Comment): Comment => ({
+      ...comment,
+      nickname: comment.mine ? this.me.nickname : comment.nickname,
+      avatarUrl: comment.mine ? this.me.avatarUrl : comment.avatarUrl,
+      reportCount: this.reportCountOf("comment", comment.id),
+      isHidden: false,
+    });
+    return [...base.map(decorate), ...extra.map(decorate)];
   }
 
   async addComment(postId: string, body: string, author: Author): Promise<Comment> {
@@ -427,7 +445,11 @@ export class DemoRepository implements Repository {
         avatarUrl: this.me.avatarUrl,
       })),
       ...seeded,
-    ];
+    ].map((review) => ({
+      ...review,
+      reportCount: this.reportCountOf("review", review.id),
+      isHidden: false,
+    }));
   }
 
   async createReview(input: NewReviewInput, author: Author): Promise<ZoneReview> {
@@ -585,7 +607,75 @@ export class DemoRepository implements Repository {
     return [...mine, ...SEED_USER_FOODS].map((food) => ({
       ...food,
       photoUrls: food.photoUrls ?? [],
+      commentCount: this.persist.userFoodComments[food.id]?.length ?? 0,
+      reportCount: this.reportCountOf("user_food", food.id),
+      isHidden: false,
     }));
+  }
+
+  /* ── 직관러 맛집 댓글 (데모 모드) ────────────────────────── */
+  async loadUserFoodComments(foodId: string): Promise<UserFoodComment[]> {
+    return (this.persist.userFoodComments[foodId] ?? []).map((comment) => ({
+      ...comment,
+      nickname: comment.mine ? this.me.nickname : comment.nickname,
+      avatarUrl: comment.mine ? this.me.avatarUrl : comment.avatarUrl,
+      reportCount: this.reportCountOf("user_food_comment", comment.id),
+      isHidden: false,
+    }));
+  }
+
+  async addUserFoodComment(
+    foodId: string,
+    body: string,
+    author: Author,
+  ): Promise<UserFoodComment> {
+    const comment: UserFoodComment = {
+      id: `demo-ufcomment-${Date.now()}`,
+      foodId,
+      userId: null,
+      nickname: author.nickname,
+      avatarUrl: author.avatarUrl ?? null,
+      body,
+      createdAt: new Date().toISOString(),
+      mine: true,
+      reportCount: 0,
+      isHidden: false,
+    };
+    this.persist.userFoodComments[foodId] = [
+      ...(this.persist.userFoodComments[foodId] ?? []),
+      comment,
+    ];
+    const food = this.persist.userFoods.find((item) => item.id === foodId);
+    if (food) food.commentCount = (food.commentCount ?? 0) + 1;
+    this.save();
+    return comment;
+  }
+
+  async updateUserFoodComment(commentId: string, body: string): Promise<UserFoodComment> {
+    for (const [foodId, list] of Object.entries(this.persist.userFoodComments)) {
+      const target = list.find((comment) => comment.id === commentId && comment.mine);
+      if (target) {
+        const updated: UserFoodComment = { ...target, body };
+        this.persist.userFoodComments[foodId] = list.map((comment) =>
+          comment.id === commentId ? updated : comment,
+        );
+        this.save();
+        return updated;
+      }
+    }
+    throw new Error("데모 모드에서는 내가 쓴 댓글만 수정할 수 있어요.");
+  }
+
+  async deleteUserFoodComment(commentId: string): Promise<void> {
+    for (const [foodId, list] of Object.entries(this.persist.userFoodComments)) {
+      const next = list.filter((comment) => comment.id !== commentId);
+      if (next.length !== list.length) {
+        this.persist.userFoodComments[foodId] = next;
+        const food = this.persist.userFoods.find((item) => item.id === foodId);
+        if (food) food.commentCount = Math.max(0, (food.commentCount ?? 0) - 1);
+      }
+    }
+    this.save();
   }
 
   async createUserFood(input: NewUserFoodInput, author: Author): Promise<UserFood> {
@@ -647,7 +737,11 @@ export class DemoRepository implements Repository {
       nickname: this.me.nickname,
       avatarUrl: this.me.avatarUrl,
     }));
-    return [...mine, ...SEED_USER_PARKINGS];
+    return [...mine, ...SEED_USER_PARKINGS].map((parking) => ({
+      ...parking,
+      reportCount: this.reportCountOf("user_parking", parking.id),
+      isHidden: false,
+    }));
   }
 
   async createUserParking(
@@ -732,7 +826,20 @@ export class DemoRepository implements Repository {
 
   /** 데모 모드 신고는 대상 미리보기를 따로 보관하지 않습니다. */
   async loadReportTarget(): Promise<ReportTargetPreview> {
-    return { found: false, body: "", nickname: "", postId: null, zoneCode: null };
+    return {
+      found: false,
+      body: "",
+      nickname: "",
+      postId: null,
+      foodId: null,
+      zoneCode: null,
+      hidden: false,
+    };
+  }
+
+  /** 데모 모드에는 마스터가 없어 숨김 복구도 일어나지 않습니다. */
+  async restoreReportedContent(): Promise<void> {
+    throw new Error("데모 모드에서는 신고 복구를 할 수 없어요.");
   }
 
   /** 데모 모드에는 서버 계정이 없어 탈퇴할 계정도 없습니다. */

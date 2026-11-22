@@ -11,12 +11,20 @@ import {
   type PhotoLightboxState,
 } from "@/components/photo-gallery";
 import { useApp } from "@/components/providers/app-provider";
+import { HiddenBadge, ReportButton, RestoreButton } from "@/components/report-controls";
 import { ReportSheet } from "@/components/report-sheet";
 import { UserFoodSheet } from "@/components/user-food-sheet";
 import { UserParkingSheet } from "@/components/user-parking-sheet";
 import { groupedFoods } from "@/lib/data/foods";
 import { PARKING } from "@/lib/data/parking";
-import type { Food, FoodFocus, ReportTargetType, UserFood, UserParking } from "@/lib/types";
+import type {
+  Food,
+  FoodFocus,
+  ReportTargetType,
+  UserFood,
+  UserFoodComment,
+  UserParking,
+} from "@/lib/types";
 
 type FoodFilter = "all" | "in" | "out";
 type FoodTab = "all" | "user" | "stadium";
@@ -53,6 +61,142 @@ function SectionHead({
   );
 }
 
+function UserFoodCommentRow({
+  comment,
+  canManage,
+  onSave,
+  onDelete,
+}: {
+  comment: UserFoodComment;
+  /** 본인 댓글이거나 마스터 */
+  canManage: boolean;
+  onSave: (body: string) => Promise<boolean>;
+  onDelete: () => void;
+}) {
+  const { isAdmin, restoreReportedContent } = useApp();
+  const [editing, setEditing] = useState(false);
+  const [draft, setDraft] = useState(comment.body);
+  const [saving, setSaving] = useState(false);
+  const [reportOpen, setReportOpen] = useState(false);
+  const [restoring, setRestoring] = useState(false);
+  const hidden = comment.isHidden === true;
+
+  useEffect(() => {
+    if (!editing) setDraft(comment.body);
+  }, [comment.body, editing]);
+
+  const save = async () => {
+    const text = draft.trim();
+    if (!text || saving) return;
+    setSaving(true);
+    const ok = await onSave(text);
+    setSaving(false);
+    if (ok) setEditing(false);
+  };
+
+  return (
+    <div className="flex flex-col gap-1.5">
+      {hidden && isAdmin ? (
+        <div className="flex flex-wrap items-center gap-1.5">
+          <HiddenBadge className="flex-1" />
+          <RestoreButton
+            busy={restoring}
+            onClick={() => {
+              setRestoring(true);
+              void restoreReportedContent("user_food_comment", comment.id).finally(() =>
+                setRestoring(false),
+              );
+            }}
+          />
+        </div>
+      ) : null}
+      <div className="flex items-start gap-[7px]">
+        <Avatar
+          nickname={comment.nickname}
+          avatarUrl={comment.avatarUrl}
+          size={22}
+          className="bg-brand-50 text-[9.5px] text-brand"
+        />
+        {editing ? (
+          <div className="flex min-w-0 flex-1 flex-col gap-1.5">
+            <input
+              value={draft}
+              maxLength={300}
+              autoFocus
+              onChange={(event) => setDraft(event.target.value)}
+              onKeyDown={(event) => {
+                // 한글 IME 조합 중 Enter 는 글자를 확정하는 키입니다.
+                if (event.nativeEvent.isComposing) return;
+                if (event.key === "Enter") {
+                  event.preventDefault();
+                  void save();
+                }
+                if (event.key === "Escape") setEditing(false);
+              }}
+              className="w-full rounded-xl border border-[#C7D7F0] bg-white px-3 py-[7px] text-[12px] text-ink outline-none"
+            />
+            <div className="flex justify-end gap-1">
+              <button
+                type="button"
+                onClick={() => setEditing(false)}
+                className="rounded-[9px] bg-[#F3F5F9] px-2.5 py-1 text-[10.5px] font-extrabold text-ink-muted"
+              >
+                취소
+              </button>
+              <button
+                type="button"
+                onClick={() => void save()}
+                disabled={!draft.trim() || saving}
+                className="rounded-[9px] bg-brand px-2.5 py-1 text-[10.5px] font-extrabold text-white disabled:bg-[#E4E7EC] disabled:text-ink-faint"
+              >
+                {saving ? "저장 중" : "저장"}
+              </button>
+            </div>
+          </div>
+        ) : (
+          <div className="flex min-w-0 flex-1 items-start gap-1">
+            <p className="min-w-0 flex-1 wrap-any pt-px text-[12px] leading-relaxed text-ink-2">
+              <span className="mr-[5px] text-[11.5px] font-extrabold text-ink">
+                {comment.nickname}
+              </span>
+              {comment.body}
+            </p>
+            <span className="flex flex-none items-center gap-0.5">
+              {canManage ? (
+                <>
+                  <button
+                    type="button"
+                    aria-label="댓글 수정"
+                    onClick={() => setEditing(true)}
+                    className="rounded-lg p-1.5 text-[#C4CBD6] transition hover:text-brand"
+                  >
+                    <Icon name="edit" size={11} />
+                  </button>
+                  <DeleteButton what="댓글" size={11} onDelete={onDelete} className="mt-[-4px]" />
+                </>
+              ) : null}
+              <ReportButton
+                count={comment.reportCount ?? 0}
+                manage={canManage}
+                size="sm"
+                onReport={() => setReportOpen(true)}
+              />
+            </span>
+          </div>
+        )}
+      </div>
+
+      <ReportSheet
+        open={reportOpen}
+        onClose={() => setReportOpen(false)}
+        targetType="user_food_comment"
+        targetId={comment.id}
+        targetHint={`${comment.nickname}님의 맛집 댓글`}
+      />
+    </div>
+  );
+}
+
 function UserFoodCard({
   food,
   canManage,
@@ -69,7 +213,39 @@ function UserFoodCard({
   onReport: () => void;
   onOpenPhoto: (index: number) => void;
 }) {
+  const {
+    isAdmin,
+    userFoodCommentsByFood,
+    userFoodCommentsLoaded,
+    loadUserFoodComments,
+    addUserFoodComment,
+    updateUserFoodComment,
+    deleteUserFoodComment,
+    restoreReportedContent,
+  } = useApp();
   const photoUrls = food.photoUrls ?? [];
+  const comments = userFoodCommentsByFood[food.id] ?? [];
+  const loaded = userFoodCommentsLoaded[food.id] === true;
+  const commentCount = loaded ? comments.length : food.commentCount ?? 0;
+  const [open, setOpen] = useState(false);
+  const [draft, setDraft] = useState("");
+  const [sending, setSending] = useState(false);
+  const [restoring, setRestoring] = useState(false);
+  const hidden = food.isHidden === true;
+
+  const toggle = () => {
+    setOpen((prev) => !prev);
+    if (!open) void loadUserFoodComments(food.id);
+  };
+
+  const send = async () => {
+    const text = draft.trim();
+    if (!text || sending) return;
+    setSending(true);
+    const ok = await addUserFoodComment(food.id, text);
+    setSending(false);
+    if (ok) setDraft("");
+  };
 
   return (
     <article
@@ -108,34 +284,101 @@ function UserFoodCard({
             </div>
           ) : null}
         </div>
-        {canManage ? (
-          <span className="flex flex-none items-center">
-            <button
-              type="button"
-              aria-label="맛집 수정"
-              onClick={onEdit}
-              className="rounded-lg p-1.5 text-[#C4CBD6] transition hover:text-brand"
-            >
-              <Icon name="edit" size={13} />
-            </button>
-            <DeleteButton what="맛집" size={13} onDelete={onDelete} />
-          </span>
-        ) : (
-          <button
-            type="button"
-            onClick={onReport}
-            className="flex-none rounded-lg px-1.5 py-1 text-[10px] font-bold text-[#B9C0CB] transition hover:text-[#B42318]"
-          >
-            신고
-          </button>
-        )}
+        <span className="flex flex-none items-center gap-0.5">
+          {canManage ? (
+            <>
+              <button
+                type="button"
+                aria-label="맛집 수정"
+                onClick={onEdit}
+                className="rounded-lg p-1.5 text-[#C4CBD6] transition hover:text-brand"
+              >
+                <Icon name="edit" size={13} />
+              </button>
+              <DeleteButton what="맛집" size={13} onDelete={onDelete} />
+            </>
+          ) : null}
+          <ReportButton
+            count={food.reportCount ?? 0}
+            manage={canManage}
+            size="sm"
+            onReport={onReport}
+          />
+        </span>
       </div>
+
+      {hidden && isAdmin ? (
+        <div className="mt-2 flex flex-wrap items-center gap-1.5">
+          <HiddenBadge className="flex-1" />
+          <RestoreButton
+            busy={restoring}
+            onClick={() => {
+              setRestoring(true);
+              void restoreReportedContent("user_food", food.id).finally(() => setRestoring(false));
+            }}
+          />
+        </div>
+      ) : null}
+
       <PhotoTiles
         urls={photoUrls}
         onOpen={onOpenPhoto}
         singleHeight={150}
         label="맛집 사진"
       />
+
+      <div className="mt-2 flex items-center gap-2 border-t border-line-soft pt-[7px]">
+        <button
+          type="button"
+          onClick={toggle}
+          aria-expanded={open}
+          className="inline-flex items-center gap-[5px] border-none bg-transparent p-0 text-[11.5px] font-bold text-ink-muted"
+        >
+          <Icon name="comment" size={13} />
+          <span>댓글 {commentCount}</span>
+        </button>
+      </div>
+
+      {open ? (
+        <div className="mt-2 flex flex-col gap-2 border-t border-line-soft pt-2">
+          {loaded && comments.length === 0 ? (
+            <p className="py-1 text-[11px] text-ink-faint">첫 댓글을 남겨보세요.</p>
+          ) : null}
+          {comments.map((comment) => (
+            <UserFoodCommentRow
+              key={comment.id}
+              comment={comment}
+              canManage={comment.mine || isAdmin}
+              onSave={(body) => updateUserFoodComment(food.id, comment.id, body)}
+              onDelete={() => void deleteUserFoodComment(food.id, comment.id)}
+            />
+          ))}
+          <div className="flex items-center gap-[6px]">
+            <input
+              value={draft}
+              onChange={(event) => setDraft(event.target.value)}
+              onKeyDown={(event) => {
+                // 한글 IME 조합 중 Enter 는 글자를 확정하는 키라 댓글을 등록하지 않습니다.
+                if (event.nativeEvent.isComposing) return;
+                if (event.key === "Enter") {
+                  event.preventDefault();
+                  void send();
+                }
+              }}
+              placeholder="댓글을 입력하세요"
+              className="min-w-0 flex-1 rounded-xl border border-line bg-[#F9FAFB] px-3 py-[8px] text-[12px] text-ink outline-none focus:border-[#C7D7F0] focus:bg-white"
+            />
+            <button
+              type="button"
+              onClick={() => void send()}
+              disabled={!draft.trim() || sending}
+              className="flex-none rounded-[11px] bg-brand px-3 py-[8px] text-[11.5px] font-extrabold text-white disabled:bg-[#E4E7EC] disabled:text-ink-faint"
+            >
+              등록
+            </button>
+          </div>
+        </div>
+      ) : null}
     </article>
   );
 }
@@ -146,6 +389,9 @@ function UserParkingCard({
   onEdit,
   onDelete,
   onReport,
+  showHidden,
+  restoring,
+  onRestoreHidden,
 }: {
   parking: UserParking;
   /** 본인 팁이거나 마스터 */
@@ -153,6 +399,10 @@ function UserParkingCard({
   onEdit: () => void;
   onDelete: () => void;
   onReport: () => void;
+  /** 숨김 배지·복구 버튼을 보여 줄지 (마스터만) */
+  showHidden: boolean;
+  restoring: boolean;
+  onRestoreHidden: () => void;
 }) {
   return (
     <article
@@ -189,28 +439,34 @@ function UserParkingCard({
             </div>
           ) : null}
         </div>
-        {canManage ? (
-          <span className="flex flex-none items-center">
-            <button
-              type="button"
-              aria-label="주차 팁 수정"
-              onClick={onEdit}
-              className="rounded-lg p-1.5 text-[#C4CBD6] transition hover:text-brand"
-            >
-              <Icon name="edit" size={13} />
-            </button>
-            <DeleteButton what="주차 팁" size={13} onDelete={onDelete} />
-          </span>
-        ) : (
-          <button
-            type="button"
-            onClick={onReport}
-            className="flex-none rounded-lg px-1.5 py-1 text-[10px] font-bold text-[#B9C0CB] transition hover:text-[#B42318]"
-          >
-            신고
-          </button>
-        )}
+        <span className="flex flex-none items-center gap-0.5">
+          {canManage ? (
+            <>
+              <button
+                type="button"
+                aria-label="주차 팁 수정"
+                onClick={onEdit}
+                className="rounded-lg p-1.5 text-[#C4CBD6] transition hover:text-brand"
+              >
+                <Icon name="edit" size={13} />
+              </button>
+              <DeleteButton what="주차 팁" size={13} onDelete={onDelete} />
+            </>
+          ) : null}
+          <ReportButton
+            count={parking.reportCount ?? 0}
+            manage={canManage}
+            size="sm"
+            onReport={onReport}
+          />
+        </span>
       </div>
+      {parking.isHidden && showHidden ? (
+        <div className="mt-2 flex flex-wrap items-center gap-1.5">
+          <HiddenBadge className="flex-1" />
+          <RestoreButton busy={restoring} onClick={onRestoreHidden} />
+        </div>
+      ) : null}
     </article>
   );
 }
@@ -536,6 +792,7 @@ export function FoodScreen({ focus }: { focus?: FoodFocus | null }) {
     deleteUserFood,
     deleteUserParking,
     isAdmin,
+    restoreReportedContent,
     loadError,
     reload,
   } = useApp();
@@ -549,6 +806,8 @@ export function FoodScreen({ focus }: { focus?: FoodFocus | null }) {
   const [editingFood, setEditingFood] = useState<UserFood | null>(null);
   const [editingParking, setEditingParking] = useState<UserParking | null>(null);
   const [lightbox, setLightbox] = useState<PhotoLightboxState | null>(null);
+  /** 복구 처리 중인 주차 팁 id */
+  const [restoringParking, setRestoringParking] = useState<string | null>(null);
   /** 신고 중인 맛집·주차 팁 */
   const [reportTarget, setReportTarget] = useState<{
     type: ReportTargetType;
@@ -731,6 +990,14 @@ export function FoodScreen({ focus }: { focus?: FoodFocus | null }) {
                       hint: `${parking.nickname}님의 주차 팁 · ${parking.name}`,
                     })
                   }
+                  showHidden={isAdmin}
+                  restoring={restoringParking === parking.id}
+                  onRestoreHidden={() => {
+                    setRestoringParking(parking.id);
+                    void restoreReportedContent("user_parking", parking.id).finally(() =>
+                      setRestoringParking(null),
+                    );
+                  }}
                 />
               ))}
             </div>

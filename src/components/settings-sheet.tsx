@@ -18,6 +18,7 @@ const REPORT_TARGET_LABEL: Record<Report["targetType"], string> = {
   comment: "댓글",
   review: "시야 후기",
   user_food: "직관러 맛집",
+  user_food_comment: "맛집 댓글",
   user_parking: "주차 팁",
 };
 
@@ -169,7 +170,9 @@ export function SettingsSheet({ open, onClose, onOpenReportTarget }: SettingsShe
     deleteComment,
     deleteReview,
     deleteUserFood,
+    deleteUserFoodComment,
     deleteUserParking,
+    restoreReportedContent,
     deleteOwnAccount,
   } = useApp();
   const toast = useToast();
@@ -277,6 +280,13 @@ export function SettingsSheet({ open, onClose, onOpenReportTarget }: SettingsShe
         case "user_food":
           await deleteUserFood(report.targetId);
           break;
+        case "user_food_comment":
+          if (!preview?.foodId) {
+            toast("댓글이 달린 맛집을 찾지 못해 삭제하지 못했어요");
+            return;
+          }
+          await deleteUserFoodComment(preview.foodId, report.targetId);
+          break;
         case "user_parking":
           await deleteUserParking(report.targetId);
           break;
@@ -292,6 +302,18 @@ export function SettingsSheet({ open, onClose, onOpenReportTarget }: SettingsShe
         return;
       }
       const ok = await setReportStatus(report.id, "resolved");
+      if (ok) await refreshReports();
+    } finally {
+      setBusyReport(null);
+    }
+  };
+
+  /** 신고 누적으로 숨겨진 대상을 다시 보이게 하고 신고 수를 초기화합니다. */
+  const restoreTarget = async (report: Report) => {
+    if (busyReport) return;
+    setBusyReport(report.id);
+    try {
+      const ok = await restoreReportedContent(report.targetType, report.targetId);
       if (ok) await refreshReports();
     } finally {
       setBusyReport(null);
@@ -414,7 +436,9 @@ export function SettingsSheet({ open, onClose, onOpenReportTarget }: SettingsShe
                             report.targetType === "review" ||
                             report.targetType === "user_food" ||
                             report.targetType === "user_parking" ||
-                            (report.targetType === "comment" && Boolean(preview?.postId)));
+                            (report.targetType === "comment" && Boolean(preview?.postId)) ||
+                            (report.targetType === "user_food_comment" &&
+                              Boolean(preview?.foodId)));
                         return (
                           <div
                             key={report.id}
@@ -466,6 +490,14 @@ export function SettingsSheet({ open, onClose, onOpenReportTarget }: SettingsShe
                                     <ReportAction
                                       label="대상 보기"
                                       onClick={() => onOpenReportTarget(report, preview ?? null)}
+                                    />
+                                  ) : null}
+                                  {preview?.hidden ? (
+                                    <ReportAction
+                                      label="숨김 복구"
+                                      tone="brand"
+                                      disabled={busyReport === report.id}
+                                      onClick={() => void restoreTarget(report)}
                                     />
                                   ) : null}
                                   {preview?.found ? (

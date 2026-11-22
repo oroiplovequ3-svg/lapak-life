@@ -21,6 +21,7 @@ import type {
   ReportTargetType,
   Saves,
   UserFood,
+  UserFoodComment,
   UserParking,
   Zone,
   ZoneReview,
@@ -113,6 +114,8 @@ function mapPost(row: AnyRow, viewerId: string | null, likedIds: Set<string>): P
     commentCount: num(row.comment_count),
     liked: likedIds.has(id),
     mine: Boolean(viewerId && userId === viewerId),
+    reportCount: num(row.report_count),
+    isHidden: row.is_hidden === true,
   };
 }
 
@@ -128,6 +131,8 @@ function mapComment(row: AnyRow, viewerId: string | null): Comment {
     body: str(row.body),
     createdAt: str(row.created_at) || new Date().toISOString(),
     mine: Boolean(viewerId && userId === viewerId),
+    reportCount: num(row.report_count),
+    isHidden: row.is_hidden === true,
   };
 }
 
@@ -147,6 +152,8 @@ function mapReview(row: AnyRow, viewerId: string | null): ZoneReview {
     photoUrls: photoUrlList(row.photo_urls),
     createdAt: str(row.created_at) || new Date().toISOString(),
     mine: Boolean(viewerId && userId === viewerId),
+    reportCount: num(row.report_count),
+    isHidden: row.is_hidden === true,
   };
 }
 
@@ -169,10 +176,14 @@ function mapGame(row: AnyRow): Game {
 const POST_COLUMNS =
   // posts ↔ profiles 는 직접 FK(posts_user_id_fkey)와 post_likes 경유 다대다 경로가 함께 있어
   // PostgREST 가 임베드를 고르지 못한다(PGRST201). 제약 이름으로 직접 경로를 지정한다.
-  "id, user_id, category, body, seat_zone, seat_detail, media, photo_urls, created_at, like_count, comment_count, profiles!posts_user_id_fkey(nickname, avatar_url)";
-const COMMENT_COLUMNS = "id, post_id, user_id, body, created_at, profiles(nickname, avatar_url)";
+  "id, user_id, category, body, seat_zone, seat_detail, media, photo_urls, created_at, like_count, comment_count, report_count, is_hidden, profiles!posts_user_id_fkey(nickname, avatar_url)";
+const COMMENT_COLUMNS =
+  "id, post_id, user_id, body, created_at, report_count, is_hidden, profiles(nickname, avatar_url)";
 const REVIEW_COLUMNS =
-  "id, zone_code, user_id, seat_detail, rating, body, photo_urls, created_at, profiles(nickname, avatar_url)";
+  "id, zone_code, user_id, seat_detail, rating, body, photo_urls, created_at, report_count, is_hidden, profiles(nickname, avatar_url)";
+/** 직관러 맛집 댓글 (supabase/migrations/015_user_food_comments.sql · 신고 필드는 016) */
+const USER_FOOD_COMMENT_COLUMNS =
+  "id, food_id, user_id, body, created_at, report_count, is_hidden, profiles(nickname, avatar_url)";
 
 /** 시야 후기 사진 버킷 (supabase/migrations/002_review_photos.sql) */
 const REVIEW_PHOTO_BUCKET = "review-photos";
@@ -202,16 +213,24 @@ const SIGNED_URL_TTL = 60 * 60 * 6;
 const GAME_COLUMNS =
   "id, user_id, played_on, opponent, home_away, zone_code, score_for, score_against, note, photo_urls, created_at";
 
-/** 직관러 맛집 (supabase/migrations/004_user_foods.sql · 사진은 006) */
+/** 직관러 맛집 (supabase/migrations/004_user_foods.sql · 사진은 006 · 댓글 수는 015 · 신고는 016) */
 const USER_FOOD_COLUMNS =
-  "id, user_id, name, menu, tip, rating, is_inside, photo_urls, created_at, profiles(nickname, avatar_url)";
+  "id, user_id, name, menu, tip, rating, is_inside, photo_urls, comment_count, report_count, is_hidden, created_at, profiles(nickname, avatar_url)";
+
+/** 016 이전 스키마(신고 컬럼 없음) 대체 목록 */
+const USER_FOOD_COLUMNS_NO_REPORT =
+  "id, user_id, name, menu, tip, rating, is_inside, photo_urls, comment_count, created_at, profiles(nickname, avatar_url)";
 
 /** 006 마이그레이션 전 스키마(사진 컬럼 없음) 대체 목록 */
 const USER_FOOD_COLUMNS_LEGACY =
   "id, user_id, name, menu, tip, rating, is_inside, created_at, profiles(nickname, avatar_url)";
 
-/** 직관러 주차 팁 (supabase/migrations/005_user_parkings.sql) */
+/** 직관러 주차 팁 (supabase/migrations/005_user_parkings.sql · 신고는 016) */
 const USER_PARKING_COLUMNS =
+  "id, user_id, name, location, is_free, fee_note, walk_time, tip, created_at, report_count, is_hidden, profiles(nickname, avatar_url)";
+
+/** 016 이전 스키마(신고 컬럼 없음) 대체 목록 */
+const USER_PARKING_COLUMNS_LEGACY =
   "id, user_id, name, location, is_free, fee_note, walk_time, tip, created_at, profiles(nickname, avatar_url)";
 
 function mapUserFood(row: AnyRow, viewerId: string | null): UserFood {
@@ -228,6 +247,9 @@ function mapUserFood(row: AnyRow, viewerId: string | null): UserFood {
     rating: num(row.rating, 5),
     inStadium: typeof row.is_inside === "boolean" ? row.is_inside : true,
     photoUrls: photoUrlList(row.photo_urls),
+    commentCount: num(row.comment_count),
+    reportCount: num(row.report_count),
+    isHidden: row.is_hidden === true,
     createdAt: str(row.created_at) || new Date().toISOString(),
     mine: Boolean(viewerId && userId === viewerId),
   };
@@ -249,6 +271,25 @@ function mapUserParking(row: AnyRow, viewerId: string | null): UserParking {
     tip: str(row.tip),
     createdAt: str(row.created_at) || new Date().toISOString(),
     mine: Boolean(viewerId && userId === viewerId),
+    reportCount: num(row.report_count),
+    isHidden: row.is_hidden === true,
+  };
+}
+
+function mapUserFoodComment(row: AnyRow, viewerId: string | null): UserFoodComment {
+  const { nickname, avatarUrl } = embeddedProfile(row);
+  const userId = row.user_id ? str(row.user_id) : null;
+  return {
+    id: str(row.id),
+    foodId: str(row.food_id),
+    userId,
+    nickname,
+    avatarUrl,
+    body: str(row.body),
+    createdAt: str(row.created_at) || new Date().toISOString(),
+    mine: Boolean(viewerId && userId === viewerId),
+    reportCount: num(row.report_count),
+    isHidden: row.is_hidden === true,
   };
 }
 
@@ -1043,17 +1084,85 @@ export class SupabaseRepository implements Repository {
 
     let rows = (primary.data ?? []) as AnyRow[];
     if (primary.error) {
-      // 006(사진 컬럼)을 아직 실행하지 않았으면 사진 없이 한 번 더 시도합니다.
-      const retry = await this.supabase
+      // 016(신고 컬럼) · 006(사진 컬럼)을 아직 실행하지 않았으면 한 단계씩 물러섭니다.
+      const noReport = await this.supabase
         .from("user_foods")
-        .select(USER_FOOD_COLUMNS_LEGACY)
+        .select(USER_FOOD_COLUMNS_NO_REPORT)
         .order("created_at", { ascending: false })
         .limit(200);
-      // 마이그레이션 004 를 아직 실행하지 않았어도 화면은 비지 않게 둡니다.
-      if (retry.error) return [];
-      rows = (retry.data ?? []) as AnyRow[];
+      if (!noReport.error) {
+        rows = (noReport.data ?? []) as AnyRow[];
+      } else {
+        const retry = await this.supabase
+          .from("user_foods")
+          .select(USER_FOOD_COLUMNS_LEGACY)
+          .order("created_at", { ascending: false })
+          .limit(200);
+        // 마이그레이션 004 를 아직 실행하지 않았어도 화면은 비지 않게 둡니다.
+        if (retry.error) return [];
+        rows = (retry.data ?? []) as AnyRow[];
+      }
     }
     return rows.map((row) => mapUserFood(row, viewerId));
+  }
+
+  /* ── 직관러 맛집 댓글 ──────────────────────────── */
+  async loadUserFoodComments(
+    foodId: string,
+    viewerId: string | null,
+  ): Promise<UserFoodComment[]> {
+    const { data, error } = await this.supabase
+      .from("user_food_comments")
+      .select(USER_FOOD_COMMENT_COLUMNS)
+      .eq("food_id", foodId)
+      .order("created_at", { ascending: true })
+      .limit(200);
+
+    // 015 를 아직 실행하지 않았으면 댓글 없이 둡니다(화면은 그대로 동작).
+    if (error) return [];
+    return ((data ?? []) as AnyRow[]).map((row) => mapUserFoodComment(row, viewerId));
+  }
+
+  async addUserFoodComment(
+    foodId: string,
+    body: string,
+    author: Author,
+  ): Promise<UserFoodComment> {
+    const { data, error } = await this.supabase
+      .from("user_food_comments")
+      .insert({ food_id: foodId, user_id: author.id, body })
+      .select(USER_FOOD_COMMENT_COLUMNS)
+      .single();
+
+    if (error || !data) fail("댓글을 등록하지 못했습니다", error);
+    return { ...mapUserFoodComment(data as AnyRow, author.id), mine: true };
+  }
+
+  /** 댓글 수정 — 본인 댓글이나 마스터일 때만 RLS 가 통과합니다. */
+  async updateUserFoodComment(
+    commentId: string,
+    body: string,
+    viewerId: string | null,
+  ): Promise<UserFoodComment> {
+    const { data, error } = await this.supabase
+      .from("user_food_comments")
+      .update({ body })
+      .eq("id", commentId)
+      .select(USER_FOOD_COMMENT_COLUMNS)
+      .maybeSingle();
+
+    if (error) fail("댓글을 수정하지 못했습니다", error);
+    if (!data) throw new Error("댓글을 수정하지 못했어요. 내가 쓴 댓글이 아니거나 권한이 없어요.");
+    return mapUserFoodComment(data as AnyRow, viewerId);
+  }
+
+  async deleteUserFoodComment(commentId: string): Promise<void> {
+    await deleteOwnRow(
+      this.supabase,
+      "user_food_comments",
+      commentId,
+      "댓글을 삭제하지 못했습니다",
+    );
   }
 
   async createUserFood(input: NewUserFoodInput, author: Author): Promise<UserFood> {
@@ -1157,8 +1266,16 @@ export class SupabaseRepository implements Repository {
       .order("created_at", { ascending: false })
       .limit(200);
 
-    if (error) return [];
-    return ((data ?? []) as AnyRow[]).map((row) => mapUserParking(row, viewerId));
+    if (!error) return ((data ?? []) as AnyRow[]).map((row) => mapUserParking(row, viewerId));
+
+    // 016(신고 컬럼)을 아직 실행하지 않았으면 신고 수 없이 보여 줍니다.
+    const retry = await this.supabase
+      .from("user_parkings")
+      .select(USER_PARKING_COLUMNS_LEGACY)
+      .order("created_at", { ascending: false })
+      .limit(200);
+    if (retry.error) return [];
+    return ((retry.data ?? []) as AnyRow[]).map((row) => mapUserParking(row, viewerId));
   }
 
   async createUserParking(
@@ -1278,14 +1395,16 @@ export class SupabaseRepository implements Repository {
       body: "",
       nickname: "",
       postId: null,
+      foodId: null,
       zoneCode: null,
+      hidden: false,
     };
 
     if (targetType === "post" || targetType === "comment") {
       if (targetType === "post") {
         const { data, error } = await this.supabase
           .from("posts")
-          .select("id, body, profiles(nickname)")
+          .select("id, body, is_hidden, profiles(nickname)")
           .eq("id", targetId)
           .maybeSingle();
         if (error) fail("신고된 내용을 불러오지 못했습니다", error);
@@ -1296,13 +1415,15 @@ export class SupabaseRepository implements Repository {
           body: str(row.body),
           nickname: embeddedProfile(row).nickname,
           postId: targetId,
+          foodId: null,
           zoneCode: null,
+          hidden: row.is_hidden === true,
         };
       }
 
       const { data, error } = await this.supabase
         .from("comments")
-        .select("id, body, post_id, profiles(nickname)")
+        .select("id, body, post_id, is_hidden, profiles(nickname)")
         .eq("id", targetId)
         .maybeSingle();
       if (error) fail("신고된 내용을 불러오지 못했습니다", error);
@@ -1313,14 +1434,16 @@ export class SupabaseRepository implements Repository {
         body: str(row.body),
         nickname: embeddedProfile(row).nickname,
         postId: str(row.post_id) || null,
+        foodId: null,
         zoneCode: null,
+        hidden: row.is_hidden === true,
       };
     }
 
     if (targetType === "review") {
       const { data, error } = await this.supabase
         .from("zone_reviews")
-        .select("id, body, zone_code, profiles(nickname)")
+        .select("id, body, zone_code, is_hidden, profiles(nickname)")
         .eq("id", targetId)
         .maybeSingle();
       if (error) fail("신고된 내용을 불러오지 못했습니다", error);
@@ -1331,14 +1454,16 @@ export class SupabaseRepository implements Repository {
         body: str(row.body),
         nickname: embeddedProfile(row).nickname,
         postId: null,
+        foodId: null,
         zoneCode: str(row.zone_code) || null,
+        hidden: row.is_hidden === true,
       };
     }
 
     if (targetType === "user_food") {
       const { data, error } = await this.supabase
         .from("user_foods")
-        .select("id, name, tip, place, profiles(nickname)")
+        .select("id, name, menu, tip, is_hidden, profiles(nickname)")
         .eq("id", targetId)
         .maybeSingle();
       if (error) fail("신고된 내용을 불러오지 못했습니다", error);
@@ -1346,16 +1471,38 @@ export class SupabaseRepository implements Repository {
       const row = data as AnyRow;
       return {
         found: true,
-        body: [str(row.name), str(row.place), str(row.tip)].filter(Boolean).join(" · "),
+        body: [str(row.name), str(row.menu), str(row.tip)].filter(Boolean).join(" · "),
         nickname: embeddedProfile(row).nickname,
         postId: null,
+        foodId: targetId,
         zoneCode: null,
+        hidden: row.is_hidden === true,
+      };
+    }
+
+    if (targetType === "user_food_comment") {
+      const { data, error } = await this.supabase
+        .from("user_food_comments")
+        .select("id, body, food_id, is_hidden, profiles(nickname)")
+        .eq("id", targetId)
+        .maybeSingle();
+      if (error) fail("신고된 내용을 불러오지 못했습니다", error);
+      if (!data) return empty;
+      const row = data as AnyRow;
+      return {
+        found: true,
+        body: str(row.body),
+        nickname: embeddedProfile(row).nickname,
+        postId: null,
+        foodId: str(row.food_id) || null,
+        zoneCode: null,
+        hidden: row.is_hidden === true,
       };
     }
 
     const { data, error } = await this.supabase
       .from("user_parkings")
-      .select("id, name, location, tip, profiles(nickname)")
+      .select("id, name, location, tip, is_hidden, profiles(nickname)")
       .eq("id", targetId)
       .maybeSingle();
     if (error) fail("신고된 내용을 불러오지 못했습니다", error);
@@ -1366,8 +1513,24 @@ export class SupabaseRepository implements Repository {
       body: [str(row.name), str(row.location), str(row.tip)].filter(Boolean).join(" · "),
       nickname: embeddedProfile(row).nickname,
       postId: null,
+      foodId: null,
       zoneCode: null,
+      hidden: row.is_hidden === true,
     };
+  }
+
+  /** 마스터만 — 숨김 해제 · 신고 수 초기화 (RPC restore_reported_content) */
+  async restoreReportedContent(targetType: ReportTargetType, targetId: string): Promise<void> {
+    const { error } = await this.supabase.rpc("restore_reported_content", {
+      p_target_type: targetType,
+      p_target_id: targetId,
+    });
+    if (error) {
+      if (error.code === "42883") {
+        throw new Error("복구 기능이 아직 준비되지 않았어요. 운영자에게 문의해 주세요.");
+      }
+      fail("숨김을 해제하지 못했습니다", error);
+    }
   }
 
   /**

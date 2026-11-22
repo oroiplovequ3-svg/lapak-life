@@ -21,6 +21,7 @@ const TARGET_LABEL: Record<ReportTargetType, string> = {
   comment: "댓글",
   review: "시야 후기",
   user_food: "직관러 맛집",
+  user_food_comment: "맛집 댓글",
   user_parking: "주차 팁",
 };
 

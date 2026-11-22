@@ -16,6 +16,7 @@ import type {
   ReportTargetType,
   Saves,
   UserFood,
+  UserFoodComment,
   UserParking,
   Zone,
   ZoneReview,
@@ -90,6 +91,15 @@ export interface Repository {
     viewerId: string | null,
   ): Promise<UserFood>;
   deleteUserFood(foodId: string): Promise<void>;
+  /** 직관러 맛집에 달린 댓글 */
+  loadUserFoodComments(foodId: string, viewerId: string | null): Promise<UserFoodComment[]>;
+  addUserFoodComment(foodId: string, body: string, author: Author): Promise<UserFoodComment>;
+  updateUserFoodComment(
+    commentId: string,
+    body: string,
+    viewerId: string | null,
+  ): Promise<UserFoodComment>;
+  deleteUserFoodComment(commentId: string): Promise<void>;
   loadUserParkings(viewerId: string | null): Promise<UserParking[]>;
   createUserParking(input: NewUserParkingInput, author: Author): Promise<UserParking>;
   updateUserParking(
@@ -111,6 +121,8 @@ export interface Repository {
     targetType: ReportTargetType,
     targetId: string,
   ): Promise<ReportTargetPreview>;
+  /** 마스터만 — 신고 누적으로 숨겨진 대상을 다시 보이게 하고 신고 수를 초기화 */
+  restoreReportedContent(targetType: ReportTargetType, targetId: string): Promise<void>;
 
   /* ── 계정 ────────────────────────────────────────────────── */
   /** 회원 탈퇴 — 내 콘텐츠·사진과 계정을 서버에서 지웁니다 (delete_own_account RPC) */

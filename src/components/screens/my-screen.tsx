@@ -12,6 +12,7 @@ import {
   PhotoTiles,
   type PhotoLightboxState,
 } from "@/components/photo-gallery";
+import { PostNo } from "@/components/post-no";
 import { ProfileSheet } from "@/components/profile-sheet";
 import { useApp } from "@/components/providers/app-provider";
 import { categoryOf } from "@/lib/data/categories";
@@ -413,6 +414,7 @@ export function MyScreen({ onOpenPost, onCompose, onAddGame, onEditGame }: MyScr
               className="cursor-pointer rounded-[13px] border border-line bg-white px-3 py-[11px]"
             >
               <div className="flex items-start gap-1.5">
+                <PostNo no={post.postNo} className="mt-[1px]" />
                 <div className="min-w-0 flex-1 text-[12.5px] font-extrabold text-brand-600">
                   {categoryOf(post.category).label}
                 </div>

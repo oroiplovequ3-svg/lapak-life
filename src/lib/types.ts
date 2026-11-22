@@ -58,6 +58,8 @@ export interface ParkingCard {
 /** 직관러가 직접 올린 맛집 (user_foods 테이블과 1:1) */
 export interface UserFood {
   id: string;
+  /** DB가 매기는 작성순번 (화면에 No.N 으로 표시 · 지워지지 않고 새 글마다 증가) */
+  postNo?: number;
   userId: string | null;
   nickname: string;
   avatarUrl: string | null;
@@ -97,6 +99,8 @@ export interface UserFoodComment {
 /** 직관러가 직접 올린 주차 팁 (user_parkings 테이블과 1:1) */
 export interface UserParking {
   id: string;
+  /** DB가 매기는 작성순번 (화면에 No.N 으로 표시) */
+  postNo?: number;
   userId: string | null;
   nickname: string;
   avatarUrl: string | null;
@@ -116,6 +120,8 @@ export interface UserParking {
 
 export interface Post {
   id: string;
+  /** DB가 매기는 작성순번 (화면에 No.N 으로 표시 · 지워지지 않고 새 글마다 증가) */
+  postNo?: number;
   userId: string | null;
   nickname: string;
   avatarUrl: string | null;
@@ -155,6 +161,8 @@ export interface Comment {
 
 export interface ZoneReview {
   id: string;
+  /** DB가 매기는 작성순번 (화면에 No.N 으로 표시) */
+  postNo?: number;
   zoneCode: string;
   userId: string | null;
   nickname: string;

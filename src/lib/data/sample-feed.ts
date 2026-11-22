@@ -8,6 +8,8 @@ export interface SeedComment {
 
 export interface SeedPost {
   id: string;
+  /** 작성순번 — 오래된 글부터 No.1 (데모 저장소가 새 글과 같은 규칙으로 매김) */
+  postNo?: number;
   nickname: string;
   badge: string;
   category: CategoryId;
@@ -19,8 +21,18 @@ export interface SeedPost {
   comments: SeedComment[];
 }
 
+/**
+ * 씨앗 데이터의 작성순번 — 오래된 글일수록 작은 번호를 붙입니다.
+ * (minutesAgo 가 클수록 오래된 글)
+ */
+function numberedByAge<T extends { minutesAgo: number; postNo?: number }>(items: T[]): T[] {
+  const ordered = [...items].sort((a, b) => b.minutesAgo - a.minutesAgo);
+  const noByItem = new Map(ordered.map((item, index) => [item, index + 1] as const));
+  return items.map((item) => ({ ...item, postNo: noByItem.get(item) ?? item.postNo }));
+}
+
 /** 데모 모드·첫 배포용 씨앗 글 (프로토타입 POSTS) */
-export const SEED_POSTS: SeedPost[] = [
+export const SEED_POSTS: SeedPost[] = numberedByAge([
   {
     id: "p1",
     nickname: "민지",
@@ -118,10 +130,12 @@ export const SEED_POSTS: SeedPost[] = [
     minutesAgo: 1500,
     comments: [{ nickname: "홈런볼기다림", body: "선크림 필수 동의합니다", minutesAgo: 1440 }],
   },
-];
+]);
 
 export interface SeedReview {
   id: string;
+  /** 작성순번 — 오래된 후기부터 No.1 */
+  postNo?: number;
   zone: string;
   nickname: string;
   badge: string;
@@ -132,7 +146,7 @@ export interface SeedReview {
 }
 
 /** 시야 후기 씨앗 (구역별 1~2건, 26개 구역 모두) */
-export const SEED_REVIEWS: SeedReview[] = [
+export const SEED_REVIEWS: SeedReview[] = numberedByAge([
   {
     id: "r1",
     zone: "T3",
@@ -463,7 +477,7 @@ export const SEED_REVIEWS: SeedReview[] = [
     body: "텐트 치고 피크닉하듯 볼 수 있어요. 아이들이 지루해하지 않아서 좋았습니다. 경기는 멀리서 보는 느낌이라 디테일보다 분위기용이에요.",
     minutesAgo: 21600,
   },
-];
+]);
 
 export interface SeedGame {
   playedOn: string;

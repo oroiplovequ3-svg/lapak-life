@@ -15,6 +15,7 @@ import {
   PhotoTiles,
   type PhotoLightboxState,
 } from "@/components/photo-gallery";
+import { PostNo } from "@/components/post-no";
 import { useApp } from "@/components/providers/app-provider";
 import { useToast } from "@/components/providers/toast-provider";
 import { HiddenBadge, ReportButton, RestoreButton } from "@/components/report-controls";
@@ -293,6 +294,10 @@ function PostCard({
             </span>
           </div>
           <div className="mt-0.5 flex flex-wrap items-center gap-[5px] text-[11px] text-ink-faint">
+            <PostNo no={post.postNo} />
+            {post.postNo ? (
+              <span className="h-0.5 w-0.5 rounded-full bg-[#D0D5DD]" />
+            ) : null}
             {seatDetail ? <span className="wrap-any">{seatDetail}</span> : null}
             {seatDetail ? <span className="h-0.5 w-0.5 rounded-full bg-[#D0D5DD]" /> : null}
             <span>{formatRelativeTime(post.createdAt)}</span>

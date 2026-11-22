@@ -10,6 +10,7 @@ import {
   PhotoTiles,
   type PhotoLightboxState,
 } from "@/components/photo-gallery";
+import { PostNo } from "@/components/post-no";
 import { useApp } from "@/components/providers/app-provider";
 import { HiddenBadge, ReportButton, RestoreButton } from "@/components/report-controls";
 import { ReportSheet } from "@/components/report-sheet";
@@ -258,6 +259,7 @@ function UserFoodCard({
         </div>
         <div className="min-w-0 flex-1">
           <div className="flex flex-wrap items-baseline gap-x-[7px] gap-y-0.5">
+            <PostNo no={food.postNo} />
             <h3 className="min-w-0 wrap-any text-[13.5px] font-extrabold tracking-tight2">{food.name}</h3>
             <span className="rounded-md bg-[#F2F8FF] px-1.5 py-[1px] text-[10px] font-extrabold text-[#0B4A96]">
               {food.inStadium ? "구장 안" : "구장 밖"}
@@ -415,6 +417,7 @@ function UserParkingCard({
         </div>
         <div className="min-w-0 flex-1">
           <div className="flex flex-wrap items-baseline gap-x-[7px] gap-y-0.5">
+            <PostNo no={parking.postNo} />
             <h3 className="min-w-0 wrap-any text-[13.5px] font-extrabold tracking-tight2">{parking.name}</h3>
             <span
               className={`rounded-md px-1.5 py-[1px] text-[10px] font-extrabold ${

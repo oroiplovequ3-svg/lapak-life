@@ -11,6 +11,7 @@ import {
   PhotoTiles,
   type PhotoLightboxState,
 } from "@/components/photo-gallery";
+import { PostNo } from "@/components/post-no";
 import { useApp } from "@/components/providers/app-provider";
 import { HiddenBadge, ReportButton, RestoreButton } from "@/components/report-controls";
 import { ReportSheet } from "@/components/report-sheet";
@@ -222,8 +223,11 @@ export function SeatScreen({
                       {review.badge}
                     </span>
                   </div>
-                  <div className="mt-0.5 wrap-any text-[11px] text-ink-faint">
-                    {zoneFullName(review.zoneCode)} · {formatRelativeTime(review.createdAt)}
+                  <div className="mt-0.5 flex flex-wrap items-center gap-[4px] text-[11px] text-ink-faint">
+                    <PostNo no={review.postNo} />
+                    <span className="wrap-any">
+                      {zoneFullName(review.zoneCode)} · {formatRelativeTime(review.createdAt)}
+                    </span>
                   </div>
                 </div>
                 <Stars value={review.stars} />

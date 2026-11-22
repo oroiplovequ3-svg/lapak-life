@@ -94,6 +94,13 @@ function badgeOf(zoneCode: unknown, viewerId: string | null, userId: string | nu
   return zone?.short ?? "라팍팬";
 }
 
+/** DB가 매기는 작성순번 (019 마이그레이션의 post_no) — 없으면 배지를 그리지 않습니다. */
+function postNoOf(row: AnyRow): number | undefined {
+  if (row.post_no === null || row.post_no === undefined) return undefined;
+  const value = num(row.post_no);
+  return value > 0 ? value : undefined;
+}
+
 function mapPost(row: AnyRow, viewerId: string | null, likedIds: Set<string>): Post {
   const { nickname, avatarUrl } = embeddedProfile(row);
   const id = str(row.id);
@@ -101,6 +108,7 @@ function mapPost(row: AnyRow, viewerId: string | null, likedIds: Set<string>): P
   const media = row.media === "day" || row.media === "night" ? row.media : null;
   return {
     id,
+    postNo: postNoOf(row),
     userId,
     nickname,
     avatarUrl,
@@ -143,6 +151,7 @@ function mapReview(row: AnyRow, viewerId: string | null): ZoneReview {
   const userId = row.user_id ? str(row.user_id) : null;
   return {
     id: str(row.id),
+    postNo: postNoOf(row),
     zoneCode: str(row.zone_code),
     userId,
     nickname,
@@ -178,11 +187,11 @@ function mapGame(row: AnyRow): Game {
 const POST_COLUMNS =
   // posts ↔ profiles 는 직접 FK(posts_user_id_fkey)와 post_likes 경유 다대다 경로가 함께 있어
   // PostgREST 가 임베드를 고르지 못한다(PGRST201). 제약 이름으로 직접 경로를 지정한다.
-  "id, user_id, category, body, seat_zone, seat_detail, media, photo_urls, created_at, like_count, comment_count, report_count, is_hidden, profiles!posts_user_id_fkey(nickname, avatar_url)";
+  "id, post_no, user_id, category, body, seat_zone, seat_detail, media, photo_urls, created_at, like_count, comment_count, report_count, is_hidden, profiles!posts_user_id_fkey(nickname, avatar_url)";
 const COMMENT_COLUMNS =
   "id, post_id, user_id, body, created_at, report_count, is_hidden, profiles(nickname, avatar_url)";
 const REVIEW_COLUMNS =
-  "id, zone_code, user_id, seat_detail, rating, body, photo_urls, created_at, report_count, is_hidden, profiles(nickname, avatar_url)";
+  "id, post_no, zone_code, user_id, seat_detail, rating, body, photo_urls, created_at, report_count, is_hidden, profiles(nickname, avatar_url)";
 /** 직관러 맛집 댓글 (supabase/migrations/015_user_food_comments.sql · 신고 필드는 016) */
 const USER_FOOD_COMMENT_COLUMNS =
   "id, food_id, user_id, body, created_at, report_count, is_hidden, profiles(nickname, avatar_url)";
@@ -217,29 +226,30 @@ const GAME_COLUMNS =
 
 /** 직관러 맛집 (supabase/migrations/004_user_foods.sql · 사진은 006 · 댓글 수는 015 · 신고는 016) */
 const USER_FOOD_COLUMNS =
-  "id, user_id, name, menu, tip, rating, is_inside, photo_urls, comment_count, report_count, is_hidden, created_at, profiles(nickname, avatar_url)";
+  "id, post_no, user_id, name, menu, tip, rating, is_inside, photo_urls, comment_count, report_count, is_hidden, created_at, profiles(nickname, avatar_url)";
 
 /** 016 이전 스키마(신고 컬럼 없음) 대체 목록 */
 const USER_FOOD_COLUMNS_NO_REPORT =
-  "id, user_id, name, menu, tip, rating, is_inside, photo_urls, comment_count, created_at, profiles(nickname, avatar_url)";
+  "id, post_no, user_id, name, menu, tip, rating, is_inside, photo_urls, comment_count, created_at, profiles(nickname, avatar_url)";
 
 /** 006 마이그레이션 전 스키마(사진 컬럼 없음) 대체 목록 */
 const USER_FOOD_COLUMNS_LEGACY =
-  "id, user_id, name, menu, tip, rating, is_inside, created_at, profiles(nickname, avatar_url)";
+  "id, post_no, user_id, name, menu, tip, rating, is_inside, created_at, profiles(nickname, avatar_url)";
 
 /** 직관러 주차 팁 (supabase/migrations/005_user_parkings.sql · 신고는 016) */
 const USER_PARKING_COLUMNS =
-  "id, user_id, name, location, is_free, fee_note, walk_time, tip, created_at, report_count, is_hidden, profiles(nickname, avatar_url)";
+  "id, post_no, user_id, name, location, is_free, fee_note, walk_time, tip, created_at, report_count, is_hidden, profiles(nickname, avatar_url)";
 
 /** 016 이전 스키마(신고 컬럼 없음) 대체 목록 */
 const USER_PARKING_COLUMNS_LEGACY =
-  "id, user_id, name, location, is_free, fee_note, walk_time, tip, created_at, profiles(nickname, avatar_url)";
+  "id, post_no, user_id, name, location, is_free, fee_note, walk_time, tip, created_at, profiles(nickname, avatar_url)";
 
 function mapUserFood(row: AnyRow, viewerId: string | null): UserFood {
   const { nickname, avatarUrl } = embeddedProfile(row);
   const userId = row.user_id ? str(row.user_id) : null;
   return {
     id: str(row.id),
+    postNo: postNoOf(row),
     userId,
     nickname,
     avatarUrl,
@@ -262,6 +272,7 @@ function mapUserParking(row: AnyRow, viewerId: string | null): UserParking {
   const userId = row.user_id ? str(row.user_id) : null;
   return {
     id: str(row.id),
+    postNo: postNoOf(row),
     userId,
     nickname,
     avatarUrl,

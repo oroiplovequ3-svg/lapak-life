@@ -56,6 +56,24 @@ interface DemoPersist {
   reports: Report[];
 }
 
+/**
+ * 데모 데이터의 작성순번 — 오래된 글부터 1, 2, 3 …
+ * (서버의 post_no 처럼 글마다 고유한 번호를 붙입니다. 데모는 저장된 글을
+ *  날짜순으로 다시 세어 번호를 매기므로 항상 같은 순서로 보입니다)
+ */
+function assignPostNos<T extends { id: string; createdAt: string }>(
+  items: T[],
+): (T & { postNo: number })[] {
+  const ordered = [...items].sort((a, b) => {
+    const at = new Date(a.createdAt).getTime();
+    const bt = new Date(b.createdAt).getTime();
+    if (at !== bt) return at - bt;
+    return a.id < b.id ? -1 : a.id > b.id ? 1 : 0;
+  });
+  const noById = new Map(ordered.map((item, index) => [item.id, index + 1]));
+  return items.map((item) => ({ ...item, postNo: noById.get(item.id) ?? 0 }));
+}
+
 function emptyPersist(): DemoPersist {
   return {
     profile: { ...DEMO_AUTHOR },
@@ -298,14 +316,20 @@ export class DemoRepository implements Repository {
         isHidden: false,
       }));
 
-    return [...mine, ...seeded].sort(
+    return assignPostNos([...mine, ...seeded]).sort(
       (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime(),
     );
   }
 
   async createPost(input: NewPostInput, author: Author): Promise<Post> {
+    const deleted = new Set(this.persist.deletedPosts);
     const post: Post = {
       id: `demo-post-${Date.now()}`,
+      // 지금 보이는 글 수 + 1 — 가장 새 글이라 목록에서도 가장 큰 번호를 받습니다.
+      postNo:
+        this.persist.posts.filter((item) => !deleted.has(item.id)).length +
+        SEED_POSTS.filter((item) => !deleted.has(item.id)).length +
+        1,
       userId: null,
       nickname: author.nickname,
       avatarUrl: author.avatarUrl ?? null,
@@ -428,6 +452,7 @@ export class DemoRepository implements Repository {
   async loadReviews(): Promise<ZoneReview[]> {
     const seeded: ZoneReview[] = SEED_REVIEWS.map((r) => ({
       id: r.id,
+      postNo: r.postNo,
       zoneCode: r.zone,
       userId: null,
       nickname: r.nickname,
@@ -440,7 +465,7 @@ export class DemoRepository implements Repository {
       createdAt: minutesAgoISO(r.minutesAgo),
       mine: false,
     }));
-    return [
+    const merged = [
       ...this.persist.reviews.map((review) => ({
         ...review,
         nickname: this.me.nickname,
@@ -452,11 +477,13 @@ export class DemoRepository implements Repository {
       reportCount: this.reportCountOf("review", review.id),
       isHidden: false,
     }));
+    return assignPostNos(merged);
   }
 
   async createReview(input: NewReviewInput, author: Author): Promise<ZoneReview> {
     const review: ZoneReview = {
       id: `demo-review-${Date.now()}`,
+      postNo: this.persist.reviews.length + SEED_REVIEWS.length + 1,
       zoneCode: input.zoneCode,
       userId: null,
       nickname: author.nickname,
@@ -606,13 +633,14 @@ export class DemoRepository implements Repository {
       avatarUrl: this.me.avatarUrl,
       photoUrls: food.photoUrls ?? [],
     }));
-    return [...mine, ...SEED_USER_FOODS].map((food) => ({
+    const merged = [...mine, ...SEED_USER_FOODS].map((food) => ({
       ...food,
       photoUrls: food.photoUrls ?? [],
       commentCount: this.persist.userFoodComments[food.id]?.length ?? 0,
       reportCount: this.reportCountOf("user_food", food.id),
       isHidden: false,
     }));
+    return assignPostNos(merged);
   }
 
   /* ── 직관러 맛집 댓글 (데모 모드) ────────────────────────── */
@@ -683,6 +711,7 @@ export class DemoRepository implements Repository {
   async createUserFood(input: NewUserFoodInput, author: Author): Promise<UserFood> {
     const food: UserFood = {
       id: `demo-ufood-${Date.now()}`,
+      postNo: this.persist.userFoods.length + SEED_USER_FOODS.length + 1,
       userId: null,
       nickname: author.nickname,
       avatarUrl: author.avatarUrl ?? null,
@@ -739,11 +768,12 @@ export class DemoRepository implements Repository {
       nickname: this.me.nickname,
       avatarUrl: this.me.avatarUrl,
     }));
-    return [...mine, ...SEED_USER_PARKINGS].map((parking) => ({
+    const merged = [...mine, ...SEED_USER_PARKINGS].map((parking) => ({
       ...parking,
       reportCount: this.reportCountOf("user_parking", parking.id),
       isHidden: false,
     }));
+    return assignPostNos(merged);
   }
 
   async createUserParking(
@@ -752,6 +782,7 @@ export class DemoRepository implements Repository {
   ): Promise<UserParking> {
     const parking: UserParking = {
       id: `demo-uparking-${Date.now()}`,
+      postNo: this.persist.userParkings.length + SEED_USER_PARKINGS.length + 1,
       userId: null,
       nickname: author.nickname,
       avatarUrl: author.avatarUrl ?? null,

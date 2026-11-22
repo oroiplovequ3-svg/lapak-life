@@ -1,15 +1,24 @@
 "use client";
 
 import Link from "next/link";
-import { useState, type ReactNode } from "react";
+import { useCallback, useEffect, useState, type ReactNode } from "react";
 
 import { Avatar } from "@/components/avatar";
 import { Icon, type IconName } from "@/components/icons";
 import { ProfileSheet } from "@/components/profile-sheet";
 import { useApp } from "@/components/providers/app-provider";
 import { Sheet } from "@/components/sheet";
+import type { Report } from "@/lib/types";
 
-const APP_VERSION = "인블루 (INBLUE) · v1.0";
+const APP_VERSION = "인블루 (INBLUE) · v1.1";
+
+const REPORT_TARGET_LABEL: Record<Report["targetType"], string> = {
+  post: "글",
+  comment: "댓글",
+  review: "시야 후기",
+  user_food: "직관러 맛집",
+  user_parking: "주차 팁",
+};
 
 function MenuRow({
   icon,
@@ -61,10 +70,39 @@ interface SettingsSheetProps {
   onClose: () => void;
 }
 
-/** 내 직관 상단 톱니(설정) — 프로필·개인정보처리방침·서비스 정보·로그인 관리 */
+/** 내 직관 상단 톱니(설정) — 프로필·개인정보처리방침·신고 관리·서비스 정보·로그인 관리 */
 export function SettingsSheet({ open, onClose }: SettingsSheetProps) {
-  const { user, profile, configured, signingIn, signInWithGoogle, signOut } = useApp();
+  const {
+    user,
+    profile,
+    configured,
+    signingIn,
+    signInWithGoogle,
+    signOut,
+    isAdmin,
+    loadReports,
+    resolveReport,
+  } = useApp();
   const [profileOpen, setProfileOpen] = useState(false);
+  const [reportsOpen, setReportsOpen] = useState(false);
+  const [reports, setReports] = useState<Report[]>([]);
+  const [reportsLoading, setReportsLoading] = useState(false);
+
+  const refreshReports = useCallback(async () => {
+    setReportsLoading(true);
+    const list = await loadReports();
+    setReports(list);
+    setReportsLoading(false);
+  }, [loadReports]);
+
+  useEffect(() => {
+    if (!open || !isAdmin || !reportsOpen) return;
+    void refreshReports();
+  }, [open, isAdmin, reportsOpen, refreshReports]);
+
+  useEffect(() => {
+    if (!open) setReportsOpen(false);
+  }, [open]);
 
   const signedIn = Boolean(user);
   const me = user ?? profile;
@@ -80,6 +118,8 @@ export function SettingsSheet({ open, onClose }: SettingsSheetProps) {
     onClose();
     setProfileOpen(true);
   };
+
+  const openCount = reports.filter((report) => report.status === "open").length;
 
   return (
     <>
@@ -107,12 +147,7 @@ export function SettingsSheet({ open, onClose }: SettingsSheetProps) {
         </section>
 
         <div className="overflow-hidden rounded-[15px] border border-line bg-white">
-          <MenuRow
-            icon="my"
-            label="프로필 설정"
-            hint="닉네임·사진"
-            onClick={openProfile}
-          />
+          <MenuRow icon="my" label="프로필 설정" hint="닉네임·사진" onClick={openProfile} />
           <div className="border-t border-line-soft">
             <Link
               href="/privacy"
@@ -133,6 +168,90 @@ export function SettingsSheet({ open, onClose }: SettingsSheetProps) {
           <div className="border-t border-line-soft">
             <PlainRow icon="info" label="서비스 정보" value={APP_VERSION} />
           </div>
+
+          {isAdmin ? (
+            <div className="border-t border-line-soft">
+              <MenuRow
+                icon="shield"
+                label="신고 관리"
+                hint={reportsOpen ? `${openCount}건 대기` : "마스터 전용"}
+                onClick={() => setReportsOpen((value) => !value)}
+              />
+              {reportsOpen ? (
+                <div className="border-t border-line-soft bg-[#FBFCFE] px-3.5 py-3">
+                  {reportsLoading ? (
+                    <p className="py-2 text-center text-[11.5px] text-ink-faint">불러오는 중…</p>
+                  ) : reports.length === 0 ? (
+                    <p className="py-2 text-center text-[11.5px] text-ink-faint">
+                      접수된 신고가 없어요.
+                    </p>
+                  ) : (
+                    <div className="flex flex-col gap-2">
+                      {reports.map((report) => (
+                        <div
+                          key={report.id}
+                          className="rounded-[11px] border border-line bg-white px-3 py-2.5"
+                        >
+                          <div className="flex items-center gap-1.5">
+                            <span className="rounded-md bg-[#FEF3F2] px-1.5 py-[1px] text-[9.5px] font-extrabold text-[#B42318]">
+                              {REPORT_TARGET_LABEL[report.targetType]}
+                            </span>
+                            <span className="text-[11.5px] font-extrabold text-ink">
+                              {report.reason}
+                            </span>
+                            <span className="ml-auto text-[10px] font-semibold text-ink-faint">
+                              {new Date(report.createdAt).toLocaleDateString("ko-KR")}
+                            </span>
+                          </div>
+                          {report.detail ? (
+                            <p className="mt-1 break-keep text-[11px] leading-relaxed text-ink-muted">
+                              {report.detail}
+                            </p>
+                          ) : null}
+                          <div className="mt-1.5 flex items-center gap-2">
+                            <span className="text-[9.5px] font-semibold text-[#B9C0CB]">
+                              {report.targetId.slice(0, 8)}…
+                            </span>
+                            {report.status === "open" ? (
+                              <button
+                                type="button"
+                                onClick={async () => {
+                                  const ok = await resolveReport(report.id);
+                                  if (ok) {
+                                    setReports((prev) =>
+                                      prev.map((item) =>
+                                        item.id === report.id
+                                          ? { ...item, status: "resolved" as const }
+                                          : item,
+                                      ),
+                                    );
+                                  }
+                                }}
+                                className="ml-auto rounded-md bg-brand-50 px-2 py-1 text-[10px] font-extrabold text-brand-600"
+                              >
+                                처리 완료
+                              </button>
+                            ) : (
+                              <span className="ml-auto rounded-md bg-[#ECFDF3] px-2 py-1 text-[10px] font-extrabold text-[#027A48]">
+                                처리됨
+                              </span>
+                            )}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                  <button
+                    type="button"
+                    onClick={() => void refreshReports()}
+                    className="mt-2 w-full rounded-[10px] bg-white py-2 text-[11px] font-extrabold text-ink-muted ring-1 ring-line"
+                  >
+                    새로고침
+                  </button>
+                </div>
+              ) : null}
+            </div>
+          ) : null}
         </div>
 
         {signedIn ? (

@@ -9,6 +9,8 @@ import { DeleteButton } from "@/components/delete-button";
 import { Icon } from "@/components/icons";
 import { PostMedia } from "@/components/media-illustration";
 import { useApp } from "@/components/providers/app-provider";
+import { useToast } from "@/components/providers/toast-provider";
+import { ReportSheet } from "@/components/report-sheet";
 import { categoryOf, FEED_FILTERS, type FilterId } from "@/lib/data/categories";
 import { isSupabaseConfigured } from "@/lib/supabase/config";
 import { formatRelativeTime } from "@/lib/utils";
@@ -29,6 +31,7 @@ function CommentRow({
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState(comment.body);
   const [saving, setSaving] = useState(false);
+  const [reportOpen, setReportOpen] = useState(false);
 
   useEffect(() => {
     if (!editing) setDraft(comment.body);
@@ -59,6 +62,8 @@ function CommentRow({
             autoFocus
             onChange={(event) => setDraft(event.target.value)}
             onKeyDown={(event) => {
+              // 한글 IME 조합 중 Enter 는 글자를 확정하는 키입니다.
+              if (event.nativeEvent.isComposing) return;
               if (event.key === "Enter") {
                 event.preventDefault();
                 void save();
@@ -103,9 +108,25 @@ function CommentRow({
               </button>
               <DeleteButton what="댓글" size={12} onDelete={onDelete} className="mt-[-4px]" />
             </span>
-          ) : null}
+          ) : (
+            <button
+              type="button"
+              onClick={() => setReportOpen(true)}
+              className="flex-none rounded-lg px-1.5 py-1 text-[10px] font-bold text-[#B9C0CB] transition hover:text-[#B42318]"
+            >
+              신고
+            </button>
+          )}
         </div>
       )}
+
+      <ReportSheet
+        open={reportOpen}
+        onClose={() => setReportOpen(false)}
+        targetType="comment"
+        targetId={comment.id}
+        targetHint={`${comment.nickname}님의 댓글`}
+      />
     </div>
   );
 }
@@ -134,9 +155,37 @@ function PostCard({
   const [draft, setDraft] = useState("");
   const [sending, setSending] = useState(false);
   const [pop, setPop] = useState(false);
+  const [reportOpen, setReportOpen] = useState(false);
+  const toast = useToast();
 
   const comments = commentsByPost[post.id] ?? [];
   const canManage = post.mine || isAdmin;
+
+  /** 이 글의 공유 링크 — /?post=딥링크로 들어오면 이 글로 바로 이동합니다. */
+  const shareUrl = () =>
+    typeof window === "undefined"
+      ? `https://inblue-fan.vercel.app/?post=${post.id}`
+      : `${window.location.origin}/?post=${post.id}`;
+
+  const share = async () => {
+    const url = shareUrl();
+    const text = post.body.length > 70 ? `${post.body.slice(0, 70)}…` : post.body;
+    if (typeof navigator !== "undefined" && typeof navigator.share === "function") {
+      try {
+        await navigator.share({ title: "인블루 · 라팍톡", text, url });
+        return;
+      } catch (error) {
+        // 사용자가 공유 창을 직접 닫았을 때는 복사 안내도 띄우지 않습니다.
+        if (error instanceof Error && error.name === "AbortError") return;
+      }
+    }
+    try {
+      await navigator.clipboard.writeText(url);
+      toast("게시글 링크를 복사했어요");
+    } catch {
+      toast("공유 링크를 복사하지 못했어요. 주소창의 링크를 복사해 주세요.");
+    }
+  };
 
   const toggle = () => {
     setOpen((prev) => !prev);
@@ -239,14 +288,28 @@ function PostCard({
           <Icon name="comment" size={15} />
           <span>댓글 {post.commentCount}</span>
         </button>
-        <span className="ml-auto inline-flex items-center gap-[5px] text-xs font-bold text-ink-faint">
+        <button
+          type="button"
+          onClick={() => void share()}
+          aria-label="게시글 공유"
+          className="inline-flex items-center gap-[5px] border-none bg-transparent p-0 text-xs font-bold text-ink-muted transition active:text-brand"
+        >
           <Icon name="share" size={15} />
-        </span>
+          <span>공유</span>
+        </button>
+        {canManage ? null : (
+          <button
+            type="button"
+            onClick={() => setReportOpen(true)}
+            className="ml-auto inline-flex items-center gap-1 border-none bg-transparent p-0 text-[11px] font-bold text-[#B9C0CB] transition hover:text-[#B42318]"
+          >
+            신고
+          </button>
+        )}
       </div>
 
       {open ? (
-        <div className="mt-2.5 flex flex-col gap-2 border-t border-line-soft pt-2.5">
-          {commentsLoaded[post.id] && comments.length === 0 ? (
+        <div className="mt-2.5 flex flex-col gap-2 border-t border-line-soft pt-2.5">          {commentsLoaded[post.id] && comments.length === 0 ? (
             <p className="py-1 text-[11.5px] text-ink-faint">첫 댓글을 남겨보세요.</p>
           ) : null}
           {comments.map((comment) => (
@@ -263,6 +326,8 @@ function PostCard({
               value={draft}
               onChange={(event) => setDraft(event.target.value)}
               onKeyDown={(event) => {
+                // 한글 IME 조합 중 Enter 는 글자를 확정하는 키라 댓글을 등록하지 않습니다.
+                if (event.nativeEvent.isComposing) return;
                 if (event.key === "Enter") {
                   event.preventDefault();
                   void send();
@@ -282,6 +347,14 @@ function PostCard({
           </div>
         </div>
       ) : null}
+
+      <ReportSheet
+        open={reportOpen}
+        onClose={() => setReportOpen(false)}
+        targetType="post"
+        targetId={post.id}
+        targetHint={`${post.nickname}님의 글`}
+      />
     </article>
   );
 }
@@ -294,7 +367,7 @@ interface HomeScreenProps {
 }
 
 export function HomeScreen({ onCompose, highlightedPostId, onGoSeat, onGoFood }: HomeScreenProps) {
-  const { posts, ready, loadError } = useApp();
+  const { posts, ready, loadError, reload } = useApp();
   const [filter, setFilter] = useState<FilterId>("all");
   const [bannerClosed, setBannerClosed] = useState(false);
   /** 수정 중인 글 (있으면 수정 시트를 엽니다) */
@@ -407,7 +480,16 @@ export function HomeScreen({ onCompose, highlightedPostId, onGoSeat, onGoFood }:
         {loadError ? (
           <div className="rounded-md2 border border-[#FECDCA] bg-[#FEF3F2] p-4 text-center">
             <p className="text-[13px] font-extrabold text-[#B42318]">글을 불러오지 못했어요</p>
-            <p className="mt-1 text-[11.5px] leading-relaxed text-[#B42318]/80">{loadError}</p>
+            <p className="mt-1 break-keep text-[11.5px] leading-relaxed text-[#B42318]/80">
+              {loadError}
+            </p>
+            <button
+              type="button"
+              onClick={() => void reload()}
+              className="mt-3 rounded-[11px] bg-[#B42318] px-3.5 py-[8px] text-[12px] font-extrabold text-white"
+            >
+              다시 시도
+            </button>
           </div>
         ) : !ready ? (
           <>
@@ -430,10 +512,23 @@ export function HomeScreen({ onCompose, highlightedPostId, onGoSeat, onGoFood }:
         ) : (
           <div className="rounded-md2 border border-dashed border-[#D9DEE7] bg-[#FBFCFE] px-4 py-[22px] text-center">
             <div className="mb-[7px] text-[26px]">💬</div>
-            <p className="text-[13px] font-extrabold text-ink-2">아직 글이 없어요</p>
-            <p className="mt-1 text-[11.5px] leading-relaxed text-ink-faint">
-              첫 글을 남겨보세요.
-            </p>
+            {posts.length > 0 ? (
+              <>
+                <p className="text-[13px] font-extrabold text-ink-2">
+                  이 카테고리에 아직 글이 없어요
+                </p>
+                <p className="mt-1 text-[11.5px] leading-relaxed text-ink-faint">
+                  다른 카테고리를 보거나 여기에 첫 글을 남겨보세요.
+                </p>
+              </>
+            ) : (
+              <>
+                <p className="text-[13px] font-extrabold text-ink-2">아직 글이 없어요</p>
+                <p className="mt-1 text-[11.5px] leading-relaxed text-ink-faint">
+                  첫 글을 남겨보세요.
+                </p>
+              </>
+            )}
           </div>
         )}
       </div>

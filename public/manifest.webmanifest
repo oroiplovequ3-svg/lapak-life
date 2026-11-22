@@ -3,17 +3,31 @@
   "short_name": "인블루",
   "description": "라팍(대구 삼성라이온즈파크)에 가는 사람이, 가기 전에·있는 동안·다녀온 뒤에 쓰는 팬 커뮤니티. 좌석 시야 후기, 먹거리·주차 정보, 직관 기록.",
   "lang": "ko",
+  "id": "/",
   "start_url": "/",
   "scope": "/",
   "display": "standalone",
+  "orientation": "portrait",
   "background_color": "#E7EBF2",
   "theme_color": "#074CA1",
   "icons": [
     {
-      "src": "/images/lapak-mascot-badge.png",
-      "sizes": "256x256",
+      "src": "/icons/icon-192.png",
+      "sizes": "192x192",
       "type": "image/png",
       "purpose": "any"
+    },
+    {
+      "src": "/icons/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/icons/maskable-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "maskable"
     }
   ]
 }

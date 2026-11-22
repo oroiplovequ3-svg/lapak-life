@@ -11,6 +11,7 @@ import {
   type PhotoLightboxState,
 } from "@/components/photo-gallery";
 import { useApp } from "@/components/providers/app-provider";
+import { ReportSheet } from "@/components/report-sheet";
 import { ReviewSheet } from "@/components/review-sheet";
 import { SeatMap } from "@/components/seat-map";
 import {
@@ -46,6 +47,8 @@ export function SeatScreen({
   const [pickerOpen, setPickerOpen] = useState(false);
   /** 수정 중인 후기 (있으면 수정 시트를 엽니다) */
   const [editingReview, setEditingReview] = useState<ZoneReview | null>(null);
+  /** 신고 중인 후기 */
+  const [reportReview, setReportReview] = useState<ZoneReview | null>(null);
   const [lightbox, setLightbox] = useState<PhotoLightboxState | null>(null);
   const pickerRef = useRef<HTMLElement | null>(null);
   const listRef = useRef<HTMLDivElement | null>(null);
@@ -447,7 +450,15 @@ export function SeatScreen({
                     </button>
                     <DeleteButton what="후기" size={14} onDelete={() => deleteReview(review.id)} />
                   </span>
-                ) : null}
+                ) : (
+                  <button
+                    type="button"
+                    onClick={() => setReportReview(review)}
+                    className="ml-[-2px] flex-none rounded-lg px-1.5 py-1 text-[10px] font-bold text-[#B9C0CB] transition hover:text-[#B42318]"
+                  >
+                    신고
+                  </button>
+                )}
               </div>
               <p className="mt-[9px] break-keep text-[13.5px] leading-relaxed text-[#1D2939]">
                 {review.body}
@@ -457,9 +468,11 @@ export function SeatScreen({
                 onOpen={(index) => setLightbox({ urls: review.photoUrls, index })}
                 label="후기 사진"
               />
-              <span className="mt-[9px] inline-block rounded-md bg-[#F3F8FF] px-[7px] py-0.5 text-[11px] font-bold text-brand-600">
-                {review.seatDetail}
-              </span>
+              {review.seatDetail ? (
+                <span className="mt-[9px] inline-block rounded-md bg-[#F3F8FF] px-[7px] py-0.5 text-[11px] font-bold text-brand-600">
+                  {review.seatDetail}
+                </span>
+              ) : null}
             </article>
           ))
         ) : (
@@ -505,6 +518,18 @@ export function SeatScreen({
         onClose={() => setEditingReview(null)}
         editing={editingReview}
         onPosted={(zoneCode) => onSelectZone(zoneCode)}
+      />
+
+      <ReportSheet
+        open={Boolean(reportReview)}
+        onClose={() => setReportReview(null)}
+        targetType="review"
+        targetId={reportReview?.id ?? ""}
+        targetHint={
+          reportReview
+            ? `${reportReview.nickname}님의 ${zoneFullName(reportReview.zoneCode)} 후기`
+            : undefined
+        }
       />
     </div>
   );

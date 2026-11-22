@@ -18,14 +18,17 @@ import { categoryOf } from "@/lib/data/categories";
 import { FOOD_BY_ID } from "@/lib/data/foods";
 import { ZONE_BY_CODE } from "@/lib/data/zones";
 import { formatDotDate, formatRelativeTime } from "@/lib/utils";
+import type { Game } from "@/lib/types";
 
 interface MyScreenProps {
   onOpenPost?: (postId: string) => void;
   onCompose?: () => void;
   onAddGame?: () => void;
+  /** 기록 수정 — 넘기면 기록 시트가 수정 모드로 열립니다 */
+  onEditGame?: (game: Game) => void;
 }
 
-export function MyScreen({ onOpenPost, onCompose, onAddGame }: MyScreenProps) {
+export function MyScreen({ onOpenPost, onCompose, onAddGame, onEditGame }: MyScreenProps) {
   const {
     user,
     profile,
@@ -295,6 +298,14 @@ export function MyScreen({ onOpenPost, onCompose, onAddGame }: MyScreenProps) {
                   <span className="text-[13px] font-extrabold tracking-tight text-ink-2">
                     {game.scoreFor} : {game.scoreAgainst}
                   </span>
+                  <button
+                    type="button"
+                    aria-label="직관 기록 수정"
+                    onClick={() => onEditGame?.(game)}
+                    className="rounded-lg p-1.5 text-[#C4CBD6] transition hover:text-brand"
+                  >
+                    <Icon name="edit" size={15} />
+                  </button>
                   <DeleteButton
                     what="직관 기록"
                     size={15}

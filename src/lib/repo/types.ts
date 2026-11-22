@@ -5,11 +5,13 @@ import type {
   Game,
   NewGameInput,
   NewPostInput,
+  NewReportInput,
   NewReviewInput,
   NewUserFoodInput,
   NewUserParkingInput,
   Post,
   ProfileUpdate,
+  Report,
   Saves,
   UserFood,
   UserParking,
@@ -73,6 +75,8 @@ export interface Repository {
   ): Promise<void>;
   loadGames(viewerId: string | null): Promise<Game[]>;
   createGame(input: NewGameInput, viewerId: string): Promise<Game>;
+  /** 수정은 본인 기록 또는 마스터만 (권한이 없으면 예외) */
+  updateGame(gameId: string, input: NewGameInput, viewerId: string | null): Promise<Game>;
   deleteGame(gameId: string): Promise<void>;
 
   /* ── 직관러 참여 콘텐츠 (맛집 · 주차 팁) ──────────────────── */
@@ -92,6 +96,14 @@ export interface Repository {
     viewerId: string | null,
   ): Promise<UserParking>;
   deleteUserParking(parkingId: string): Promise<void>;
+
+  /* ── 신고 ────────────────────────────────────────────────── */
+  /** 신고 접수 — 같은 항목을 두 번 신고하면 예외 */
+  createReport(input: NewReportInput, reporterId: string): Promise<void>;
+  /** 마스터만 — 접수된 신고 목록 */
+  loadReports(): Promise<Report[]>;
+  /** 마스터만 — 신고를 처리 완료로 */
+  resolveReport(reportId: string): Promise<void>;
 }
 
 export const DEMO_AUTHOR: Author = {

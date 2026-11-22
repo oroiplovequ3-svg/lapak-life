@@ -68,6 +68,8 @@ export function ComposeSheet({ open, onClose, editing = null, onPosted }: Compos
       open={open}
       title={editing ? "글 수정" : "새 글 쓰기"}
       onClose={onClose}
+      dirty={body.trim().length > 0 || seatZone !== (editing?.seatZone ?? "")}
+      dirtyMessage={editing ? "수정 중인 내용이 사라져요. 닫을까요?" : "작성 중인 글이 사라져요. 닫을까요?"}
     >
       <span className="text-xs font-extrabold text-ink-2">카테고리</span>
       <div className="flex flex-wrap gap-1.5">
@@ -127,7 +129,7 @@ export function ComposeSheet({ open, onClose, editing = null, onPosted }: Compos
 
       {configured && !user && !editing && (
         <p className="rounded-[11px] bg-brand-50 px-3 py-2.5 text-[11.5px] leading-relaxed text-brand">
-          등록하면 구글 로그인을 먼저 요청해요. 지금 데모 모드라면 바로 등록됩니다.
+          등록하려면 구글 로그인이 필요해요. 로그인한 뒤에 남겨주세요.
         </p>
       )}
 

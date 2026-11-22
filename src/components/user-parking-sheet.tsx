@@ -73,6 +73,10 @@ export function UserParkingSheet({ open, onClose, editing = null }: UserParkingS
       open={open}
       title={editing ? "직관러 주차 팁 수정" : "직관러 주차 팁 추가"}
       onClose={onClose}
+      dirty={Boolean(name.trim() || location.trim() || tip.trim() || feeNote.trim())}
+      dirtyMessage={
+        editing ? "수정 중인 주차 팁이 사라져요. 닫을까요?" : "작성 중인 주차 팁이 사라져요. 닫을까요?"
+      }
     >
       <span className="text-xs font-extrabold text-ink-2">장소 이름</span>
       <input

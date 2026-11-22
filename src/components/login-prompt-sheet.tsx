@@ -1,20 +1,24 @@
 "use client";
 
 import Link from "next/link";
-import { useState } from "react";
 
 import { Icon } from "@/components/icons";
 import { useApp } from "@/components/providers/app-provider";
 import { Sheet } from "@/components/sheet";
 
-/** 쓰기 액션 시 뜨는 구글 로그인 유도 바텀시트 */
+/**
+ * 쓰기 액션 시 뜨는 구글 로그인 유도 바텀시트.
+ *
+ * 예전에는 "구글로 계속하기"를 한 번 누르면 같은 사유로는 다시 뜨지 않아,
+ * 구글 화면에서 취소·실패로 돌아온 뒤 같은 동작을 다시 눌러도 아무 반응이
+ * 없었습니다. 이제 시트는 authPrompt 상태만 따르고, 닫으면 앱 쪽에서
+ * authPrompt 를 내리므로 다시 시도할 수 있습니다.
+ */
 export function LoginPromptSheet() {
   const { authPrompt, closeAuthPrompt, signInWithGoogle, signingIn, configured } = useApp();
-  const [dismissed, setDismissed] = useState<string | null>(null);
 
   if (!configured) return null;
   if (!authPrompt.open) return null;
-  if (dismissed === authPrompt.reason) return null;
 
   return (
     <Sheet open title="로그인이 필요해요" onClose={closeAuthPrompt}>
@@ -26,7 +30,9 @@ export function LoginPromptSheet() {
       <button
         type="button"
         onClick={() => {
-          setDismissed(authPrompt.reason);
+          // 로그인 화면으로 이동하기 전에 시트를 닫아 둡니다.
+          // 돌아왔을 때 로그인이 안 되어 있으면 같은 동작에서 다시 열립니다.
+          closeAuthPrompt();
           void signInWithGoogle();
         }}
         disabled={signingIn}

@@ -18,17 +18,21 @@ import {
   venueLabel,
   type Samsung2026Game,
 } from "@/lib/data/samsung-2026-schedule";
+import { ZONE_ORDER, zoneFullName } from "@/lib/data/zones";
 import { formatDotDate, todayISO } from "@/lib/utils";
+import type { Game } from "@/lib/types";
 import { useEffect, useRef, useState, type ChangeEvent } from "react";
 
 interface GameSheetProps {
   open: boolean;
   onClose: () => void;
+  /** 수정할 기록 — 남기면 '수정' 모드로 열립니다 */
+  editing?: Game | null;
 }
 
-/** 내 직관 · 직관 기록 추가 바텀시트 */
-export function GameSheet({ open, onClose }: GameSheetProps) {
-  const { addGame } = useApp();
+/** 내 직관 · 직관 기록 추가·수정 바텀시트 */
+export function GameSheet({ open, onClose, editing = null }: GameSheetProps) {
+  const { addGame, updateGame } = useApp();
   const toast = useToast();
   const fileRef = useRef<HTMLInputElement>(null);
   const [playedOn, setPlayedOn] = useState(todayISO());
@@ -36,6 +40,7 @@ export function GameSheet({ open, onClose }: GameSheetProps) {
   const [gameIndex, setGameIndex] = useState(0);
   const [opponent, setOpponent] = useState("");
   const [homeAway, setHomeAway] = useState<"home" | "away">("home");
+  const [zoneCode, setZoneCode] = useState("");
   const [scoreFor, setScoreFor] = useState("");
   const [scoreAgainst, setScoreAgainst] = useState("");
   const [note, setNote] = useState("");
@@ -72,14 +77,39 @@ export function GameSheet({ open, onClose }: GameSheetProps) {
     applyGame(gamesOnDate(next)[0] ?? null);
   };
 
-  // 시트를 열 때마다 현재 날짜 기준으로 다시 맞춥니다.
+  // 시트를 열 때마다 현재 날짜 기준으로 다시 맞춥니다. 수정할 때는 그 기록 값으로 채웁니다.
   useEffect(() => {
     if (!open) return;
     setGameIndex(0);
+    setBusy(false);
+    setSubmitting(false);
+    if (editing) {
+      setPlayedOn(editing.playedOn || todayISO());
+      setOpponent(editing.opponent);
+      setHomeAway(editing.homeAway);
+      setZoneCode(editing.zoneCode ?? "");
+      setScoreFor(String(editing.scoreFor));
+      setScoreAgainst(String(editing.scoreAgainst));
+      setNote(editing.note);
+      setPhotos(
+        (editing.photoUrls ?? []).map((url, index) => ({
+          id: `keep-${index}`,
+          dataUrl: url,
+          width: 0,
+          height: 0,
+          bytes: 0,
+          name: `기존 사진 ${index + 1}`,
+        })),
+      );
+      return;
+    }
     applyGame(gamesOnDate(playedOn)[0] ?? null);
+    setZoneCode("");
+    setNote("");
+    setPhotos([]);
     // playedOn 은 열 때의 값만 씁니다 (열려 있는 동안 날짜 변경은 selectDate 가 처리).
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [open]);
+  }, [open, editing]);
 
   const reset = () => {
     setOpponent("");
@@ -125,17 +155,18 @@ export function GameSheet({ open, onClose }: GameSheetProps) {
   const submit = async () => {
     if (!valid || busy) return;
     setSubmitting(true);
-    const ok = await addGame({
+    const input = {
       playedOn,
       opponent: opponent.trim(),
       homeAway,
-      // 좌석 구역은 기록에서 받지 않습니다(구역 없이 저장).
-      zoneCode: null,
+      // 좌석 구역은 선택 사항 — 고른 경우에만 저장합니다.
+      zoneCode: zoneCode || null,
       scoreFor: Number(scoreFor),
       scoreAgainst: Number(scoreAgainst),
       note: note.trim(),
       photoUrls: photos.map((photo) => photo.dataUrl),
-    });
+    };
+    const ok = editing ? await updateGame(editing.id, input) : await addGame(input);
     setSubmitting(false);
     if (ok) {
       reset();
@@ -144,7 +175,23 @@ export function GameSheet({ open, onClose }: GameSheetProps) {
   };
 
   return (
-    <Sheet open={open} title="직관 기록 추가" onClose={onClose}>
+    <Sheet
+      open={open}
+      title={editing ? "직관 기록 수정" : "직관 기록 추가"}
+      onClose={onClose}
+      dirty={
+        editing
+          ? opponent !== editing.opponent ||
+            scoreFor !== String(editing.scoreFor) ||
+            scoreAgainst !== String(editing.scoreAgainst) ||
+            note !== editing.note ||
+            zoneCode !== (editing.zoneCode ?? "")
+          : Boolean(opponent.trim() || note.trim() || photos.length)
+      }
+      dirtyMessage={
+        editing ? "수정 중인 기록이 사라져요. 닫을까요?" : "작성 중인 기록이 사라져요. 닫을까요?"
+      }
+    >
       <span className="text-xs font-extrabold text-ink-2">경기 날짜</span>
       <input
         type="date"
@@ -272,6 +319,28 @@ export function GameSheet({ open, onClose }: GameSheetProps) {
         ))}
       </div>
 
+      <span className="text-xs font-extrabold text-ink-2">
+        좌석 구역 <span className="text-[10.5px] font-bold text-ink-faint">(선택)</span>
+      </span>
+      <div className="relative">
+        <select
+          value={zoneCode}
+          onChange={(event) => setZoneCode(event.target.value)}
+          aria-label="직관한 좌석 구역"
+          className="w-full appearance-none rounded-[13px] border border-line bg-[#FAFBFC] px-3 py-[11px] pr-9 text-[13px] font-bold text-ink-2 outline-none"
+        >
+          <option value="">구역을 선택하지 않음</option>
+          {ZONE_ORDER.map((code) => (
+            <option key={code} value={code}>
+              {zoneFullName(code)}
+            </option>
+          ))}
+        </select>
+        <span className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-ink-muted">
+          <Icon name="chevron" size={15} />
+        </span>
+      </div>
+
       <span className="text-xs font-extrabold text-ink-2">스코어 (삼성 : 상대)</span>
       <div className="flex items-center gap-2">
         <input
@@ -332,7 +401,7 @@ export function GameSheet({ open, onClose }: GameSheetProps) {
               <Icon name="close" size={11} strokeWidth={2.8} />
             </button>
             <span className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/55 to-transparent px-1.5 pb-1 pt-3 text-[9px] font-bold text-white">
-              {formatPhotoSize(photo.bytes)}
+              {photo.bytes ? formatPhotoSize(photo.bytes) : "기존 사진"}
             </span>
           </div>
         ))}
@@ -388,7 +457,7 @@ export function GameSheet({ open, onClose }: GameSheetProps) {
           disabled={!valid || submitting || busy}
           className="flex-1 rounded-[13px] bg-brand py-3 text-[13px] font-extrabold text-white shadow-brand disabled:bg-[#E4E7EC] disabled:text-ink-faint disabled:shadow-none"
         >
-          {submitting ? "저장 중…" : "기록 저장"}
+          {submitting ? "저장 중…" : editing ? "수정 완료" : "기록 저장"}
         </button>
       </div>
     </Sheet>

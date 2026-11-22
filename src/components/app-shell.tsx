@@ -1,7 +1,7 @@
 "use client";
 
 import Image from "next/image";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 
 import { ComposeSheet } from "@/components/compose-sheet";
 import { GameSheet } from "@/components/game-sheet";
@@ -15,7 +15,7 @@ import { FoodScreen } from "@/components/screens/food-screen";
 import { HomeScreen } from "@/components/screens/home-screen";
 import { MyScreen } from "@/components/screens/my-screen";
 import { SeatScreen } from "@/components/screens/seat-screen";
-import type { FoodFocus, FoodFocusKind } from "@/lib/types";
+import type { FoodFocus, FoodFocusKind, Game } from "@/lib/types";
 
 type Tab = "home" | "seat" | "food" | "my";
 
@@ -41,12 +41,14 @@ const SUBS: Record<Tab, string> = {
 };
 
 export function AppShell() {
-  const { isAdmin } = useApp();
+  const { isAdmin, posts } = useApp();
   const [tab, setTab] = useState<Tab>("home");
   const [composeOpen, setComposeOpen] = useState(false);
   const [reviewOpen, setReviewOpen] = useState(false);
   const [reviewZone, setReviewZone] = useState<string>("T3");
   const [gameOpen, setGameOpen] = useState(false);
+  /** 수정 중인 직관 기록 (있으면 기록 시트를 수정 모드로 엽니다) */
+  const [editingGame, setEditingGame] = useState<Game | null>(null);
   const [highlightId, setHighlightId] = useState<string | null>(null);
   const [searchOpen, setSearchOpen] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
@@ -58,6 +60,31 @@ export function AppShell() {
   const scrollScreenTop = () => {
     document.getElementById("screen")?.scrollTo({ top: 0 });
   };
+
+  /** 하단 탭 이동 — 이전 탭에서 내려둔 스크롤 위치를 이어받지 않도록 맨 위로 올립니다. */
+  const goTab = (next: Tab) => {
+    setTab(next);
+    scrollScreenTop();
+  };
+
+  /* 공유 링크(?post=글id)로 들어오면 그 글로 바로 이동합니다. */
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const id = new URLSearchParams(window.location.search).get("post");
+    if (!id) return;
+    setHighlightId(id);
+    setTab("home");
+  }, []);
+
+  useEffect(() => {
+    if (!highlightId || tab !== "home") return;
+    const timer = window.setTimeout(() => {
+      document
+        .querySelector(`[data-post-id="${highlightId}"]`)
+        ?.scrollIntoView({ behavior: "smooth", block: "center" });
+    }, 180);
+    return () => window.clearTimeout(timer);
+  }, [highlightId, tab, posts.length]);
 
   const openMyPost = (postId: string) => {
     setHighlightId(postId);
@@ -161,8 +188,8 @@ export function AppShell() {
           <HomeScreen
             onCompose={() => setComposeOpen(true)}
             highlightedPostId={highlightId}
-            onGoSeat={() => setTab("seat")}
-            onGoFood={() => setTab("food")}
+            onGoSeat={() => goTab("seat")}
+            onGoFood={() => goTab("food")}
           />
         ) : null}
         {tab === "seat" ? (
@@ -182,6 +209,7 @@ export function AppShell() {
             onOpenPost={openMyPost}
             onCompose={() => setComposeOpen(true)}
             onAddGame={() => setGameOpen(true)}
+            onEditGame={(game) => setEditingGame(game)}
           />
         ) : null}
       </main>
@@ -192,7 +220,7 @@ export function AppShell() {
           <button
             key={item.id}
             type="button"
-            onClick={() => setTab(item.id)}
+            onClick={() => goTab(item.id)}
             aria-current={tab === item.id ? "page" : "false"}
             className={`flex flex-1 flex-col items-center gap-0.5 border-none bg-transparent py-1 pb-[3px] text-[10.5px] font-extrabold tracking-tight2 ${
               tab === item.id ? "text-brand" : "text-[#98A2B3]"
@@ -224,7 +252,14 @@ export function AppShell() {
         initialZone={reviewZone}
         onPosted={(zone) => setReviewZone(zone)}
       />
-      <GameSheet open={gameOpen} onClose={() => setGameOpen(false)} />
+      <GameSheet
+        open={gameOpen || Boolean(editingGame)}
+        onClose={() => {
+          setGameOpen(false);
+          setEditingGame(null);
+        }}
+        editing={editingGame}
+      />
       <SearchSheet
         open={searchOpen}
         onClose={() => setSearchOpen(false)}

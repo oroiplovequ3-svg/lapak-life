@@ -14,11 +14,13 @@ import type {
   Game,
   NewGameInput,
   NewPostInput,
+  NewReportInput,
   NewReviewInput,
   NewUserFoodInput,
   NewUserParkingInput,
   Post,
   ProfileUpdate,
+  Report,
   Saves,
   UserFood,
   UserParking,
@@ -44,6 +46,8 @@ interface DemoPersist {
   deletedPosts: string[];
   userFoods: UserFood[];
   userParkings: UserParking[];
+  /** 데모 모드에서 접수한 신고 (마스터가 없어 목록은 열리지 않습니다) */
+  reports: Report[];
 }
 
 function emptyPersist(): DemoPersist {
@@ -58,6 +62,7 @@ function emptyPersist(): DemoPersist {
     deletedPosts: [],
     userFoods: [],
     userParkings: [],
+    reports: [],
   };
 }
 
@@ -76,6 +81,7 @@ function readPersist(): DemoPersist {
       extraComments: parsed.extraComments ?? {},
       userFoods: parsed.userFoods ?? [],
       userParkings: parsed.userParkings ?? [],
+      reports: parsed.reports ?? [],
     };
   } catch {
     return emptyPersist();
@@ -539,6 +545,31 @@ export class DemoRepository implements Repository {
     this.save();
   }
 
+  /** 직관 기록 수정 — 데모 모드에서는 내가 만든 기록만 고칩니다. */
+  async updateGame(gameId: string, input: NewGameInput): Promise<Game> {
+    const target = this.persist.games.find((game) => game.id === gameId);
+    if (!target) throw new Error("데모 모드에서는 내가 만든 직관 기록만 수정할 수 있어요.");
+    const updated: Game = {
+      ...target,
+      playedOn: input.playedOn,
+      opponent: input.opponent,
+      homeAway: input.homeAway,
+      zoneCode: input.zoneCode,
+      scoreFor: input.scoreFor,
+      scoreAgainst: input.scoreAgainst,
+      note: input.note,
+      photoUrls: (input.photoUrls ?? []).filter(Boolean).slice(0, 3),
+    };
+    this.persist.games = this.persist.games.map((game) =>
+      game.id === gameId ? updated : game,
+    );
+    if (this.save() === "failed") {
+      updated.photoUrls = target.photoUrls;
+      this.save();
+    }
+    return updated;
+  }
+
   /* ── 직관러 맛집 ──────────────────────────────────────────── */
   async loadUserFoods(): Promise<UserFood[]> {
     const mine = this.persist.userFoods.map((food) => ({
@@ -665,5 +696,33 @@ export class DemoRepository implements Repository {
       (parking) => parking.id !== parkingId,
     );
     this.save();
+  }
+
+  /* ── 신고 (데모 모드) ──────────────────────────────── */
+  async createReport(input: NewReportInput): Promise<void> {
+    const duplicate = this.persist.reports.some(
+      (report) =>
+        report.targetType === input.targetType && report.targetId === input.targetId,
+    );
+    if (duplicate) throw new Error("이미 신고한 항목이에요.");
+    this.persist.reports.unshift({
+      id: `demo-report-${Date.now()}`,
+      targetType: input.targetType,
+      targetId: input.targetId,
+      reason: input.reason,
+      detail: input.detail ?? "",
+      status: "open",
+      createdAt: new Date().toISOString(),
+    });
+    this.save();
+  }
+
+  /** 데모 모드에는 마스터가 없어 신고 목록을 열 수 없습니다. */
+  async loadReports(): Promise<Report[]> {
+    return [];
+  }
+
+  async resolveReport(): Promise<void> {
+    throw new Error("데모 모드에서는 신고를 처리할 수 없어요.");
   }
 }

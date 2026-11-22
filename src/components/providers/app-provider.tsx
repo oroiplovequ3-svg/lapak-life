@@ -27,11 +27,13 @@ import type {
   Game,
   NewGameInput,
   NewPostInput,
+  NewReportInput,
   NewReviewInput,
   NewUserFoodInput,
   NewUserParkingInput,
   Post,
   ProfileUpdate,
+  Report,
   Saves,
   UserFood,
   UserParking,
@@ -92,6 +94,7 @@ interface AppContextValue {
   toggleSaveZone: (code: string) => Promise<void>;
   toggleSaveFood: (id: string) => Promise<void>;
   addGame: (input: NewGameInput) => Promise<boolean>;
+  updateGame: (gameId: string, input: NewGameInput) => Promise<boolean>;
   deleteGame: (gameId: string) => Promise<void>;
   addUserFood: (input: NewUserFoodInput) => Promise<boolean>;
   updateUserFood: (foodId: string, input: NewUserFoodInput) => Promise<boolean>;
@@ -99,6 +102,11 @@ interface AppContextValue {
   addUserParking: (input: NewUserParkingInput) => Promise<boolean>;
   updateUserParking: (parkingId: string, input: NewUserParkingInput) => Promise<boolean>;
   deleteUserParking: (parkingId: string) => Promise<void>;
+
+  /* 신고 — 누구나 접수, 목록·처리는 마스터만 */
+  createReport: (input: NewReportInput) => Promise<boolean>;
+  loadReports: () => Promise<Report[]>;
+  resolveReport: (reportId: string) => Promise<boolean>;
   reload: () => Promise<void>;
 }
 
@@ -768,6 +776,26 @@ export function AppProvider({ children }: { children: ReactNode }) {
     [repo, toast],
   );
 
+  const updateGame = useCallback(
+    async (gameId: string, input: NewGameInput) => {
+      if (!repo) return false;
+      try {
+        const updated = await repo.updateGame(gameId, input, userRef.current?.id ?? null);
+        setGames((prev) =>
+          prev
+            .map((game) => (game.id === gameId ? updated : game))
+            .sort((a, b) => (a.playedOn < b.playedOn ? 1 : -1)),
+        );
+        toast("직관 기록을 수정했어요");
+        return true;
+      } catch (error) {
+        toast(errorMessage(error));
+        return false;
+      }
+    },
+    [repo, toast],
+  );
+
   /* ── 10. 직관러 맛집 · 주차 팁 ─────────────────────────────── */
   const addUserFood = useCallback(
     async (input: NewUserFoodInput) => {
@@ -879,6 +907,51 @@ export function AppProvider({ children }: { children: ReactNode }) {
     [repo, toast],
   );
 
+  /* ── 11. 신고 ──────────────────────────────────────────────── */
+  const createReport = useCallback(
+    async (input: NewReportInput) => {
+      if (!repo) return false;
+      const reporterId = userRef.current?.id ?? null;
+      if (!reporterId) {
+        setAuthPrompt({ open: true, reason: "신고하려면 구글 로그인이 필요해요" });
+        return false;
+      }
+      try {
+        await repo.createReport(input, reporterId);
+        toast("신고를 접수했어요. 확인 후 처리할게요.");
+        return true;
+      } catch (error) {
+        toast(errorMessage(error));
+        return false;
+      }
+    },
+    [repo, toast],
+  );
+
+  const loadReports = useCallback(async () => {
+    if (!repo) return [];
+    try {
+      return await repo.loadReports();
+    } catch {
+      return [];
+    }
+  }, [repo]);
+
+  const resolveReport = useCallback(
+    async (reportId: string) => {
+      if (!repo) return false;
+      try {
+        await repo.resolveReport(reportId);
+        toast("신고를 처리 완료로 표시했어요");
+        return true;
+      } catch (error) {
+        toast(errorMessage(error));
+        return false;
+      }
+    },
+    [repo, toast],
+  );
+
   const value = useMemo<AppContextValue>(
     () => ({
       configured: isSupabaseConfigured,
@@ -919,6 +992,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
       toggleSaveZone,
       toggleSaveFood,
       addGame,
+      updateGame,
       deleteGame,
       addUserFood,
       updateUserFood,
@@ -926,6 +1000,9 @@ export function AppProvider({ children }: { children: ReactNode }) {
       addUserParking,
       updateUserParking,
       deleteUserParking,
+      createReport,
+      loadReports,
+      resolveReport,
       reload,
     }),
     [
@@ -965,6 +1042,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
       toggleSaveZone,
       toggleSaveFood,
       addGame,
+      updateGame,
       deleteGame,
       addUserFood,
       updateUserFood,
@@ -972,6 +1050,9 @@ export function AppProvider({ children }: { children: ReactNode }) {
       addUserParking,
       updateUserParking,
       deleteUserParking,
+      createReport,
+      loadReports,
+      resolveReport,
       reload,
     ],
   );

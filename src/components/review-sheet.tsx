@@ -6,7 +6,7 @@ import { Icon, Stars } from "@/components/icons";
 import { useApp } from "@/components/providers/app-provider";
 import { useToast } from "@/components/providers/toast-provider";
 import { Sheet } from "@/components/sheet";
-import { ZONE_ORDER, ZONE_BY_CODE } from "@/lib/data/zones";
+import { ZONE_ORDER, zoneFullName } from "@/lib/data/zones";
 import {
   MAX_REVIEW_PHOTOS,
   formatPhotoSize,
@@ -143,23 +143,35 @@ export function ReviewSheet({
       open={open}
       title={editing ? "직관 시야 후기 수정" : "직관 시야 후기 쓰기"}
       onClose={onClose}
+      dirty={
+        editing
+          ? body !== editing.body ||
+            seatDetail !== editing.seatDetail ||
+            zone !== editing.zoneCode ||
+            stars !== editing.stars
+          : Boolean(body.trim() || seatDetail.trim() || photos.length)
+      }
+      dirtyMessage={
+        editing ? "수정 중인 후기가 사라져요. 닫을까요?" : "작성 중인 후기가 사라져요. 닫을까요?"
+      }
     >
       <span className="text-xs font-extrabold text-ink-2">구역</span>
-      <div className="flex flex-wrap gap-1.5">
-        {ZONE_ORDER.map((code) => (
-          <button
-            key={code}
-            type="button"
-            onClick={() => setZone(code)}
-            className={`rounded-full border px-3 py-[7px] text-xs font-bold transition ${
-              zone === code
-                ? "border-brand bg-brand text-white"
-                : "border-line bg-white text-[#475467]"
-            }`}
-          >
-            {ZONE_BY_CODE[code]?.short ?? code}
-          </button>
-        ))}
+      <div className="relative">
+        <select
+          value={zone}
+          onChange={(event) => setZone(event.target.value)}
+          aria-label="후기를 남길 구역"
+          className="w-full appearance-none rounded-[13px] border border-line bg-[#FAFBFC] px-3 py-[11px] pr-9 text-[13px] font-bold text-ink-2 outline-none"
+        >
+          {ZONE_ORDER.map((code) => (
+            <option key={code} value={code}>
+              {zoneFullName(code)}
+            </option>
+          ))}
+        </select>
+        <span className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-ink-muted">
+          <Icon name="chevron" size={15} />
+        </span>
       </div>
 
       <span className="text-xs font-extrabold text-ink-2">

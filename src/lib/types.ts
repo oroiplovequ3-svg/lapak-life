@@ -226,3 +226,26 @@ export interface NewUserParkingInput {
   walkTime: string;
   tip: string;
 }
+
+/** 신고할 수 있는 콘텐츠 종류 (reports.target_type) */
+export type ReportTargetType = "post" | "comment" | "review" | "user_food" | "user_parking";
+
+/** 직관러가 접수한 신고 (reports 테이블과 1:1) */
+export interface Report {
+  id: string;
+  targetType: ReportTargetType;
+  targetId: string;
+  /** 신고 사유 (짧은 문구) */
+  reason: string;
+  /** 사용자가 덧붙인 설명 (선택) */
+  detail: string;
+  status: "open" | "resolved";
+  createdAt: string;
+}
+
+export interface NewReportInput {
+  targetType: ReportTargetType;
+  targetId: string;
+  reason: string;
+  detail?: string;
+}

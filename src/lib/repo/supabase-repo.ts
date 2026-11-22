@@ -13,8 +13,10 @@ import type {
   NewReviewInput,
   NewUserFoodInput,
   NewUserParkingInput,
+  NewReportInput,
   Post,
   ProfileUpdate,
+  Report,
   Saves,
   UserFood,
   UserParking,
@@ -54,6 +56,39 @@ function photoUrlList(value: unknown): string[] {
     : [];
 }
 
+/**
+ * Storage 의 공개/서명 URL 또는 저장된 경로에서 버킷 안 경로만 뽑습니다.
+ * (예: https://xxx.supabase.co/storage/v1/object/public/checkin-photos/uid/a.jpg → uid/a.jpg)
+ */
+function storagePath(value: string, bucketName: string): string | null {
+  if (!value) return null;
+  const markers = [
+    `/object/public/${bucketName}/`,
+    `/object/sign/${bucketName}/`,
+    `/object/authenticated/${bucketName}/`,
+  ];
+  for (const marker of markers) {
+    const at = value.indexOf(marker);
+    if (at >= 0) {
+      const path = decodeURIComponent(value.slice(at + marker.length).split("?")[0]);
+      return path || null;
+    }
+  }
+  if (/^https?:\/\//i.test(value)) return null;
+  return value.replace(/^\/+/, "") || null;
+}
+
+/**
+ * 글·후기의 배지 — 내 글이면 '나', 남의 글이면 앉은 구역 이름을 씁니다.
+ * (라이브에서 모든 글이 똑같이 '라팍팬'으로 보이던 것을 구역 기반으로 바꿈)
+ */
+function badgeOf(zoneCode: unknown, viewerId: string | null, userId: string | null): string {
+  if (viewerId && userId === viewerId) return "나";
+  const code = typeof zoneCode === "string" ? zoneCode : "";
+  const zone = code ? ZONES.find((item) => item.code === code) : undefined;
+  return zone?.short ?? "라팍팬";
+}
+
 function mapPost(row: AnyRow, viewerId: string | null, likedIds: Set<string>): Post {
   const { nickname, avatarUrl } = embeddedProfile(row);
   const id = str(row.id);
@@ -64,7 +99,7 @@ function mapPost(row: AnyRow, viewerId: string | null, likedIds: Set<string>): P
     userId,
     nickname,
     avatarUrl,
-    badge: viewerId && userId === viewerId ? "나" : "라팍팬",
+    badge: badgeOf(row.seat_zone, viewerId, userId),
     category: normalizeCategory(str(row.category) || "review"),
     body: str(row.body),
     seatZone: row.seat_zone ? str(row.seat_zone) : null,
@@ -102,7 +137,7 @@ function mapReview(row: AnyRow, viewerId: string | null): ZoneReview {
     userId,
     nickname,
     avatarUrl,
-    badge: viewerId && userId === viewerId ? "나" : "라팍팬",
+    badge: badgeOf(row.zone_code, viewerId, userId),
     seatDetail: str(row.seat_detail),
     stars: num(row.rating, 5),
     body: str(row.body),
@@ -151,6 +186,12 @@ const AVATAR_BUCKET = "avatars";
 /** 프로필 닉네임 길이 (프로필 설정 시트와 같은 규칙) */
 const NICKNAME_MIN = 2;
 const NICKNAME_MAX = 16;
+
+/**
+ * 직관 기록 사진(비공개 버킷)의 서명 URL 유효 시간.
+ * 화면을 다시 열 때마다 새로 발급하므로 길게 잡아도 됩니다.
+ */
+const SIGNED_URL_TTL = 60 * 60 * 6;
 
 const GAME_COLUMNS =
   "id, user_id, played_on, opponent, home_away, zone_code, score_for, score_against, note, photo_urls, created_at";
@@ -528,7 +569,10 @@ export class SupabaseRepository implements Repository {
     if (liked) {
       const { error } = await this.supabase
         .from("post_likes")
-        .upsert({ post_id: postId, user_id: viewerId }, { onConflict: "post_id,user_id" });
+        .upsert(
+          { post_id: postId, user_id: viewerId },
+          { onConflict: "post_id,user_id", ignoreDuplicates: true },
+        );
       if (error) fail("좋아요를 저장하지 못했습니다", error);
     } else {
       const { error } = await this.supabase
@@ -604,17 +648,22 @@ export class SupabaseRepository implements Repository {
   }
 
   /**
-   * 브라우저에서 축소한 data URL 사진을 Storage에 올리고 공개 URL을 돌려줍니다.
-   * 사진 업로드가 실패해도 후기·직관 기록 본문 등록은 막지 않습니다.
+   * 브라우저에서 축소한 data URL 사진을 Storage에 올리고 저장할 값을 돌려줍니다.
+   * - 공개 버킷: 공개 URL
+   * - 비공개 버킷(signed = true): 버킷 안 경로 (표시할 때 서명 URL 로 바꿉니다)
+   * 한 장이라도 올리지 못하면 올린 파일을 되돌리고 에러를 던져 사용자에게 알립니다.
    */
   private async uploadPhotos(
     bucketName: string,
     dataUrls: string[],
     userId: string | null,
+    options: { signed?: boolean } = {},
   ): Promise<string[]> {
     if (!userId || !dataUrls.length) return [];
     const bucket = this.supabase.storage.from(bucketName);
     const uploaded: string[] = [];
+    const uploadedPaths: string[] = [];
+    let failed = 0;
 
     for (const dataUrl of dataUrls.slice(0, 3)) {
       try {
@@ -628,13 +677,67 @@ export class SupabaseRepository implements Repository {
           upsert: false,
         });
         if (error) throw new Error(error.message);
-        uploaded.push(bucket.getPublicUrl(path).data.publicUrl);
+        uploadedPaths.push(path);
+        uploaded.push(options.signed ? path : bucket.getPublicUrl(path).data.publicUrl);
       } catch {
-        // 개별 사진 실패는 건너뜁니다.
+        failed += 1;
       }
     }
 
+    if (failed > 0) {
+      // 일부만 올라간 파일이 남지 않도록 정리합니다.
+      if (uploadedPaths.length) {
+        await bucket.remove(uploadedPaths).catch(() => undefined);
+      }
+      throw new Error(
+        `사진 ${failed}장을 올리지 못했어요. 네트워크를 확인하고 다시 시도해 주세요.`,
+      );
+    }
+
     return uploaded;
+  }
+
+  /** 사진 URL/경로 목록을 Storage 에서 지웁니다. (실패해도 화면 동작은 막지 않음) */
+  private async removePhotoFiles(bucketName: string, values: string[]): Promise<void> {
+    const paths = values
+      .map((value) => storagePath(value, bucketName))
+      .filter((path): path is string => Boolean(path));
+    if (!paths.length) return;
+    await this.supabase.storage.from(bucketName).remove(paths).catch(() => undefined);
+  }
+
+  /** 직관 기록 사진은 비공개 버킷이라 화면에 보여줄 때 서명 URL 로 바꿉니다. */
+  private async signGamePhotos(games: Game[]): Promise<Game[]> {
+    const targets: { gameIndex: number; photoIndex: number; path: string }[] = [];
+    games.forEach((game, gameIndex) => {
+      game.photoUrls.forEach((value, photoIndex) => {
+        const path = storagePath(value, CHECKIN_PHOTO_BUCKET);
+        if (path) targets.push({ gameIndex, photoIndex, path });
+      });
+    });
+    if (!targets.length) return games;
+
+    const unique = Array.from(new Set(targets.map((target) => target.path)));
+    const { data, error } = await this.supabase.storage
+      .from(CHECKIN_PHOTO_BUCKET)
+      .createSignedUrls(unique, SIGNED_URL_TTL);
+    if (error || !data) return games;
+
+    const signedByPath = new Map<string, string>();
+    for (const item of data) {
+      if (item.signedUrl && item.path) signedByPath.set(item.path, item.signedUrl);
+    }
+
+    return games.map((game, gameIndex) => {
+      const photoUrls = game.photoUrls.map((value, photoIndex) => {
+        const target = targets.find(
+          (item) => item.gameIndex === gameIndex && item.photoIndex === photoIndex,
+        );
+        if (!target) return value;
+        return signedByPath.get(target.path) ?? "";
+      });
+      return { ...game, photoUrls: photoUrls.filter(Boolean) };
+    });
   }
 
   async createReview(input: NewReviewInput, author: Author): Promise<ZoneReview> {
@@ -673,6 +776,12 @@ export class SupabaseRepository implements Repository {
     const uploaded = await this.uploadPhotos(REVIEW_PHOTO_BUCKET, fresh, viewerId);
     const photoUrls = [...kept, ...uploaded].slice(0, 3);
 
+    const { data: before } = await this.supabase
+      .from("zone_reviews")
+      .select("photo_urls")
+      .eq("id", reviewId)
+      .maybeSingle();
+
     const { data, error } = await this.supabase
       .from("zone_reviews")
       .update({
@@ -690,11 +799,27 @@ export class SupabaseRepository implements Repository {
     if (!data) {
       throw new Error("후기를 수정하지 못했어요. 내가 쓴 후기가 아니거나 권한이 없어요.");
     }
+
+    // 수정에서 빼낸 사진은 Storage 에서도 지웁니다.
+    const dropped = photoUrlList((before as AnyRow | null)?.photo_urls).filter(
+      (url) => !kept.includes(url),
+    );
+    if (dropped.length) await this.removePhotoFiles(REVIEW_PHOTO_BUCKET, dropped);
+
     return mapReview(data as AnyRow, viewerId);
   }
 
   async deleteReview(reviewId: string): Promise<void> {
+    const { data } = await this.supabase
+      .from("zone_reviews")
+      .select("photo_urls")
+      .eq("id", reviewId)
+      .maybeSingle();
     await deleteOwnRow(this.supabase, "zone_reviews", reviewId, "시야 후기를 삭제하지 못했습니다");
+    await this.removePhotoFiles(
+      REVIEW_PHOTO_BUCKET,
+      photoUrlList((data as AnyRow | null)?.photo_urls),
+    );
   }
 
   async loadSaves(viewerId: string | null): Promise<Saves> {
@@ -727,7 +852,7 @@ export class SupabaseRepository implements Repository {
         .from("saves")
         .upsert(
           { user_id: viewerId, target_type: targetType, target_id: targetId },
-          { onConflict: "user_id,target_type,target_id" },
+          { onConflict: "user_id,target_type,target_id", ignoreDuplicates: true },
         );
       if (error) fail("저장하지 못했습니다", error);
     } else {
@@ -750,7 +875,7 @@ export class SupabaseRepository implements Repository {
       .order("played_on", { ascending: false });
 
     if (error) fail("직관 기록을 불러오지 못했습니다", error);
-    return ((data ?? []) as AnyRow[]).map(mapGame);
+    return this.signGamePhotos(((data ?? []) as AnyRow[]).map(mapGame));
   }
 
   async createGame(input: NewGameInput, viewerId: string): Promise<Game> {
@@ -758,6 +883,7 @@ export class SupabaseRepository implements Repository {
       CHECKIN_PHOTO_BUCKET,
       input.photoUrls ?? [],
       viewerId,
+      { signed: true },
     );
 
     const { data, error } = await this.supabase
@@ -777,11 +903,77 @@ export class SupabaseRepository implements Repository {
       .single();
 
     if (error || !data) fail("직관 기록을 저장하지 못했습니다", error);
-    return mapGame(data as AnyRow);
+    const [game] = await this.signGamePhotos([mapGame(data as AnyRow)]);
+    return game;
+  }
+
+  /** 직관 기록 수정 — 사진은 남길 사진 + 새로 올린 사진으로 다시 채웁니다. */
+  async updateGame(
+    gameId: string,
+    input: NewGameInput,
+    viewerId: string | null,
+  ): Promise<Game> {
+    const incoming = input.photoUrls ?? [];
+    // 서명 URL(https)도 저장된 경로를 되살려 남길 사진으로 처리합니다.
+    const kept = incoming
+      .filter((value) => /^https?:\/\//i.test(value))
+      .map((value) => storagePath(value, CHECKIN_PHOTO_BUCKET))
+      .filter((path): path is string => Boolean(path));
+    const fresh = incoming.filter((value) => !/^https?:\/\//i.test(value));
+    const uploaded = await this.uploadPhotos(CHECKIN_PHOTO_BUCKET, fresh, viewerId, {
+      signed: true,
+    });
+    const photoUrls = [...kept, ...uploaded].slice(0, 3);
+
+    const { data: before } = await this.supabase
+      .from("games")
+      .select("photo_urls")
+      .eq("id", gameId)
+      .maybeSingle();
+
+    const { data, error } = await this.supabase
+      .from("games")
+      .update({
+        played_on: input.playedOn,
+        opponent: input.opponent,
+        home_away: input.homeAway,
+        zone_code: input.zoneCode,
+        score_for: input.scoreFor,
+        score_against: input.scoreAgainst,
+        note: input.note,
+        photo_urls: photoUrls,
+      })
+      .eq("id", gameId)
+      .select(GAME_COLUMNS)
+      .maybeSingle();
+
+    if (error) fail("직관 기록을 수정하지 못했습니다", error);
+    if (!data) {
+      throw new Error("직관 기록을 수정하지 못했어요. 내가 쓴 기록이 아니거나 권한이 없어요.");
+    }
+
+    // 뺀 사진은 Storage 에서도 지웁니다.
+    const dropped = photoUrlList((before as AnyRow | null)?.photo_urls).filter((value) => {
+      const path = storagePath(value, CHECKIN_PHOTO_BUCKET);
+      return path ? !kept.includes(path) : false;
+    });
+    if (dropped.length) await this.removePhotoFiles(CHECKIN_PHOTO_BUCKET, dropped);
+
+    const [game] = await this.signGamePhotos([mapGame(data as AnyRow)]);
+    return game;
   }
 
   async deleteGame(gameId: string): Promise<void> {
+    const { data } = await this.supabase
+      .from("games")
+      .select("photo_urls")
+      .eq("id", gameId)
+      .maybeSingle();
     await deleteOwnRow(this.supabase, "games", gameId, "직관 기록을 삭제하지 못했습니다");
+    await this.removePhotoFiles(
+      CHECKIN_PHOTO_BUCKET,
+      photoUrlList((data as AnyRow | null)?.photo_urls),
+    );
   }
 
   /* ── 직관러 맛집 ──────────────────────────────────────────── */
@@ -859,8 +1051,15 @@ export class SupabaseRepository implements Repository {
       tip: input.tip,
       rating: input.rating,
       is_inside: input.inStadium,
+      // 사진을 모두 지운 경우에도 빈 배열을 저장해야 화면에서도 사라집니다.
+      photo_urls: [...kept, ...uploaded].slice(0, 3),
     };
-    if (kept.length || uploaded.length) payload.photo_urls = [...kept, ...uploaded].slice(0, 3);
+
+    const { data: before } = await this.supabase
+      .from("user_foods")
+      .select("photo_urls")
+      .eq("id", foodId)
+      .maybeSingle();
 
     const { data, error } = await this.supabase
       .from("user_foods")
@@ -871,11 +1070,26 @@ export class SupabaseRepository implements Repository {
 
     if (error) fail("맛집을 수정하지 못했습니다", error);
     if (!data) throw new Error("맛집을 수정하지 못했어요. 내가 쓴 맛집이 아니거나 권한이 없어요.");
+
+    const dropped = photoUrlList((before as AnyRow | null)?.photo_urls).filter(
+      (url) => !kept.includes(url),
+    );
+    if (dropped.length) await this.removePhotoFiles(USER_FOOD_PHOTO_BUCKET, dropped);
+
     return mapUserFood(data as AnyRow, viewerId);
   }
 
   async deleteUserFood(foodId: string): Promise<void> {
+    const { data } = await this.supabase
+      .from("user_foods")
+      .select("photo_urls")
+      .eq("id", foodId)
+      .maybeSingle();
     await deleteOwnRow(this.supabase, "user_foods", foodId, "맛집을 삭제하지 못했습니다");
+    await this.removePhotoFiles(
+      USER_FOOD_PHOTO_BUCKET,
+      photoUrlList((data as AnyRow | null)?.photo_urls),
+    );
   }
 
   /* ── 직관러 주차 팁 ──────────────────────────────────────── */
@@ -940,5 +1154,46 @@ export class SupabaseRepository implements Repository {
 
   async deleteUserParking(parkingId: string): Promise<void> {
     await deleteOwnRow(this.supabase, "user_parkings", parkingId, "주차 팁을 삭제하지 못했습니다");
+  }
+
+  /* ── 신고 ────────────────────────────────────────────────── */
+  async createReport(input: NewReportInput, reporterId: string): Promise<void> {
+    const { error } = await this.supabase.from("reports").insert({
+      target_type: input.targetType,
+      target_id: input.targetId,
+      reason: input.reason,
+      detail: input.detail ?? "",
+      reporter_id: reporterId,
+    });
+    if (!error) return;
+    if (error.code === "23505") throw new Error("이미 신고한 항목이에요.");
+    if (error.code === "42P01") throw new Error("신고 기능이 아직 준비되지 않았어요.");
+    fail("신고를 접수하지 못했습니다", error);
+  }
+
+  async loadReports(): Promise<Report[]> {
+    const { data, error } = await this.supabase
+      .from("reports")
+      .select("id, target_type, target_id, reason, detail, status, created_at")
+      .order("created_at", { ascending: false })
+      .limit(100);
+    if (error) return [];
+    return ((data ?? []) as AnyRow[]).map((row) => ({
+      id: str(row.id),
+      targetType: str(row.target_type) as Report["targetType"],
+      targetId: str(row.target_id),
+      reason: str(row.reason),
+      detail: str(row.detail),
+      status: row.status === "resolved" ? "resolved" : "open",
+      createdAt: str(row.created_at) || new Date().toISOString(),
+    }));
+  }
+
+  async resolveReport(reportId: string): Promise<void> {
+    const { error } = await this.supabase
+      .from("reports")
+      .update({ status: "resolved", resolved_at: new Date().toISOString() })
+      .eq("id", reportId);
+    if (error) fail("신고를 처리하지 못했습니다", error);
   }
 }

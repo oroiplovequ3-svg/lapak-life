@@ -11,11 +11,12 @@ import {
   type PhotoLightboxState,
 } from "@/components/photo-gallery";
 import { useApp } from "@/components/providers/app-provider";
+import { ReportSheet } from "@/components/report-sheet";
 import { UserFoodSheet } from "@/components/user-food-sheet";
 import { UserParkingSheet } from "@/components/user-parking-sheet";
 import { groupedFoods } from "@/lib/data/foods";
 import { PARKING } from "@/lib/data/parking";
-import type { Food, FoodFocus, UserFood, UserParking } from "@/lib/types";
+import type { Food, FoodFocus, ReportTargetType, UserFood, UserParking } from "@/lib/types";
 
 type FoodFilter = "all" | "in" | "out";
 type FoodTab = "all" | "user" | "stadium";
@@ -57,6 +58,7 @@ function UserFoodCard({
   canManage,
   onEdit,
   onDelete,
+  onReport,
   onOpenPhoto,
 }: {
   food: UserFood;
@@ -64,6 +66,7 @@ function UserFoodCard({
   canManage: boolean;
   onEdit: () => void;
   onDelete: () => void;
+  onReport: () => void;
   onOpenPhoto: (index: number) => void;
 }) {
   const photoUrls = food.photoUrls ?? [];
@@ -117,7 +120,15 @@ function UserFoodCard({
             </button>
             <DeleteButton what="맛집" size={13} onDelete={onDelete} />
           </span>
-        ) : null}
+        ) : (
+          <button
+            type="button"
+            onClick={onReport}
+            className="flex-none rounded-lg px-1.5 py-1 text-[10px] font-bold text-[#B9C0CB] transition hover:text-[#B42318]"
+          >
+            신고
+          </button>
+        )}
       </div>
       <PhotoTiles
         urls={photoUrls}
@@ -134,12 +145,14 @@ function UserParkingCard({
   canManage,
   onEdit,
   onDelete,
+  onReport,
 }: {
   parking: UserParking;
   /** 본인 팁이거나 마스터 */
   canManage: boolean;
   onEdit: () => void;
   onDelete: () => void;
+  onReport: () => void;
 }) {
   return (
     <article
@@ -188,7 +201,15 @@ function UserParkingCard({
             </button>
             <DeleteButton what="주차 팁" size={13} onDelete={onDelete} />
           </span>
-        ) : null}
+        ) : (
+          <button
+            type="button"
+            onClick={onReport}
+            className="flex-none rounded-lg px-1.5 py-1 text-[10px] font-bold text-[#B9C0CB] transition hover:text-[#B42318]"
+          >
+            신고
+          </button>
+        )}
       </div>
     </article>
   );
@@ -515,6 +536,8 @@ export function FoodScreen({ focus }: { focus?: FoodFocus | null }) {
     deleteUserFood,
     deleteUserParking,
     isAdmin,
+    loadError,
+    reload,
   } = useApp();
   const [segment, setSegment] = useState<"food" | "parking">("food");
   const [tab, setTab] = useState<FoodTab>("all");
@@ -526,6 +549,12 @@ export function FoodScreen({ focus }: { focus?: FoodFocus | null }) {
   const [editingFood, setEditingFood] = useState<UserFood | null>(null);
   const [editingParking, setEditingParking] = useState<UserParking | null>(null);
   const [lightbox, setLightbox] = useState<PhotoLightboxState | null>(null);
+  /** 신고 중인 맛집·주차 팁 */
+  const [reportTarget, setReportTarget] = useState<{
+    type: ReportTargetType;
+    id: string;
+    hint: string;
+  } | null>(null);
 
   // 검색에서 특정 매장·맛집·주차 항목을 골라 들어오면 그 카드가 바로 보이게 맞춰요.
   useEffect(() => {
@@ -590,6 +619,21 @@ export function FoodScreen({ focus }: { focus?: FoodFocus | null }) {
 
   return (
     <div className="flex flex-col gap-3.5 px-4 pb-[30px] pt-3.5">
+      {loadError ? (
+        <div className="rounded-md2 border border-[#FECDCA] bg-[#FEF3F2] p-4 text-center">
+          <p className="text-[13px] font-extrabold text-[#B42318]">정보를 불러오지 못했어요</p>
+          <p className="mt-1 break-keep text-[11.5px] leading-relaxed text-[#B42318]/80">
+            {loadError}
+          </p>
+          <button
+            type="button"
+            onClick={() => void reload()}
+            className="mt-3 rounded-[11px] bg-[#B42318] px-3.5 py-[8px] text-[12px] font-extrabold text-white"
+          >
+            다시 시도
+          </button>
+        </div>
+      ) : null}
       <div className="flex gap-[3px] rounded-[14px] bg-[#EEF1F6] p-1">
         <button
           type="button"
@@ -680,6 +724,13 @@ export function FoodScreen({ focus }: { focus?: FoodFocus | null }) {
                   canManage={parking.mine || isAdmin}
                   onEdit={() => setEditingParking(parking)}
                   onDelete={() => void deleteUserParking(parking.id)}
+                  onReport={() =>
+                    setReportTarget({
+                      type: "user_parking",
+                      id: parking.id,
+                      hint: `${parking.nickname}님의 주차 팁 · ${parking.name}`,
+                    })
+                  }
                 />
               ))}
             </div>
@@ -781,6 +832,13 @@ export function FoodScreen({ focus }: { focus?: FoodFocus | null }) {
                       canManage={food.mine || isAdmin}
                       onEdit={() => setEditingFood(food)}
                       onDelete={() => void deleteUserFood(food.id)}
+                      onReport={() =>
+                        setReportTarget({
+                          type: "user_food",
+                          id: food.id,
+                          hint: `${food.nickname}님의 맛집 · ${food.name}`,
+                        })
+                      }
                       onOpenPhoto={(index) =>
                         setLightbox({ urls: food.photoUrls ?? [], index })
                       }
@@ -854,6 +912,14 @@ export function FoodScreen({ focus }: { focus?: FoodFocus | null }) {
           label="맛집 사진"
         />
       ) : null}
+
+      <ReportSheet
+        open={Boolean(reportTarget)}
+        onClose={() => setReportTarget(null)}
+        targetType={reportTarget?.type ?? "user_food"}
+        targetId={reportTarget?.id ?? ""}
+        targetHint={reportTarget?.hint}
+      />
     </div>
   );
 }

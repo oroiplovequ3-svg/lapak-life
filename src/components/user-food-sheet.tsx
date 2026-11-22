@@ -127,6 +127,10 @@ export function UserFoodSheet({ open, onClose, editing = null }: UserFoodSheetPr
       open={open}
       title={editing ? "직관러 맛집 수정" : "직관러 맛집 추가"}
       onClose={onClose}
+      dirty={Boolean(name.trim() || menu.trim() || tip.trim() || photos.length)}
+      dirtyMessage={
+        editing ? "수정 중인 맛집 정보가 사라져요. 닫을까요?" : "작성 중인 맛집 정보가 사라져요. 닫을까요?"
+      }
     >
       <span className="text-xs font-extrabold text-ink-2">가게 이름</span>
       <input

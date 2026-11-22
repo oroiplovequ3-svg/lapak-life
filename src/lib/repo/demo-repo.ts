@@ -113,6 +113,7 @@ function seedPostToPost(sp: SeedPost, liked: boolean, commentCount: number): Pos
     seatZone: null,
     seatDetail: sp.seat,
     media: sp.media,
+    photoUrls: [],
     createdAt: minutesAgoISO(sp.minutesAgo),
     likeCount: sp.likes + (liked ? 1 : 0),
     commentCount,
@@ -295,6 +296,7 @@ export class DemoRepository implements Repository {
       seatZone: input.seatZone,
       seatDetail: input.seatDetail,
       media: null,
+      photoUrls: (input.photoUrls ?? []).slice(0, 3),
       createdAt: new Date().toISOString(),
       likeCount: 0,
       commentCount: 0,
@@ -315,6 +317,7 @@ export class DemoRepository implements Repository {
       body: input.body,
       seatZone: input.seatZone,
       seatDetail: input.seatDetail,
+      photoUrls: (input.photoUrls ?? []).slice(0, 3),
       mine: true,
     };
     this.persist.posts = this.persist.posts.map((p) => (p.id === postId ? updated : p));

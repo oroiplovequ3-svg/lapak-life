@@ -8,6 +8,11 @@ import { ComposeSheet } from "@/components/compose-sheet";
 import { DeleteButton } from "@/components/delete-button";
 import { Icon } from "@/components/icons";
 import { PostMedia } from "@/components/media-illustration";
+import {
+  PhotoLightbox,
+  PhotoTiles,
+  type PhotoLightboxState,
+} from "@/components/photo-gallery";
 import { useApp } from "@/components/providers/app-provider";
 import { useToast } from "@/components/providers/toast-provider";
 import { ReportSheet } from "@/components/report-sheet";
@@ -156,6 +161,7 @@ function PostCard({
   const [sending, setSending] = useState(false);
   const [pop, setPop] = useState(false);
   const [reportOpen, setReportOpen] = useState(false);
+  const [lightbox, setLightbox] = useState<PhotoLightboxState | null>(null);
   const toast = useToast();
 
   const comments = commentsByPost[post.id] ?? [];
@@ -263,6 +269,12 @@ function PostCard({
 
       {post.media ? <PostMedia media={post.media} /> : null}
 
+      <PhotoTiles
+        urls={post.photoUrls}
+        label="글 사진"
+        onOpen={(index) => setLightbox({ urls: post.photoUrls, index })}
+      />
+
       <div className="mt-[11px] flex items-center gap-[15px] border-t border-line-soft pt-[9px]">
         <button
           type="button"
@@ -355,6 +367,15 @@ function PostCard({
         targetId={post.id}
         targetHint={`${post.nickname}님의 글`}
       />
+
+      {lightbox ? (
+        <PhotoLightbox
+          state={lightbox}
+          label="글 사진"
+          onClose={() => setLightbox(null)}
+          onPick={(index) => setLightbox({ ...lightbox, index })}
+        />
+      ) : null}
     </article>
   );
 }

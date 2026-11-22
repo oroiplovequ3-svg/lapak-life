@@ -99,6 +99,8 @@ export interface Post {
   seatZone: string | null;
   seatDetail: string | null;
   media: "day" | "night" | null;
+  /** 글에 첨부한 사진 (최대 3장 · 데모는 축소된 data URL, 연동 시 Storage 공개 URL) */
+  photoUrls: string[];
   createdAt: string;
   likeCount: number;
   commentCount: number;
@@ -178,6 +180,11 @@ export interface NewPostInput {
   body: string;
   seatZone: string | null;
   seatDetail: string | null;
+  /**
+   * 첨부 사진 — 새로 고른 사진은 축소된 data URL,
+   * 수정할 때 남겨 둔 사진은 Storage 공개 URL 로 넘깁니다. (최대 3장)
+   */
+  photoUrls?: string[];
 }
 
 export interface NewReviewInput {

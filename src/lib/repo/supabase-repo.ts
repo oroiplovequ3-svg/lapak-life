@@ -105,6 +105,7 @@ function mapPost(row: AnyRow, viewerId: string | null, likedIds: Set<string>): P
     seatZone: row.seat_zone ? str(row.seat_zone) : null,
     seatDetail: row.seat_detail ? str(row.seat_detail) : null,
     media,
+    photoUrls: photoUrlList(row.photo_urls),
     createdAt: str(row.created_at) || new Date().toISOString(),
     likeCount: num(row.like_count),
     commentCount: num(row.comment_count),
@@ -166,13 +167,16 @@ function mapGame(row: AnyRow): Game {
 const POST_COLUMNS =
   // posts ↔ profiles 는 직접 FK(posts_user_id_fkey)와 post_likes 경유 다대다 경로가 함께 있어
   // PostgREST 가 임베드를 고르지 못한다(PGRST201). 제약 이름으로 직접 경로를 지정한다.
-  "id, user_id, category, body, seat_zone, seat_detail, media, created_at, like_count, comment_count, profiles!posts_user_id_fkey(nickname, avatar_url)";
+  "id, user_id, category, body, seat_zone, seat_detail, media, photo_urls, created_at, like_count, comment_count, profiles!posts_user_id_fkey(nickname, avatar_url)";
 const COMMENT_COLUMNS = "id, post_id, user_id, body, created_at, profiles(nickname, avatar_url)";
 const REVIEW_COLUMNS =
   "id, zone_code, user_id, seat_detail, rating, body, photo_urls, created_at, profiles(nickname, avatar_url)";
 
 /** 시야 후기 사진 버킷 (supabase/migrations/002_review_photos.sql) */
 const REVIEW_PHOTO_BUCKET = "review-photos";
+
+/** 글(라팍톡) 사진 버킷 (supabase/migrations/013_post_photos.sql) */
+const POST_PHOTO_BUCKET = "post-photos";
 
 /** 직관러 맛집 사진 버킷 (supabase/migrations/006_user_food_photos.sql) */
 const USER_FOOD_PHOTO_BUCKET = "user-food-photos";
@@ -516,6 +520,12 @@ export class SupabaseRepository implements Repository {
   }
 
   async createPost(input: NewPostInput, author: Author): Promise<Post> {
+    const photoUrls = await this.uploadPhotos(
+      POST_PHOTO_BUCKET,
+      input.photoUrls ?? [],
+      author.id,
+    );
+
     const { data, error } = await this.supabase
       .from("posts")
       .insert({
@@ -524,22 +534,44 @@ export class SupabaseRepository implements Repository {
         body: input.body,
         seat_zone: input.seatZone,
         seat_detail: input.seatDetail,
+        photo_urls: photoUrls,
       })
       .select(POST_COLUMNS)
       .single();
 
-    if (error || !data) fail("글을 등록하지 못했습니다", error);
+    if (error || !data) {
+      // 글이 저장되지 않았으면 올라간 사진도 남기지 않습니다.
+      if (photoUrls.length) await this.removePhotoFiles(POST_PHOTO_BUCKET, photoUrls);
+      fail("글을 등록하지 못했습니다", error);
+    }
 
     const row = data as AnyRow;
     return { ...mapPost(row, author.id, new Set()), mine: true, badge: "나" };
   }
 
-  /** 글 수정 — 본인 글이거나 마스터일 때만 RLS 가 통과합니다. */
+  /** 글 수정 — 사진은 남길 사진 + 새로 올린 사진으로 다시 채웁니다. */
   async updatePost(
     postId: string,
     input: NewPostInput,
     viewerId: string | null,
   ): Promise<Post> {
+    const incoming = input.photoUrls ?? [];
+    // 남길 사진은 Storage 공개 URL(https)로 들어오고, 새 사진은 축소된 data URL 입니다.
+    const kept = incoming.filter((url) => /^https?:\/\//i.test(url)).slice(0, 3);
+    const fresh = incoming.filter((url) => !/^https?:\/\//i.test(url));
+    const uploaded = await this.uploadPhotos(
+      POST_PHOTO_BUCKET,
+      fresh.slice(0, Math.max(0, 3 - kept.length)),
+      viewerId,
+    );
+    const photoUrls = [...kept, ...uploaded].slice(0, 3);
+
+    const { data: before } = await this.supabase
+      .from("posts")
+      .select("photo_urls")
+      .eq("id", postId)
+      .maybeSingle();
+
     const { data, error } = await this.supabase
       .from("posts")
       .update({
@@ -547,18 +579,39 @@ export class SupabaseRepository implements Repository {
         body: input.body,
         seat_zone: input.seatZone,
         seat_detail: input.seatDetail,
+        photo_urls: photoUrls,
       })
       .eq("id", postId)
       .select(POST_COLUMNS)
       .maybeSingle();
 
     if (error) fail("글을 수정하지 못했습니다", error);
-    if (!data) throw new Error("글을 수정하지 못했어요. 내가 쓴 글이 아니거나 권한이 없어요.");
+    if (!data) {
+      // 수정 권한이 없어 실패했으면 방금 올린 사진은 남기지 않습니다.
+      if (uploaded.length) await this.removePhotoFiles(POST_PHOTO_BUCKET, uploaded);
+      throw new Error("글을 수정하지 못했어요. 내가 쓴 글이 아니거나 권한이 없어요.");
+    }
+
+    // 수정에서 빼낸 사진은 Storage 에서도 지웁니다.
+    const dropped = photoUrlList((before as AnyRow | null)?.photo_urls).filter(
+      (url) => !kept.includes(url),
+    );
+    if (dropped.length) await this.removePhotoFiles(POST_PHOTO_BUCKET, dropped);
+
     return mapPost(data as AnyRow, viewerId, new Set());
   }
 
   async deletePost(postId: string): Promise<void> {
+    const { data } = await this.supabase
+      .from("posts")
+      .select("photo_urls")
+      .eq("id", postId)
+      .maybeSingle();
     await deleteOwnRow(this.supabase, "posts", postId, "글을 삭제하지 못했습니다");
+    await this.removePhotoFiles(
+      POST_PHOTO_BUCKET,
+      photoUrlList((data as AnyRow | null)?.photo_urls),
+    );
   }
 
   async toggleLike(

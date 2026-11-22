@@ -429,8 +429,16 @@ export function MyScreen({ onOpenPost, onCompose, onAddGame, onEditGame }: MyScr
               <p className="mt-[5px] line-clamp-2 break-keep text-[13px] leading-relaxed text-[#1D2939]">
                 {post.body}
               </p>
-              <div className="mt-[7px] text-[10.5px] font-semibold text-ink-faint">
-                {formatRelativeTime(post.createdAt)} · 좋아요 {post.likeCount} · 댓글 {post.commentCount}
+              <div className="mt-[7px] flex items-center gap-[5px] text-[10.5px] font-semibold text-ink-faint">
+                <span>
+                  {formatRelativeTime(post.createdAt)} · 좋아요 {post.likeCount} · 댓글 {post.commentCount}
+                </span>
+                {post.photoUrls.length ? (
+                  <span className="inline-flex items-center gap-[2px] rounded-md bg-[#F1F4F9] px-1 py-[1px] text-[10px] font-extrabold text-[#667085]">
+                    <Icon name="camera" size={10} strokeWidth={2} />
+                    {post.photoUrls.length}
+                  </span>
+                ) : null}
               </div>
             </article>
           ))}

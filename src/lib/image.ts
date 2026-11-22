@@ -12,6 +12,9 @@ export const MAX_GAME_PHOTOS = 3;
 /** 직관러 맛집 카드에 붙일 수 있는 사진 수 */
 export const MAX_USER_FOOD_PHOTOS = 3;
 
+/** 라팍톡 글에 붙일 수 있는 사진 수 (모든 카테고리 공통) */
+export const MAX_POST_PHOTOS = 3;
+
 /** 장당 목표 용량 */
 export const PHOTO_TARGET_BYTES = 140 * 1024;
 

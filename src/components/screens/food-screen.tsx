@@ -390,7 +390,7 @@ function FoodPicker({
   );
 }
 
-/** 기본 상태(전체 매장)에서 14개 카드 대신 보여주는 한눈에 요약 카드 */
+/** 기본 상태(전체 매장)에서 매장 카드 대신 보여주는 한눈에 요약 카드 */
 function FoodOverview({ foods }: { foods: Food[] }) {
   const inside = foods.filter((food) => food.inStadium).length;
   const outside = foods.length - inside;
@@ -402,7 +402,7 @@ function FoodOverview({ foods }: { foods: Food[] }) {
           [
             "🏟️",
             "구장 안",
-            "2F 푸드스트리트·외야석, 3F 내야석, 5F SKY에 매장이 나뉘어 있어요. 좌석이 있는 층에서 먹는 게 가장 빠릅니다.",
+            "2F 푸드스트리트·외야석, 3F 내야석, 4F 스윗박스, 5F SKY에 매장이 나뉘어 있어요. 좌석이 있는 층에서 먹는 게 가장 빠릅니다.",
           ],
         ] as [string, string, string][])
       : []),
@@ -411,7 +411,7 @@ function FoodOverview({ foods }: { foods: Food[] }) {
           [
             "🚪",
             "구장 밖",
-            "Gate 1과 외야 매표소 밖은 입장 전에 들르기 좋아요. 하우스 오브 라이온즈는 티켓 없이도 들어갈 수 있습니다.",
+            "1F 외야 매표소와 2F Gate 1 밖에 매장이 있어요. 하우스 오브 라이온즈는 티켓 없이도 들어갈 수 있습니다.",
           ],
         ] as [string, string, string][])
       : []),
@@ -424,7 +424,7 @@ function FoodOverview({ foods }: { foods: Food[] }) {
         <div className="pointer-events-none absolute -bottom-[60px] -right-10 h-[150px] w-[150px] rounded-full bg-white/[.07]" />
         <div className="relative text-lg font-extrabold tracking-tight3">🍽️ 라팍 먹거리 한눈에</div>
         <div className="relative mt-[5px] break-keep text-[11.5px] font-semibold text-white/80">
-          구장 안 {inside}곳 · 구장 밖 {outside}곳 · 2026 시즌 공개 자료
+          구장 안 {inside}곳 · 구장 밖 {outside}곳 · 2026 시즌 식음매장 안내 기준
         </div>
         <div className="relative mt-3.5 grid grid-cols-3 gap-[7px]">
           {[
@@ -881,7 +881,7 @@ export function FoodScreen({ focus }: { focus?: FoodFocus | null }) {
 
           {tab !== "user" ? (
             <p className="break-keep px-2.5 pt-1 text-center text-[10.5px] leading-relaxed text-[#AEB6C2]">
-              매장·메뉴는 2026 시즌 공개 자료를 참고한 샘플입니다. 실제 운영은 구단 공지로 확인하세요.
+              매장·위치·메뉴는 2026 시즌 구단 식음매장 안내와 직관 후기 기준이에요. 가격·운영은 바뀔 수 있으니 방문 전 구단 공지로 확인하세요. 평점·웨이팅은 앱 자체 표본입니다.
             </p>
           ) : null}
         </>

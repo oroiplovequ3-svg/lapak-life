@@ -1,6 +1,6 @@
 "use client";
 
-import { useRef, useState, type ChangeEvent } from "react";
+import { useEffect, useRef, useState, type ChangeEvent } from "react";
 
 import { Icon } from "@/components/icons";
 import { useApp } from "@/components/providers/app-provider";
@@ -12,15 +12,18 @@ import {
   preparePhoto,
   type PreparedPhoto,
 } from "@/lib/image";
+import type { UserFood } from "@/lib/types";
 
 interface UserFoodSheetProps {
   open: boolean;
   onClose: () => void;
+  /** 수정할 맛집 — 넘기면 '수정' 모드로 열립니다 */
+  editing?: UserFood | null;
 }
 
 /** 맛집·주차 → 직관러 맛집 등록 바텀시트 */
-export function UserFoodSheet({ open, onClose }: UserFoodSheetProps) {
-  const { addUserFood } = useApp();
+export function UserFoodSheet({ open, onClose, editing = null }: UserFoodSheetProps) {
+  const { addUserFood, updateUserFood, isAdmin } = useApp();
   const toast = useToast();
   const fileRef = useRef<HTMLInputElement>(null);
   const [name, setName] = useState("");
@@ -34,6 +37,28 @@ export function UserFoodSheet({ open, onClose }: UserFoodSheetProps) {
 
   const valid = name.trim().length >= 1;
 
+  // 열 때마다 새 맛집 / 수정할 맛집으로 채웁니다.
+  useEffect(() => {
+    if (!open) return;
+    setName(editing?.name ?? "");
+    setMenu(editing?.menu ?? "");
+    setTip(editing?.tip ?? "");
+    setRating(editing?.rating ?? 5);
+    setInStadium(editing?.inStadium ?? true);
+    setPhotos(
+      (editing?.photoUrls ?? []).map((url, index) => ({
+        id: `keep-${index}`,
+        dataUrl: url,
+        width: 0,
+        height: 0,
+        bytes: 0,
+        name: `기존 사진 ${index + 1}`,
+      })),
+    );
+    setBusy(false);
+    setSubmitting(false);
+  }, [open, editing]);
+
   const reset = () => {
     setName("");
     setMenu("");
@@ -46,17 +71,18 @@ export function UserFoodSheet({ open, onClose }: UserFoodSheetProps) {
   const submit = async () => {
     if (!valid || submitting || busy) return;
     setSubmitting(true);
-    const ok = await addUserFood({
+    const input = {
       name: name.trim(),
       menu: menu.trim(),
       tip: tip.trim(),
       rating,
       inStadium,
       photoUrls: photos.map((photo) => photo.dataUrl),
-    });
+    };
+    const ok = editing ? await updateUserFood(editing.id, input) : await addUserFood(input);
     setSubmitting(false);
     if (ok) {
-      reset();
+      if (!editing) reset();
       onClose();
     }
   };
@@ -97,7 +123,11 @@ export function UserFoodSheet({ open, onClose }: UserFoodSheetProps) {
   const totalSize = photos.reduce((sum, photo) => sum + photo.bytes, 0);
 
   return (
-    <Sheet open={open} title="직관러 맛집 추가" onClose={onClose}>
+    <Sheet
+      open={open}
+      title={editing ? "직관러 맛집 수정" : "직관러 맛집 추가"}
+      onClose={onClose}
+    >
       <span className="text-xs font-extrabold text-ink-2">가게 이름</span>
       <input
         value={name}
@@ -200,7 +230,7 @@ export function UserFoodSheet({ open, onClose }: UserFoodSheetProps) {
               <Icon name="close" size={11} strokeWidth={2.8} />
             </button>
             <span className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/55 to-transparent px-1.5 pb-1 pt-3 text-[9px] font-bold text-white">
-              {formatPhotoSize(photo.bytes)}
+              {photo.bytes ? formatPhotoSize(photo.bytes) : "기존 사진"}
             </span>
           </div>
         ))}
@@ -257,9 +287,15 @@ export function UserFoodSheet({ open, onClose }: UserFoodSheetProps) {
           disabled={!valid || submitting || busy}
           className="flex-1 rounded-[13px] bg-brand py-3 text-[13px] font-extrabold text-white shadow-brand disabled:bg-[#E4E7EC] disabled:text-ink-faint disabled:shadow-none"
         >
-          {submitting ? "등록 중…" : "맛집 등록"}
+          {submitting ? "저장 중…" : editing ? "수정 완료" : "맛집 등록"}
         </button>
       </div>
+
+      {editing && !editing.mine && isAdmin ? (
+        <p className="break-keep text-[10.5px] font-bold leading-relaxed text-[#B54708]">
+          마스터 권한으로 다른 직관러의 맛집을 수정합니다.
+        </p>
+      ) : null}
     </Sheet>
   );
 }

@@ -28,7 +28,7 @@ import type {
 import { minutesAgoISO } from "@/lib/utils";
 import { MAX_USER_FOOD_PHOTOS } from "@/lib/image";
 
-import { DEMO_AUTHOR, type Repository, type SaveTargetType } from "./types";
+import { DEMO_AUTHOR, NICKNAME_TAKEN_MESSAGE, type Repository, type SaveTargetType } from "./types";
 
 const STORAGE_KEY = "lapak-life:demo:v1";
 
@@ -136,6 +136,31 @@ export class DemoRepository implements Repository {
     return { ...this.me, id: null };
   }
 
+  /** 데모 모드에는 다른 사용자가 없으므로 마스터도 없습니다. */
+  async isAdmin(): Promise<boolean> {
+    return false;
+  }
+
+  /** 샘플 데이터에 이미 있는 이름 + 내가 지금 쓰는 이름을 기준으로 확인합니다. */
+  async isNicknameAvailable(nickname: string): Promise<boolean> {
+    const key = nickname.trim().toLowerCase();
+    if (!key) return false;
+    if (key === this.me.nickname.trim().toLowerCase()) return true;
+    return !this.seedNicknames().some((name) => name.trim().toLowerCase() === key);
+  }
+
+  private seedNicknames(): string[] {
+    const names = new Set<string>();
+    for (const post of SEED_POSTS) {
+      names.add(post.nickname);
+      for (const comment of post.comments) names.add(comment.nickname);
+    }
+    for (const review of SEED_REVIEWS) names.add(review.nickname);
+    for (const food of SEED_USER_FOODS) names.add(food.nickname);
+    for (const parking of SEED_USER_PARKINGS) names.add(parking.nickname);
+    return [...names];
+  }
+
   /**
    * 데모 모드 프로필 저장. 사진은 브라우저에서 줄인 data URL 그대로
    * localStorage 에 넣고, 닉네임·사진은 내가 쓴 글·후기 표시에도 바로 반영합니다.
@@ -144,6 +169,9 @@ export class DemoRepository implements Repository {
     const nickname = input.nickname.trim();
     if (nickname.length < 2 || nickname.length > 16) {
       throw new Error("닉네임은 2~16자로 정해주세요");
+    }
+    if (nickname !== this.me.nickname && !(await this.isNicknameAvailable(nickname))) {
+      throw new Error(NICKNAME_TAKEN_MESSAGE);
     }
 
     const avatarUrl =
@@ -272,6 +300,22 @@ export class DemoRepository implements Repository {
     return post;
   }
 
+  async updatePost(postId: string, input: NewPostInput): Promise<Post> {
+    const target = this.persist.posts.find((p) => p.id === postId);
+    if (!target) throw new Error("데모 모드에서는 내가 쓴 글만 수정할 수 있어요.");
+    const updated: Post = {
+      ...target,
+      category: input.category,
+      body: input.body,
+      seatZone: input.seatZone,
+      seatDetail: input.seatDetail,
+      mine: true,
+    };
+    this.persist.posts = this.persist.posts.map((p) => (p.id === postId ? updated : p));
+    this.save();
+    return updated;
+  }
+
   async deletePost(postId: string): Promise<void> {
     this.persist.posts = this.persist.posts.filter((p) => p.id !== postId);
     // 글과 함께 달린 내 댓글도 같이 정리합니다. (샘플 글은 그대로)
@@ -326,6 +370,21 @@ export class DemoRepository implements Repository {
     ];
     this.save();
     return comment;
+  }
+
+  async updateComment(commentId: string, body: string): Promise<Comment> {
+    for (const [postId, list] of Object.entries(this.persist.extraComments)) {
+      const target = list.find((comment) => comment.id === commentId && comment.mine);
+      if (target) {
+        const updated: Comment = { ...target, body };
+        this.persist.extraComments[postId] = list.map((comment) =>
+          comment.id === commentId ? updated : comment,
+        );
+        this.save();
+        return updated;
+      }
+    }
+    throw new Error("데모 모드에서는 내가 쓴 댓글만 수정할 수 있어요.");
   }
 
   async deleteComment(commentId: string): Promise<void> {
@@ -384,6 +443,28 @@ export class DemoRepository implements Repository {
       this.save();
     }
     return review;
+  }
+
+  async updateReview(reviewId: string, input: NewReviewInput): Promise<ZoneReview> {
+    const target = this.persist.reviews.find((review) => review.id === reviewId);
+    if (!target) throw new Error("데모 모드에서는 내가 쓴 후기만 수정할 수 있어요.");
+    const updated: ZoneReview = {
+      ...target,
+      zoneCode: input.zoneCode,
+      seatDetail:
+        input.seatDetail || ZONES.find((z) => z.code === input.zoneCode)?.name || "",
+      stars: input.stars,
+      body: input.body,
+      photoUrls: (input.photoUrls ?? []).filter(Boolean).slice(0, 3),
+    };
+    this.persist.reviews = this.persist.reviews.map((review) =>
+      review.id === reviewId ? updated : review,
+    );
+    if (this.save() === "failed") {
+      updated.photoUrls = target.photoUrls;
+      this.save();
+    }
+    return updated;
   }
 
   async deleteReview(reviewId: string): Promise<void> {
@@ -497,6 +578,28 @@ export class DemoRepository implements Repository {
     return food;
   }
 
+  async updateUserFood(foodId: string, input: NewUserFoodInput): Promise<UserFood> {
+    const target = this.persist.userFoods.find((food) => food.id === foodId);
+    if (!target) throw new Error("데모 모드에서는 내가 쓴 맛집만 수정할 수 있어요.");
+    const updated: UserFood = {
+      ...target,
+      name: input.name,
+      menu: input.menu,
+      tip: input.tip,
+      rating: Math.min(5, Math.max(1, Math.round(input.rating))),
+      inStadium: input.inStadium,
+      photoUrls: (input.photoUrls ?? []).filter(Boolean).slice(0, MAX_USER_FOOD_PHOTOS),
+    };
+    this.persist.userFoods = this.persist.userFoods.map((food) =>
+      food.id === foodId ? updated : food,
+    );
+    if (this.save() === "failed") {
+      updated.photoUrls = target.photoUrls;
+      this.save();
+    }
+    return updated;
+  }
+
   async deleteUserFood(foodId: string): Promise<void> {
     this.persist.userFoods = this.persist.userFoods.filter((food) => food.id !== foodId);
     this.save();
@@ -533,6 +636,28 @@ export class DemoRepository implements Repository {
     this.persist.userParkings.unshift(parking);
     this.save();
     return parking;
+  }
+
+  async updateUserParking(
+    parkingId: string,
+    input: NewUserParkingInput,
+  ): Promise<UserParking> {
+    const target = this.persist.userParkings.find((parking) => parking.id === parkingId);
+    if (!target) throw new Error("데모 모드에서는 내가 쓴 주차 팁만 수정할 수 있어요.");
+    const updated: UserParking = {
+      ...target,
+      name: input.name,
+      location: input.location,
+      isFree: input.isFree,
+      feeNote: input.isFree ? "" : input.feeNote,
+      walkTime: input.walkTime,
+      tip: input.tip,
+    };
+    this.persist.userParkings = this.persist.userParkings.map((parking) =>
+      parking.id === parkingId ? updated : parking,
+    );
+    this.save();
+    return updated;
   }
 
   async deleteUserParking(parkingId: string): Promise<void> {

@@ -52,6 +52,8 @@ interface AppContextValue {
   loadError: string | null;
   repoMode: "demo" | "live";
   user: AppUser | null;
+  /** 지금 로그인한 계정이 마스터(관리자)인지 — 남의 글·댓글·후기·맛집·주차 팁도 수정·삭제 */
+  isAdmin: boolean;
   /** 지금 이 브라우저에서 보이는 내 이름·사진 (데모 모드에서는 저장된 데모 프로필) */
   profile: Author;
   signingIn: boolean;
@@ -72,23 +74,30 @@ interface AppContextValue {
   signInWithGoogle: () => Promise<void>;
   signOut: () => Promise<void>;
   updateProfile: (input: ProfileUpdate) => Promise<boolean>;
+  /** 닉네임을 지금 쓸 수 있는지 (내 이름 제외) */
+  isNicknameAvailable: (nickname: string) => Promise<boolean>;
 
   createPost: (input: NewPostInput) => Promise<boolean>;
+  updatePost: (postId: string, input: NewPostInput) => Promise<boolean>;
   deletePost: (postId: string) => Promise<void>;
   toggleLike: (postId: string) => Promise<void>;
   loadComments: (postId: string) => Promise<void>;
   addComment: (postId: string, body: string) => Promise<boolean>;
+  updateComment: (postId: string, commentId: string, body: string) => Promise<boolean>;
   deleteComment: (postId: string, commentId: string) => Promise<void>;
 
   createReview: (input: NewReviewInput) => Promise<boolean>;
+  updateReview: (reviewId: string, input: NewReviewInput) => Promise<boolean>;
   deleteReview: (reviewId: string) => Promise<void>;
   toggleSaveZone: (code: string) => Promise<void>;
   toggleSaveFood: (id: string) => Promise<void>;
   addGame: (input: NewGameInput) => Promise<boolean>;
   deleteGame: (gameId: string) => Promise<void>;
   addUserFood: (input: NewUserFoodInput) => Promise<boolean>;
+  updateUserFood: (foodId: string, input: NewUserFoodInput) => Promise<boolean>;
   deleteUserFood: (foodId: string) => Promise<void>;
   addUserParking: (input: NewUserParkingInput) => Promise<boolean>;
+  updateUserParking: (parkingId: string, input: NewUserParkingInput) => Promise<boolean>;
   deleteUserParking: (parkingId: string) => Promise<void>;
   reload: () => Promise<void>;
 }
@@ -122,6 +131,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const [ready, setReady] = useState(false);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [user, setUser] = useState<AppUser | null>(null);
+  const [isAdmin, setIsAdmin] = useState(false);
   const [profile, setProfile] = useState<Author>({ ...DEMO_AUTHOR });
   const [signingIn, setSigningIn] = useState(false);
   const [authPrompt, setAuthPrompt] = useState<AuthPrompt>({ open: false, reason: "" });
@@ -279,6 +289,27 @@ export function AppProvider({ children }: { children: ReactNode }) {
     };
   }, [repo, user?.id, loadAll]);
 
+  /* ── 2-1. 마스터(관리자) 여부 ─────────────────────────────── */
+  useEffect(() => {
+    if (!repo) return;
+    if (!user?.id) {
+      setIsAdmin(false);
+      return;
+    }
+    let active = true;
+    repo
+      .isAdmin()
+      .then((ok) => {
+        if (active) setIsAdmin(ok);
+      })
+      .catch(() => {
+        if (active) setIsAdmin(false);
+      });
+    return () => {
+      active = false;
+    };
+  }, [repo, user?.id]);
+
   /* ── 3. OAuth 콜백 오류 안내 ────────────────────────────────── */
   useEffect(() => {
     if (typeof window === "undefined") return;
@@ -360,6 +391,22 @@ export function AppProvider({ children }: { children: ReactNode }) {
   }, [toast]);
 
   /* ── 5-1. 프로필 설정 (닉네임 · 프로필 사진) ────────────────── */
+  const isNicknameAvailable = useCallback(
+    async (nickname: string) => {
+      if (!repo) return true;
+      const trimmed = nickname.trim();
+      if (!trimmed) return false;
+      // 지금 내가 쓰는 이름은 그대로 통과시킵니다.
+      if (trimmed.toLowerCase() === profile.nickname.trim().toLowerCase()) return true;
+      try {
+        return await repo.isNicknameAvailable(trimmed, userRef.current?.id ?? null);
+      } catch {
+        return true; // 확인 실패는 저장을 막지 않고 DB 제약이 최종 판단합니다.
+      }
+    },
+    [repo, profile.nickname],
+  );
+
   const updateProfile = useCallback(
     async (input: ProfileUpdate) => {
       if (!repo) return false;
@@ -421,6 +468,26 @@ export function AppProvider({ children }: { children: ReactNode }) {
         toast("글을 삭제했어요");
       } catch (error) {
         toast(errorMessage(error));
+      }
+    },
+    [repo, toast],
+  );
+
+  const updatePost = useCallback(
+    async (postId: string, input: NewPostInput) => {
+      if (!repo) return false;
+      try {
+        const updated = await repo.updatePost(postId, input, userRef.current?.id ?? null);
+        setPosts((prev) =>
+          prev.map((post) =>
+            post.id === postId ? { ...updated, liked: post.liked, mine: post.mine } : post,
+          ),
+        );
+        toast("글을 수정했어요");
+        return true;
+      } catch (error) {
+        toast(errorMessage(error));
+        return false;
       }
     },
     [repo, toast],
@@ -511,6 +578,31 @@ export function AppProvider({ children }: { children: ReactNode }) {
     [repo, ensureCanWrite, author, commentsByPost, toast],
   );
 
+  const updateComment = useCallback(
+    async (postId: string, commentId: string, body: string) => {
+      if (!repo) return false;
+      const text = body.trim();
+      if (!text) return false;
+      try {
+        const updated = await repo.updateComment(commentId, text, userRef.current?.id ?? null);
+        setCommentsByPost((prev) => ({
+          ...prev,
+          [postId]: (prev[postId] ?? []).map((comment) =>
+            comment.id === commentId
+              ? { ...updated, mine: comment.mine, nickname: comment.nickname }
+              : comment,
+          ),
+        }));
+        toast("댓글을 수정했어요");
+        return true;
+      } catch (error) {
+        toast(errorMessage(error));
+        return false;
+      }
+    },
+    [repo, toast],
+  );
+
   /* ── 7. 시야 후기 ───────────────────────────────────────────── */
   const deleteComment = useCallback(
     async (postId: string, commentId: string) => {
@@ -563,6 +655,28 @@ export function AppProvider({ children }: { children: ReactNode }) {
         toast("시야 후기를 삭제했어요");
       } catch (error) {
         toast(errorMessage(error));
+      }
+    },
+    [repo, toast],
+  );
+
+  const updateReview = useCallback(
+    async (reviewId: string, input: NewReviewInput) => {
+      if (!repo) return false;
+      try {
+        const updated = await repo.updateReview(reviewId, input, userRef.current?.id ?? null);
+        setReviews((prev) =>
+          prev.map((review) =>
+            review.id === reviewId
+              ? { ...updated, mine: review.mine, nickname: review.nickname, badge: review.badge }
+              : review,
+          ),
+        );
+        toast("시야 후기를 수정했어요");
+        return true;
+      } catch (error) {
+        toast(errorMessage(error));
+        return false;
       }
     },
     [repo, toast],
@@ -672,6 +786,28 @@ export function AppProvider({ children }: { children: ReactNode }) {
     [repo, ensureCanWrite, author, toast],
   );
 
+  const updateUserFood = useCallback(
+    async (foodId: string, input: NewUserFoodInput) => {
+      if (!repo) return false;
+      try {
+        const updated = await repo.updateUserFood(foodId, input, userRef.current?.id ?? null);
+        setUserFoods((prev) =>
+          prev.map((food) =>
+            food.id === foodId
+              ? { ...updated, mine: food.mine, nickname: food.nickname }
+              : food,
+          ),
+        );
+        toast("맛집을 수정했어요");
+        return true;
+      } catch (error) {
+        toast(errorMessage(error));
+        return false;
+      }
+    },
+    [repo, toast],
+  );
+
   const deleteUserFood = useCallback(
     async (foodId: string) => {
       if (!repo) return;
@@ -703,6 +839,32 @@ export function AppProvider({ children }: { children: ReactNode }) {
     [repo, ensureCanWrite, author, toast],
   );
 
+  const updateUserParking = useCallback(
+    async (parkingId: string, input: NewUserParkingInput) => {
+      if (!repo) return false;
+      try {
+        const updated = await repo.updateUserParking(
+          parkingId,
+          input,
+          userRef.current?.id ?? null,
+        );
+        setUserParkings((prev) =>
+          prev.map((parking) =>
+            parking.id === parkingId
+              ? { ...updated, mine: parking.mine, nickname: parking.nickname }
+              : parking,
+          ),
+        );
+        toast("주차 팁을 수정했어요");
+        return true;
+      } catch (error) {
+        toast(errorMessage(error));
+        return false;
+      }
+    },
+    [repo, toast],
+  );
+
   const deleteUserParking = useCallback(
     async (parkingId: string) => {
       if (!repo) return;
@@ -724,6 +886,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
       loadError,
       repoMode: repo?.mode ?? "demo",
       user,
+      isAdmin,
       profile,
       signingIn,
       authPrompt,
@@ -741,21 +904,27 @@ export function AppProvider({ children }: { children: ReactNode }) {
       signInWithGoogle,
       signOut,
       updateProfile,
+      isNicknameAvailable,
       createPost,
+      updatePost,
       deletePost,
       toggleLike,
       loadComments,
       addComment,
+      updateComment,
       deleteComment,
       createReview,
+      updateReview,
       deleteReview,
       toggleSaveZone,
       toggleSaveFood,
       addGame,
       deleteGame,
       addUserFood,
+      updateUserFood,
       deleteUserFood,
       addUserParking,
+      updateUserParking,
       deleteUserParking,
       reload,
     }),
@@ -764,6 +933,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
       loadError,
       repo,
       user,
+      isAdmin,
       profile,
       signingIn,
       authPrompt,
@@ -780,21 +950,27 @@ export function AppProvider({ children }: { children: ReactNode }) {
       signInWithGoogle,
       signOut,
       updateProfile,
+      isNicknameAvailable,
       createPost,
+      updatePost,
       deletePost,
       toggleLike,
       loadComments,
       addComment,
+      updateComment,
       deleteComment,
       createReview,
+      updateReview,
       deleteReview,
       toggleSaveZone,
       toggleSaveFood,
       addGame,
       deleteGame,
       addUserFood,
+      updateUserFood,
       deleteUserFood,
       addUserParking,
+      updateUserParking,
       deleteUserParking,
       reload,
     ],

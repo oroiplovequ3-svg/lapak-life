@@ -1,13 +1,13 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 
 import { Icon } from "@/components/icons";
 import { useApp } from "@/components/providers/app-provider";
 import { Sheet } from "@/components/sheet";
 import { WRITE_CATEGORIES } from "@/lib/data/categories";
 import { zoneFullName, ZONE_ORDER } from "@/lib/data/zones";
-import type { CategoryId } from "@/lib/types";
+import type { CategoryId, Post } from "@/lib/types";
 
 /** 좌석을 함께 남기는 카테고리 — 직관후기 · 실시간현장만 */
 const SEAT_CATEGORY_IDS: CategoryId[] = ["review", "live"];
@@ -15,16 +15,27 @@ const SEAT_CATEGORY_IDS: CategoryId[] = ["review", "live"];
 interface ComposeSheetProps {
   open: boolean;
   onClose: () => void;
-  /** 등록 성공 시 (예: 피드 새로고침·스크롤) */
+  /** 수정할 글 — 넘기면 '수정' 모드로 열립니다 */
+  editing?: Post | null;
+  /** 등록·수정 성공 시 (예: 피드 새로고침·스크롤) */
   onPosted?: () => void;
 }
 
-export function ComposeSheet({ open, onClose, onPosted }: ComposeSheetProps) {
-  const { createPost, user, configured } = useApp();
+export function ComposeSheet({ open, onClose, editing = null, onPosted }: ComposeSheetProps) {
+  const { createPost, updatePost, user, configured, isAdmin } = useApp();
   const [category, setCategory] = useState<CategoryId>("review");
   const [seatZone, setSeatZone] = useState("");
   const [body, setBody] = useState("");
   const [submitting, setSubmitting] = useState(false);
+
+  // 열 때마다 새 글 / 수정할 글로 채웁니다.
+  useEffect(() => {
+    if (!open) return;
+    setCategory(editing?.category ?? "review");
+    setSeatZone(editing?.seatZone ?? "");
+    setBody(editing?.body ?? "");
+    setSubmitting(false);
+  }, [open, editing]);
 
   /** 소통해요·굿즈에서는 좌석 항목을 숨기고 저장도 하지 않는다 */
   const withSeat = SEAT_CATEGORY_IDS.includes(category);
@@ -34,12 +45,15 @@ export function ComposeSheet({ open, onClose, onPosted }: ComposeSheetProps) {
     const text = body.trim();
     if (!text) return;
     setSubmitting(true);
-    const ok = await createPost({
+    const input = {
       category,
       body: text,
       seatZone: seatCode,
       seatDetail: seatCode ? zoneFullName(seatCode) : null,
-    });
+    };
+    const ok = editing
+      ? await updatePost(editing.id, input)
+      : await createPost(input);
     setSubmitting(false);
     if (ok) {
       setBody("");
@@ -50,7 +64,11 @@ export function ComposeSheet({ open, onClose, onPosted }: ComposeSheetProps) {
   };
 
   return (
-    <Sheet open={open} title="새 글 쓰기" onClose={onClose}>
+    <Sheet
+      open={open}
+      title={editing ? "글 수정" : "새 글 쓰기"}
+      onClose={onClose}
+    >
       <span className="text-xs font-extrabold text-ink-2">카테고리</span>
       <div className="flex flex-wrap gap-1.5">
         {WRITE_CATEGORIES.map((c) => (
@@ -107,11 +125,17 @@ export function ComposeSheet({ open, onClose, onPosted }: ComposeSheetProps) {
         {body.length} / 300
       </div>
 
-      {configured && !user && (
+      {configured && !user && !editing && (
         <p className="rounded-[11px] bg-brand-50 px-3 py-2.5 text-[11.5px] leading-relaxed text-brand">
           등록하면 구글 로그인을 먼저 요청해요. 지금 데모 모드라면 바로 등록됩니다.
         </p>
       )}
+
+      {editing && !editing.mine && isAdmin ? (
+        <p className="rounded-[11px] bg-[#FFF7E8] px-3 py-2.5 text-[11.5px] leading-relaxed text-[#B54708]">
+          마스터 권한으로 다른 직관러의 글을 수정합니다.
+        </p>
+      ) : null}
 
       <div className="flex gap-2 pt-0.5">
         <button
@@ -127,7 +151,7 @@ export function ComposeSheet({ open, onClose, onPosted }: ComposeSheetProps) {
           disabled={!body.trim() || submitting}
           className="flex-1 rounded-[13px] bg-brand py-3 text-[13px] font-extrabold text-white shadow-brand disabled:bg-[#E4E7EC] disabled:text-ink-faint disabled:shadow-none"
         >
-          {submitting ? "등록 중…" : "등록하기"}
+          {submitting ? "저장 중…" : editing ? "수정 완료" : "등록하기"}
         </button>
       </div>
     </Sheet>

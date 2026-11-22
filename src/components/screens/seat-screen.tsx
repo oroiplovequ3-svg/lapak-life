@@ -11,6 +11,7 @@ import {
   type PhotoLightboxState,
 } from "@/components/photo-gallery";
 import { useApp } from "@/components/providers/app-provider";
+import { ReviewSheet } from "@/components/review-sheet";
 import { SeatMap } from "@/components/seat-map";
 import {
   ZONE_BY_CODE,
@@ -19,6 +20,7 @@ import {
   zoneFullName,
 } from "@/lib/data/zones";
 import { formatRelativeTime } from "@/lib/utils";
+import type { ZoneReview } from "@/lib/types";
 
 interface SeatScreenProps {
   /** 지금 고른 구역 코드 ('all' 이면 전체 구역 · 검색에서도 같은 값을 씁니다) */
@@ -39,9 +41,11 @@ export function SeatScreen({
   focusNonce = 0,
   onWriteReview,
 }: SeatScreenProps) {
-  const { zones, reviews, saves, toggleSaveZone, deleteReview } = useApp();
+  const { zones, reviews, saves, toggleSaveZone, deleteReview, isAdmin } = useApp();
   const selected = selectedZone;
   const [pickerOpen, setPickerOpen] = useState(false);
+  /** 수정 중인 후기 (있으면 수정 시트를 엽니다) */
+  const [editingReview, setEditingReview] = useState<ZoneReview | null>(null);
   const [lightbox, setLightbox] = useState<PhotoLightboxState | null>(null);
   const pickerRef = useRef<HTMLElement | null>(null);
   const listRef = useRef<HTMLDivElement | null>(null);
@@ -431,13 +435,18 @@ export function SeatScreen({
                   </div>
                 </div>
                 <Stars value={review.stars} />
-                {review.mine ? (
-                  <DeleteButton
-                    what="후기"
-                    size={14}
-                    onDelete={() => deleteReview(review.id)}
-                    className="ml-[-2px]"
-                  />
+                {review.mine || isAdmin ? (
+                  <span className="ml-[-2px] flex flex-none items-center">
+                    <button
+                      type="button"
+                      aria-label="후기 수정"
+                      onClick={() => setEditingReview(review)}
+                      className="rounded-lg p-1.5 text-[#C4CBD6] transition hover:text-brand"
+                    >
+                      <Icon name="edit" size={14} />
+                    </button>
+                    <DeleteButton what="후기" size={14} onDelete={() => deleteReview(review.id)} />
+                  </span>
                 ) : null}
               </div>
               <p className="mt-[9px] break-keep text-[13.5px] leading-relaxed text-[#1D2939]">
@@ -490,6 +499,13 @@ export function SeatScreen({
           label="후기 사진"
         />
       ) : null}
+
+      <ReviewSheet
+        open={Boolean(editingReview)}
+        onClose={() => setEditingReview(null)}
+        editing={editingReview}
+        onPosted={(zoneCode) => onSelectZone(zoneCode)}
+      />
     </div>
   );
 }

@@ -4,6 +4,7 @@ import Image from "next/image";
 import { useEffect, useMemo, useState } from "react";
 
 import { Avatar } from "@/components/avatar";
+import { ComposeSheet } from "@/components/compose-sheet";
 import { DeleteButton } from "@/components/delete-button";
 import { Icon } from "@/components/icons";
 import { PostMedia } from "@/components/media-illustration";
@@ -13,7 +14,35 @@ import { isSupabaseConfigured } from "@/lib/supabase/config";
 import { formatRelativeTime } from "@/lib/utils";
 import type { Comment, Post } from "@/lib/types";
 
-function CommentRow({ comment, onDelete }: { comment: Comment; onDelete: () => void }) {
+function CommentRow({
+  comment,
+  canManage,
+  onSave,
+  onDelete,
+}: {
+  comment: Comment;
+  /** 본인 댓글이거나 마스터 */
+  canManage: boolean;
+  onSave: (body: string) => Promise<boolean>;
+  onDelete: () => void;
+}) {
+  const [editing, setEditing] = useState(false);
+  const [draft, setDraft] = useState(comment.body);
+  const [saving, setSaving] = useState(false);
+
+  useEffect(() => {
+    if (!editing) setDraft(comment.body);
+  }, [comment.body, editing]);
+
+  const save = async () => {
+    const text = draft.trim();
+    if (!text || saving) return;
+    setSaving(true);
+    const ok = await onSave(text);
+    setSaving(false);
+    if (ok) setEditing(false);
+  };
+
   return (
     <div className="flex items-start gap-[7px]">
       <Avatar
@@ -22,33 +51,84 @@ function CommentRow({ comment, onDelete }: { comment: Comment; onDelete: () => v
         size={25}
         className="bg-brand-50 text-[10.5px] text-brand"
       />
-      <div className="flex min-w-0 flex-1 items-start gap-1">
-        <p className="min-w-0 flex-1 break-keep pt-px text-[12.5px] leading-relaxed text-ink-2">
-          <span className="mr-[5px] text-xs font-extrabold text-ink">{comment.nickname}</span>
-          {comment.body}
-        </p>
-        {comment.mine ? (
-          <DeleteButton
-            what="댓글"
-            size={12}
-            onDelete={onDelete}
-            className="mt-[-4px]"
+      {editing ? (
+        <div className="flex min-w-0 flex-1 flex-col gap-1.5">
+          <input
+            value={draft}
+            maxLength={300}
+            autoFocus
+            onChange={(event) => setDraft(event.target.value)}
+            onKeyDown={(event) => {
+              if (event.key === "Enter") {
+                event.preventDefault();
+                void save();
+              }
+              if (event.key === "Escape") setEditing(false);
+            }}
+            className="w-full rounded-xl border border-[#C7D7F0] bg-white px-3 py-[8px] text-[12.5px] text-ink outline-none"
           />
-        ) : null}
-      </div>
+          <div className="flex justify-end gap-1">
+            <button
+              type="button"
+              onClick={() => setEditing(false)}
+              className="rounded-[9px] bg-[#F3F5F9] px-2.5 py-1 text-[10.5px] font-extrabold text-ink-muted"
+            >
+              취소
+            </button>
+            <button
+              type="button"
+              onClick={() => void save()}
+              disabled={!draft.trim() || saving}
+              className="rounded-[9px] bg-brand px-2.5 py-1 text-[10.5px] font-extrabold text-white disabled:bg-[#E4E7EC] disabled:text-ink-faint"
+            >
+              {saving ? "저장 중" : "저장"}
+            </button>
+          </div>
+        </div>
+      ) : (
+        <div className="flex min-w-0 flex-1 items-start gap-1">
+          <p className="min-w-0 flex-1 break-keep pt-px text-[12.5px] leading-relaxed text-ink-2">
+            <span className="mr-[5px] text-xs font-extrabold text-ink">{comment.nickname}</span>
+            {comment.body}
+          </p>
+          {canManage ? (
+            <span className="flex flex-none items-center">
+              <button
+                type="button"
+                aria-label="댓글 수정"
+                onClick={() => setEditing(true)}
+                className="rounded-lg p-1.5 text-[#C4CBD6] transition hover:text-brand"
+              >
+                <Icon name="edit" size={12} />
+              </button>
+              <DeleteButton what="댓글" size={12} onDelete={onDelete} className="mt-[-4px]" />
+            </span>
+          ) : null}
+        </div>
+      )}
     </div>
   );
 }
 
-function PostCard({ post, highlight }: { post: Post; highlight?: boolean }) {
+function PostCard({
+  post,
+  highlight,
+  onEdit,
+}: {
+  post: Post;
+  highlight?: boolean;
+  onEdit: () => void;
+}) {
   const {
     toggleLike,
     loadComments,
     addComment,
+    updateComment,
     deletePost,
     deleteComment,
     commentsByPost,
     commentsLoaded,
+    isAdmin,
   } = useApp();
   const [open, setOpen] = useState(false);
   const [draft, setDraft] = useState("");
@@ -56,6 +136,7 @@ function PostCard({ post, highlight }: { post: Post; highlight?: boolean }) {
   const [pop, setPop] = useState(false);
 
   const comments = commentsByPost[post.id] ?? [];
+  const canManage = post.mine || isAdmin;
 
   const toggle = () => {
     setOpen((prev) => !prev);
@@ -112,13 +193,18 @@ function PostCard({ post, highlight }: { post: Post; highlight?: boolean }) {
         >
           {categoryOf(post.category).label}
         </span>
-        {post.mine ? (
-          <DeleteButton
-            what="글"
-            size={14}
-            onDelete={() => deletePost(post.id)}
-            className="ml-[-2px]"
-          />
+        {canManage ? (
+          <span className="ml-[-2px] flex flex-none items-center">
+            <button
+              type="button"
+              aria-label="글 수정"
+              onClick={onEdit}
+              className="rounded-lg p-1.5 text-[#C4CBD6] transition hover:text-brand"
+            >
+              <Icon name="edit" size={14} />
+            </button>
+            <DeleteButton what="글" size={14} onDelete={() => deletePost(post.id)} />
+          </span>
         ) : null}
       </div>
 
@@ -167,6 +253,8 @@ function PostCard({ post, highlight }: { post: Post; highlight?: boolean }) {
             <CommentRow
               key={comment.id}
               comment={comment}
+              canManage={comment.mine || isAdmin}
+              onSave={(body) => updateComment(post.id, comment.id, body)}
               onDelete={() => void deleteComment(post.id, comment.id)}
             />
           ))}
@@ -209,6 +297,8 @@ export function HomeScreen({ onCompose, highlightedPostId, onGoSeat, onGoFood }:
   const { posts, ready, loadError } = useApp();
   const [filter, setFilter] = useState<FilterId>("all");
   const [bannerClosed, setBannerClosed] = useState(false);
+  /** 수정 중인 글 (있으면 수정 시트를 엽니다) */
+  const [editingPost, setEditingPost] = useState<Post | null>(null);
 
   // 검색·내 글에서 특정 글로 들어오면, 지금 고른 카테고리에 가려 보이지 않는 일이 없도록
   // 전체 필터로 돌려 놓습니다.
@@ -334,6 +424,7 @@ export function HomeScreen({ onCompose, highlightedPostId, onGoSeat, onGoFood }:
               key={post.id}
               post={post}
               highlight={highlightedPostId === post.id}
+              onEdit={() => setEditingPost(post)}
             />
           ))
         ) : (
@@ -359,6 +450,12 @@ export function HomeScreen({ onCompose, highlightedPostId, onGoSeat, onGoFood }:
       >
         <Icon name="plus" size={24} strokeWidth={2.2} />
       </button>
+
+      <ComposeSheet
+        open={Boolean(editingPost)}
+        onClose={() => setEditingPost(null)}
+        editing={editingPost}
+      />
     </div>
   );
 }

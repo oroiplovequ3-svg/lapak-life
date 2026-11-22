@@ -54,10 +54,15 @@ function SectionHead({
 
 function UserFoodCard({
   food,
+  canManage,
+  onEdit,
   onDelete,
   onOpenPhoto,
 }: {
   food: UserFood;
+  /** 본인 맛집이거나 마스터 */
+  canManage: boolean;
+  onEdit: () => void;
   onDelete: () => void;
   onOpenPhoto: (index: number) => void;
 }) {
@@ -100,8 +105,18 @@ function UserFoodCard({
             </div>
           ) : null}
         </div>
-        {food.mine ? (
-          <DeleteButton what="맛집" size={13} onDelete={onDelete} />
+        {canManage ? (
+          <span className="flex flex-none items-center">
+            <button
+              type="button"
+              aria-label="맛집 수정"
+              onClick={onEdit}
+              className="rounded-lg p-1.5 text-[#C4CBD6] transition hover:text-brand"
+            >
+              <Icon name="edit" size={13} />
+            </button>
+            <DeleteButton what="맛집" size={13} onDelete={onDelete} />
+          </span>
         ) : null}
       </div>
       <PhotoTiles
@@ -116,9 +131,14 @@ function UserFoodCard({
 
 function UserParkingCard({
   parking,
+  canManage,
+  onEdit,
   onDelete,
 }: {
   parking: UserParking;
+  /** 본인 팁이거나 마스터 */
+  canManage: boolean;
+  onEdit: () => void;
   onDelete: () => void;
 }) {
   return (
@@ -156,8 +176,18 @@ function UserParkingCard({
             </div>
           ) : null}
         </div>
-        {parking.mine ? (
-          <DeleteButton what="주차 팁" size={13} onDelete={onDelete} />
+        {canManage ? (
+          <span className="flex flex-none items-center">
+            <button
+              type="button"
+              aria-label="주차 팁 수정"
+              onClick={onEdit}
+              className="rounded-lg p-1.5 text-[#C4CBD6] transition hover:text-brand"
+            >
+              <Icon name="edit" size={13} />
+            </button>
+            <DeleteButton what="주차 팁" size={13} onDelete={onDelete} />
+          </span>
         ) : null}
       </div>
     </article>
@@ -478,13 +508,23 @@ function FoodCard({ food }: { food: Food }) {
 }
 
 export function FoodScreen({ focus }: { focus?: FoodFocus | null }) {
-  const { foods, userFoods, userParkings, deleteUserFood, deleteUserParking } = useApp();
+  const {
+    foods,
+    userFoods,
+    userParkings,
+    deleteUserFood,
+    deleteUserParking,
+    isAdmin,
+  } = useApp();
   const [segment, setSegment] = useState<"food" | "parking">("food");
   const [tab, setTab] = useState<FoodTab>("all");
   const [filter, setFilter] = useState<FoodFilter>("all");
   const [picked, setPicked] = useState<string>("all");
   const [foodSheetOpen, setFoodSheetOpen] = useState(false);
   const [parkingSheetOpen, setParkingSheetOpen] = useState(false);
+  /** 수정 중인 맛집·주차 팁 (있으면 수정 시트를 엽니다) */
+  const [editingFood, setEditingFood] = useState<UserFood | null>(null);
+  const [editingParking, setEditingParking] = useState<UserParking | null>(null);
   const [lightbox, setLightbox] = useState<PhotoLightboxState | null>(null);
 
   // 검색에서 특정 매장·맛집·주차 항목을 골라 들어오면 그 카드가 바로 보이게 맞춰요.
@@ -637,6 +677,8 @@ export function FoodScreen({ focus }: { focus?: FoodFocus | null }) {
                 <UserParkingCard
                   key={parking.id}
                   parking={parking}
+                  canManage={parking.mine || isAdmin}
+                  onEdit={() => setEditingParking(parking)}
                   onDelete={() => void deleteUserParking(parking.id)}
                 />
               ))}
@@ -736,6 +778,8 @@ export function FoodScreen({ focus }: { focus?: FoodFocus | null }) {
                     <UserFoodCard
                       key={food.id}
                       food={food}
+                      canManage={food.mine || isAdmin}
+                      onEdit={() => setEditingFood(food)}
                       onDelete={() => void deleteUserFood(food.id)}
                       onOpenPhoto={(index) =>
                         setLightbox({ urls: food.photoUrls ?? [], index })
@@ -785,10 +829,21 @@ export function FoodScreen({ focus }: { focus?: FoodFocus | null }) {
         </>
       )}
 
-      <UserFoodSheet open={foodSheetOpen} onClose={() => setFoodSheetOpen(false)} />
+      <UserFoodSheet
+        open={foodSheetOpen || Boolean(editingFood)}
+        onClose={() => {
+          setFoodSheetOpen(false);
+          setEditingFood(null);
+        }}
+        editing={editingFood}
+      />
       <UserParkingSheet
-        open={parkingSheetOpen}
-        onClose={() => setParkingSheetOpen(false)}
+        open={parkingSheetOpen || Boolean(editingParking)}
+        onClose={() => {
+          setParkingSheetOpen(false);
+          setEditingParking(null);
+        }}
+        editing={editingParking}
       />
 
       {lightbox ? (

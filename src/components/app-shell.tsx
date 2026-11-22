@@ -7,6 +7,7 @@ import { ComposeSheet } from "@/components/compose-sheet";
 import { GameSheet } from "@/components/game-sheet";
 import { Icon, type IconName } from "@/components/icons";
 import { LoginPromptSheet } from "@/components/login-prompt-sheet";
+import { useApp } from "@/components/providers/app-provider";
 import { ReviewSheet } from "@/components/review-sheet";
 import { SearchSheet } from "@/components/search-sheet";
 import { SettingsSheet } from "@/components/settings-sheet";
@@ -40,6 +41,7 @@ const SUBS: Record<Tab, string> = {
 };
 
 export function AppShell() {
+  const { isAdmin } = useApp();
   const [tab, setTab] = useState<Tab>("home");
   const [composeOpen, setComposeOpen] = useState(false);
   const [reviewOpen, setReviewOpen] = useState(false);
@@ -101,9 +103,16 @@ export function AppShell() {
             className="h-[36px] w-[36px] flex-none rounded-full border-[1.5px] border-brand-100 bg-brand-50 object-cover shadow-[0_2px_8px_rgba(7,76,161,.24)]"
           />
           <div className="flex min-w-0 flex-col">
-            <span className="text-lg font-extrabold leading-[1.15] tracking-tight3">
-              {TITLES[tab]}
-            </span>
+            <div className="flex items-center gap-1.5">
+              <span className="text-lg font-extrabold leading-[1.15] tracking-tight3">
+                {TITLES[tab]}
+              </span>
+              {isAdmin ? (
+                <span className="rounded-[6px] bg-[#0F172A] px-[5px] py-[2px] text-[8.5px] font-extrabold leading-none tracking-[.12em] text-[#FFD77A]">
+                  MASTER
+                </span>
+              ) : null}
+            </div>
             <span className="mt-0.5 text-[10.5px] font-semibold tracking-tight text-ink-faint">
               {SUBS[tab]}
             </span>

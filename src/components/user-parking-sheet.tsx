@@ -1,18 +1,21 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 
 import { useApp } from "@/components/providers/app-provider";
 import { Sheet } from "@/components/sheet";
+import type { UserParking } from "@/lib/types";
 
 interface UserParkingSheetProps {
   open: boolean;
   onClose: () => void;
+  /** 수정할 주차 팁 — 넘기면 '수정' 모드로 열립니다 */
+  editing?: UserParking | null;
 }
 
 /** 맛집·주차 → 직관러 주차 팁 등록 바텀시트 */
-export function UserParkingSheet({ open, onClose }: UserParkingSheetProps) {
-  const { addUserParking } = useApp();
+export function UserParkingSheet({ open, onClose, editing = null }: UserParkingSheetProps) {
+  const { addUserParking, updateUserParking, isAdmin } = useApp();
   const [name, setName] = useState("");
   const [location, setLocation] = useState("");
   const [isFree, setIsFree] = useState(true);
@@ -22,6 +25,18 @@ export function UserParkingSheet({ open, onClose }: UserParkingSheetProps) {
   const [submitting, setSubmitting] = useState(false);
 
   const valid = name.trim().length >= 1;
+
+  // 열 때마다 새 주차 팁 / 수정할 팁으로 채웁니다.
+  useEffect(() => {
+    if (!open) return;
+    setName(editing?.name ?? "");
+    setLocation(editing?.location ?? "");
+    setIsFree(editing?.isFree ?? true);
+    setFeeNote(editing?.feeNote ?? "");
+    setWalkTime(editing?.walkTime ?? "");
+    setTip(editing?.tip ?? "");
+    setSubmitting(false);
+  }, [open, editing]);
 
   const reset = () => {
     setName("");
@@ -35,23 +50,30 @@ export function UserParkingSheet({ open, onClose }: UserParkingSheetProps) {
   const submit = async () => {
     if (!valid || submitting) return;
     setSubmitting(true);
-    const ok = await addUserParking({
+    const input = {
       name: name.trim(),
       location: location.trim(),
       isFree,
       feeNote: isFree ? "" : feeNote.trim(),
       walkTime: walkTime.trim(),
       tip: tip.trim(),
-    });
+    };
+    const ok = editing
+      ? await updateUserParking(editing.id, input)
+      : await addUserParking(input);
     setSubmitting(false);
     if (ok) {
-      reset();
+      if (!editing) reset();
       onClose();
     }
   };
 
   return (
-    <Sheet open={open} title="직관러 주차 팁 추가" onClose={onClose}>
+    <Sheet
+      open={open}
+      title={editing ? "직관러 주차 팁 수정" : "직관러 주차 팁 추가"}
+      onClose={onClose}
+    >
       <span className="text-xs font-extrabold text-ink-2">장소 이름</span>
       <input
         value={name}
@@ -144,9 +166,15 @@ export function UserParkingSheet({ open, onClose }: UserParkingSheetProps) {
           disabled={!valid || submitting}
           className="flex-1 rounded-[13px] bg-brand py-3 text-[13px] font-extrabold text-white shadow-brand disabled:bg-[#E4E7EC] disabled:text-ink-faint disabled:shadow-none"
         >
-          {submitting ? "등록 중…" : "주차 팁 등록"}
+          {submitting ? "저장 중…" : editing ? "수정 완료" : "주차 팁 등록"}
         </button>
       </div>
+
+      {editing && !editing.mine && isAdmin ? (
+        <p className="break-keep text-[10.5px] font-bold leading-relaxed text-[#B54708]">
+          마스터 권한으로 다른 직관러의 주차 팁을 수정합니다.
+        </p>
+      ) : null}
     </Sheet>
   );
 }

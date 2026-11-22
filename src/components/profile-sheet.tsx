@@ -8,6 +8,7 @@ import { useApp } from "@/components/providers/app-provider";
 import { useToast } from "@/components/providers/toast-provider";
 import { Sheet } from "@/components/sheet";
 import { formatPhotoSize, prepareAvatar, type PreparedPhoto } from "@/lib/image";
+import { NICKNAME_TAKEN_MESSAGE } from "@/lib/repo/types";
 
 interface ProfileSheetProps {
   open: boolean;
@@ -19,7 +20,7 @@ const NICKNAME_MAX = 16;
 
 /** 프로필 설정 — 프로필 사진 변경 · 닉네임 정하기 */
 export function ProfileSheet({ open, onClose }: ProfileSheetProps) {
-  const { profile, repoMode, updateProfile } = useApp();
+  const { profile, repoMode, updateProfile, isNicknameAvailable } = useApp();
   const toast = useToast();
   const fileRef = useRef<HTMLInputElement>(null);
 
@@ -28,6 +29,10 @@ export function ProfileSheet({ open, onClose }: ProfileSheetProps) {
   const [clearPhoto, setClearPhoto] = useState(false);
   const [busy, setBusy] = useState(false);
   const [saving, setSaving] = useState(false);
+  /** 이미 누가 쓰는 이름일 때 보여 주는 안내 */
+  const [taken, setTaken] = useState<string | null>(null);
+  const [checkingName, setCheckingName] = useState(false);
+  const nameCheckSeq = useRef(0);
 
   // 시트를 열 때마다 지금 프로필로 채웁니다.
   useEffect(() => {
@@ -37,10 +42,34 @@ export function ProfileSheet({ open, onClose }: ProfileSheetProps) {
     setClearPhoto(false);
     setBusy(false);
     setSaving(false);
+    setTaken(null);
+    setCheckingName(false);
   }, [open, profile.nickname]);
 
   const trimmed = nickname.trim();
   const lengthOk = trimmed.length >= NICKNAME_MIN && trimmed.length <= NICKNAME_MAX;
+  const sameAsMine = trimmed.toLowerCase() === profile.nickname.trim().toLowerCase();
+
+  // 입력을 잠깐 멈추면 중복 여부를 먼저 확인해 둡니다. (저장하기 전에 미리 알려 주려고)
+  useEffect(() => {
+    if (!open) return;
+    if (!lengthOk || sameAsMine) {
+      nameCheckSeq.current += 1;
+      setTaken(null);
+      setCheckingName(false);
+      return;
+    }
+    const seq = ++nameCheckSeq.current;
+    const timer = window.setTimeout(() => {
+      setCheckingName(true);
+      void isNicknameAvailable(trimmed).then((available) => {
+        if (seq !== nameCheckSeq.current) return;
+        setTaken(available ? null : NICKNAME_TAKEN_MESSAGE);
+        setCheckingName(false);
+      });
+    }, 400);
+    return () => window.clearTimeout(timer);
+  }, [open, trimmed, lengthOk, sameAsMine, isNicknameAvailable]);
   const previewUrl = clearPhoto ? null : (photo?.dataUrl ?? profile.avatarUrl);
   const changed =
     trimmed !== profile.nickname || Boolean(photo) || (clearPhoto && Boolean(profile.avatarUrl));
@@ -75,6 +104,19 @@ export function ProfileSheet({ open, onClose }: ProfileSheetProps) {
     if (!changed) {
       onClose();
       return;
+    }
+
+    // 저장 직전에 한 번 더 확인 — 입력하는 동안 누가 먼저 가져갔을 수 있어요.
+    if (!sameAsMine) {
+      setSaving(true);
+      const available = await isNicknameAvailable(trimmed);
+      setSaving(false);
+      if (!available) {
+        setTaken(NICKNAME_TAKEN_MESSAGE);
+        setCheckingName(false);
+        toast(NICKNAME_TAKEN_MESSAGE);
+        return;
+      }
     }
 
     setSaving(true);
@@ -169,14 +211,18 @@ export function ProfileSheet({ open, onClose }: ProfileSheetProps) {
       />
       <p
         className={`-mt-2 break-keep text-[10.5px] leading-relaxed ${
-          lengthOk ? "text-[#AEB6C2]" : "text-[#B42318]"
+          taken ? "font-bold text-[#B42318]" : lengthOk ? "text-[#AEB6C2]" : "text-[#B42318]"
         }`}
       >
-        {trimmed.length < NICKNAME_MIN
-          ? `닉네임은 ${NICKNAME_MIN}자 이상 입력해 주세요.`
-          : trimmed.length > NICKNAME_MAX
-            ? `닉네임은 ${NICKNAME_MAX}자까지 쓸 수 있어요.`
-            : "글·댓글·후기·맛집에 이 이름과 사진으로 표시돼요."}
+        {taken
+          ? taken
+          : trimmed.length < NICKNAME_MIN
+            ? `닉네임은 ${NICKNAME_MIN}자 이상 입력해 주세요.`
+            : trimmed.length > NICKNAME_MAX
+              ? `닉네임은 ${NICKNAME_MAX}자까지 쓸 수 있어요.`
+              : checkingName
+                ? "닉네임을 확인하는 중…"
+                : "글·댓글·후기·맛집에 이 이름과 사진으로 표시돼요."}
       </p>
 
       {repoMode === "demo" ? (
@@ -197,7 +243,7 @@ export function ProfileSheet({ open, onClose }: ProfileSheetProps) {
         <button
           type="button"
           onClick={() => void submit()}
-          disabled={!lengthOk || saving || busy}
+          disabled={!lengthOk || saving || busy || Boolean(taken)}
           className="flex-1 rounded-[13px] bg-brand py-3 text-[13px] font-extrabold text-white shadow-brand disabled:bg-[#E4E7EC] disabled:text-ink-faint disabled:shadow-none"
         >
           {saving ? "저장 중…" : "저장"}

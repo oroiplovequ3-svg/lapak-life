@@ -13,17 +13,26 @@ import {
   prepareReviewPhoto,
   type PreparedPhoto,
 } from "@/lib/image";
+import type { ZoneReview } from "@/lib/types";
 
 interface ReviewSheetProps {
   open: boolean;
   onClose: () => void;
   initialZone?: string;
+  /** 수정할 후기 — 넘기면 '수정' 모드로 열립니다 */
+  editing?: ZoneReview | null;
   /** 등록 후 이동할 구역 */
   onPosted?: (zoneCode: string) => void;
 }
 
-export function ReviewSheet({ open, onClose, initialZone = "T3", onPosted }: ReviewSheetProps) {
-  const { createReview } = useApp();
+export function ReviewSheet({
+  open,
+  onClose,
+  initialZone = "T3",
+  editing = null,
+  onPosted,
+}: ReviewSheetProps) {
+  const { createReview, updateReview, isAdmin } = useApp();
   const toast = useToast();
   const fileRef = useRef<HTMLInputElement>(null);
   const [zone, setZone] = useState(initialZone);
@@ -34,10 +43,36 @@ export function ReviewSheet({ open, onClose, initialZone = "T3", onPosted }: Rev
   const [busy, setBusy] = useState(false);
   const [submitting, setSubmitting] = useState(false);
 
-  // 시트를 열 때마다 지금 고른 구역이 미리 선택되게 맞춥니다.
+  // 시트를 열 때마다 수정할 후기 또는 지금 고른 구역으로 채웁니다.
   useEffect(() => {
-    if (open) setZone(initialZone);
-  }, [open, initialZone]);
+    if (!open) return;
+    if (editing) {
+      setZone(editing.zoneCode);
+      setSeatDetail(editing.seatDetail);
+      setStars(editing.stars);
+      setBody(editing.body);
+      setPhotos(
+        (editing.photoUrls ?? []).map((url, index) => ({
+          id: `keep-${index}`,
+          dataUrl: url,
+          width: 0,
+          height: 0,
+          bytes: 0,
+          name: `기존 사진 ${index + 1}`,
+        })),
+      );
+      setBusy(false);
+      setSubmitting(false);
+      return;
+    }
+    setZone(initialZone);
+    setSeatDetail("");
+    setStars(5);
+    setBody("");
+    setPhotos([]);
+    setBusy(false);
+    setSubmitting(false);
+  }, [open, initialZone, editing]);
 
   const reset = () => {
     setBody("");
@@ -50,16 +85,19 @@ export function ReviewSheet({ open, onClose, initialZone = "T3", onPosted }: Rev
     const text = body.trim();
     if (!text) return;
     setSubmitting(true);
-    const ok = await createReview({
+    const input = {
       zoneCode: zone,
       seatDetail: seatDetail.trim(),
       stars,
       body: text,
       photoUrls: photos.map((photo) => photo.dataUrl),
-    });
+    };
+    const ok = editing
+      ? await updateReview(editing.id, input)
+      : await createReview(input);
     setSubmitting(false);
     if (ok) {
-      reset();
+      if (!editing) reset();
       onClose();
       onPosted?.(zone);
     }
@@ -101,7 +139,11 @@ export function ReviewSheet({ open, onClose, initialZone = "T3", onPosted }: Rev
   const totalSize = photos.reduce((sum, photo) => sum + photo.bytes, 0);
 
   return (
-    <Sheet open={open} title="직관 시야 후기 쓰기" onClose={onClose}>
+    <Sheet
+      open={open}
+      title={editing ? "직관 시야 후기 수정" : "직관 시야 후기 쓰기"}
+      onClose={onClose}
+    >
       <span className="text-xs font-extrabold text-ink-2">구역</span>
       <div className="flex flex-wrap gap-1.5">
         {ZONE_ORDER.map((code) => (
@@ -184,7 +226,7 @@ export function ReviewSheet({ open, onClose, initialZone = "T3", onPosted }: Rev
               <Icon name="close" size={11} strokeWidth={2.8} />
             </button>
             <span className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/55 to-transparent px-1.5 pb-1 pt-3 text-[9px] font-bold text-white">
-              {formatPhotoSize(photo.bytes)}
+              {photo.bytes ? formatPhotoSize(photo.bytes) : "기존 사진"}
             </span>
           </div>
         ))}
@@ -227,6 +269,12 @@ export function ReviewSheet({ open, onClose, initialZone = "T3", onPosted }: Rev
         {photos.length ? ` 지금 ${formatPhotoSize(totalSize)}` : ""}
       </p>
 
+      {editing && !editing.mine && isAdmin ? (
+        <p className="break-keep text-[10.5px] font-bold leading-relaxed text-[#B54708]">
+          마스터 권한으로 다른 직관러의 후기를 수정합니다.
+        </p>
+      ) : null}
+
       <div className="flex gap-2 pt-0.5">
         <button
           type="button"
@@ -241,7 +289,7 @@ export function ReviewSheet({ open, onClose, initialZone = "T3", onPosted }: Rev
           disabled={!body.trim() || submitting || busy}
           className="flex-1 rounded-[13px] bg-brand py-3 text-[13px] font-extrabold text-white shadow-brand disabled:bg-[#E4E7EC] disabled:text-ink-faint disabled:shadow-none"
         >
-          {submitting ? "등록 중…" : "후기 등록"}
+          {submitting ? "저장 중…" : editing ? "수정 완료" : "후기 등록"}
         </button>
       </div>
     </Sheet>

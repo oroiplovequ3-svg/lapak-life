@@ -22,7 +22,7 @@ import type {
   ZoneReview,
 } from "@/lib/types";
 
-import type { Repository, SaveTargetType } from "./types";
+import { NICKNAME_TAKEN_MESSAGE, type Repository, type SaveTargetType } from "./types";
 
 /* ------------------------------------------------------------------ */
 /* PostgREST 응답은 중첩 조인(profiles)을 객체/배열 어느 쪽으로도 줄 수 있어
@@ -209,6 +209,14 @@ function fail(context: string, error: { message: string } | null): never {
   throw new Error(`${context}: ${error?.message ?? "알 수 없는 오류"}`);
 }
 
+/** 닉네임 유니크 인덱스에 걸린 오류인지 (23505 unique_violation) */
+function isDuplicateNicknameError(
+  error: { code?: string; message?: string } | null | undefined,
+): boolean {
+  if (!error) return false;
+  return error.code === "23505" || /duplicate key|unique constraint/i.test(error.message ?? "");
+}
+
 /**
  * 내가 쓴 행만 지우는 공통 경로.
  * RLS 가 막으면 에러 없이 0건이 지워지므로, 실제로 지워졌는지 확인까지 합니다.
@@ -255,6 +263,42 @@ export class SupabaseRepository implements Repository {
    * 사진은 브라우저에서 정사각형으로 줄인 data URL 을 avatars 버킷에 올리고
    * 공개 URL 을 avatar_url 에 넣습니다. (null 이면 기본 아바타로 되돌림)
    */
+  /**
+   * 닉네임 사용 가능 여부. 010 마이그레이션의 is_nickname_available() 과
+   * 유니크 인덱스가 같은 규칙(앞뒤 공백·대소문자 무시)으로 판단합니다.
+   */
+  async isNicknameAvailable(
+    nickname: string,
+    excludeUserId: string | null = null,
+  ): Promise<boolean> {
+    const candidate = nickname.trim();
+    if (!candidate) return false;
+
+    const { data, error } = await this.supabase.rpc("is_nickname_available", {
+      candidate,
+      exclude_id: excludeUserId,
+    });
+    if (!error) return data === true;
+
+    // 함수가 아직 없거나 RPC 를 못 부를 때: 같은 규칙으로 목록을 읽어 직접 비교합니다.
+    const { data: rows, error: listError } = await this.supabase
+      .from("profiles")
+      .select("id, nickname")
+      .limit(1000);
+    if (listError) return true; // 확인할 수 없으면 저장을 막지 않고 DB 제약이 최종 판단합니다.
+    const key = candidate.toLowerCase();
+    return !((rows ?? []) as AnyRow[]).some(
+      (row) => str(row.nickname).trim().toLowerCase() === key && str(row.id) !== excludeUserId,
+    );
+  }
+
+  /** 마스터(관리자) 계정인지 — 011 마이그레이션의 is_admin() */
+  async isAdmin(): Promise<boolean> {
+    const { data, error } = await this.supabase.rpc("is_admin");
+    if (error) return false;
+    return data === true;
+  }
+
   async updateProfile(input: ProfileUpdate, viewerId: string | null): Promise<Author> {
     if (!viewerId) throw new Error("로그인한 뒤에 프로필을 바꿀 수 있어요");
 
@@ -264,6 +308,10 @@ export class SupabaseRepository implements Repository {
     }
 
     const current = await this.loadProfile(viewerId);
+    if (nickname !== current.nickname) {
+      const available = await this.isNicknameAvailable(nickname, viewerId);
+      if (!available) throw new Error(NICKNAME_TAKEN_MESSAGE);
+    }
     let avatarUrl = current.avatarUrl;
 
     if (input.avatarDataUrl === null) {
@@ -278,7 +326,11 @@ export class SupabaseRepository implements Repository {
       .select("nickname, avatar_url")
       .single();
 
-    if (error || !data) fail("프로필을 저장하지 못했습니다", error);
+    if (error || !data) {
+      // 같은 이름이 동시에 저장된 경우 — DB 유니크 인덱스가 막아 줍니다.
+      if (isDuplicateNicknameError(error)) throw new Error(NICKNAME_TAKEN_MESSAGE);
+      fail("프로필을 저장하지 못했습니다", error);
+    }
 
     // 앱 밖(다른 기기·새 로그인)에서도 같은 이름·사진으로 먼저 그릴 수 있게
     // 세션 메타데이터도 맞춰 둡니다. 실패해도 profiles 가 기준입니다.
@@ -441,6 +493,29 @@ export class SupabaseRepository implements Repository {
     return { ...mapPost(row, author.id, new Set()), mine: true, badge: "나" };
   }
 
+  /** 글 수정 — 본인 글이거나 마스터일 때만 RLS 가 통과합니다. */
+  async updatePost(
+    postId: string,
+    input: NewPostInput,
+    viewerId: string | null,
+  ): Promise<Post> {
+    const { data, error } = await this.supabase
+      .from("posts")
+      .update({
+        category: input.category,
+        body: input.body,
+        seat_zone: input.seatZone,
+        seat_detail: input.seatDetail,
+      })
+      .eq("id", postId)
+      .select(POST_COLUMNS)
+      .maybeSingle();
+
+    if (error) fail("글을 수정하지 못했습니다", error);
+    if (!data) throw new Error("글을 수정하지 못했어요. 내가 쓴 글이 아니거나 권한이 없어요.");
+    return mapPost(data as AnyRow, viewerId, new Set());
+  }
+
   async deletePost(postId: string): Promise<void> {
     await deleteOwnRow(this.supabase, "posts", postId, "글을 삭제하지 못했습니다");
   }
@@ -493,6 +568,24 @@ export class SupabaseRepository implements Repository {
 
     if (error || !data) fail("댓글을 등록하지 못했습니다", error);
     return { ...mapComment(data as AnyRow, author.id), mine: true };
+  }
+
+  /** 댓글 수정 — 본인 댓글이거나 마스터일 때만 RLS 가 통과합니다. */
+  async updateComment(
+    commentId: string,
+    body: string,
+    viewerId: string | null,
+  ): Promise<Comment> {
+    const { data, error } = await this.supabase
+      .from("comments")
+      .update({ body })
+      .eq("id", commentId)
+      .select(COMMENT_COLUMNS)
+      .maybeSingle();
+
+    if (error) fail("댓글을 수정하지 못했습니다", error);
+    if (!data) throw new Error("댓글을 수정하지 못했어요. 내가 쓴 댓글이 아니거나 권한이 없어요.");
+    return mapComment(data as AnyRow, viewerId);
   }
 
   async deleteComment(commentId: string): Promise<void> {
@@ -566,6 +659,38 @@ export class SupabaseRepository implements Repository {
 
     if (error || !data) fail("시야 후기를 등록하지 못했습니다", error);
     return { ...mapReview(data as AnyRow, author.id), mine: true };
+  }
+
+  /** 시야 후기 수정 — 사진은 남길 URL + 새로 올린 사진으로 다시 채웁니다. */
+  async updateReview(
+    reviewId: string,
+    input: NewReviewInput,
+    viewerId: string | null,
+  ): Promise<ZoneReview> {
+    const incoming = input.photoUrls ?? [];
+    const kept = incoming.filter((url) => /^https?:\/\//i.test(url));
+    const fresh = incoming.filter((url) => !/^https?:\/\//i.test(url));
+    const uploaded = await this.uploadPhotos(REVIEW_PHOTO_BUCKET, fresh, viewerId);
+    const photoUrls = [...kept, ...uploaded].slice(0, 3);
+
+    const { data, error } = await this.supabase
+      .from("zone_reviews")
+      .update({
+        zone_code: input.zoneCode,
+        seat_detail: input.seatDetail,
+        rating: input.stars,
+        body: input.body,
+        photo_urls: photoUrls,
+      })
+      .eq("id", reviewId)
+      .select(REVIEW_COLUMNS)
+      .maybeSingle();
+
+    if (error) fail("시야 후기를 수정하지 못했습니다", error);
+    if (!data) {
+      throw new Error("후기를 수정하지 못했어요. 내가 쓴 후기가 아니거나 권한이 없어요.");
+    }
+    return mapReview(data as AnyRow, viewerId);
   }
 
   async deleteReview(reviewId: string): Promise<void> {
@@ -717,6 +842,38 @@ export class SupabaseRepository implements Repository {
     return { ...mapUserFood(data as AnyRow, author.id), mine: true };
   }
 
+  /** 직관러 맛집 수정 — 남길 사진 URL + 새로 올린 사진으로 photo_urls 를 다시 채웁니다. */
+  async updateUserFood(
+    foodId: string,
+    input: NewUserFoodInput,
+    viewerId: string | null,
+  ): Promise<UserFood> {
+    const incoming = input.photoUrls ?? [];
+    const kept = incoming.filter((url) => /^https?:\/\//i.test(url));
+    const fresh = incoming.filter((url) => !/^https?:\/\//i.test(url));
+    const uploaded = await this.uploadPhotos(USER_FOOD_PHOTO_BUCKET, fresh, viewerId);
+
+    const payload: Record<string, unknown> = {
+      name: input.name,
+      menu: input.menu,
+      tip: input.tip,
+      rating: input.rating,
+      is_inside: input.inStadium,
+    };
+    if (kept.length || uploaded.length) payload.photo_urls = [...kept, ...uploaded].slice(0, 3);
+
+    const { data, error } = await this.supabase
+      .from("user_foods")
+      .update(payload)
+      .eq("id", foodId)
+      .select(USER_FOOD_COLUMNS)
+      .maybeSingle();
+
+    if (error) fail("맛집을 수정하지 못했습니다", error);
+    if (!data) throw new Error("맛집을 수정하지 못했어요. 내가 쓴 맛집이 아니거나 권한이 없어요.");
+    return mapUserFood(data as AnyRow, viewerId);
+  }
+
   async deleteUserFood(foodId: string): Promise<void> {
     await deleteOwnRow(this.supabase, "user_foods", foodId, "맛집을 삭제하지 못했습니다");
   }
@@ -753,6 +910,32 @@ export class SupabaseRepository implements Repository {
 
     if (error || !data) fail("주차 팁을 등록하지 못했습니다", error);
     return { ...mapUserParking(data as AnyRow, author.id), mine: true };
+  }
+
+  async updateUserParking(
+    parkingId: string,
+    input: NewUserParkingInput,
+    viewerId: string | null,
+  ): Promise<UserParking> {
+    const { data, error } = await this.supabase
+      .from("user_parkings")
+      .update({
+        name: input.name,
+        location: input.location,
+        is_free: input.isFree,
+        fee_note: input.isFree ? "" : input.feeNote,
+        walk_time: input.walkTime,
+        tip: input.tip,
+      })
+      .eq("id", parkingId)
+      .select(USER_PARKING_COLUMNS)
+      .maybeSingle();
+
+    if (error) fail("주차 팁을 수정하지 못했습니다", error);
+    if (!data) {
+      throw new Error("주차 팁을 수정하지 못했어요. 내가 쓴 팁이 아니거나 권한이 없어요.");
+    }
+    return mapUserParking(data as AnyRow, viewerId);
   }
 
   async deleteUserParking(parkingId: string): Promise<void> {

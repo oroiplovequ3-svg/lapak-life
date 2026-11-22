@@ -33,6 +33,7 @@ export function MyScreen({ onOpenPost, onCompose, onAddGame }: MyScreenProps) {
     signInWithGoogle,
     signOut,
     signingIn,
+    isAdmin,
     games,
     saves,
     posts,
@@ -103,6 +104,11 @@ export function MyScreen({ onOpenPost, onCompose, onAddGame }: MyScreenProps) {
                 <span className="rounded-md bg-brand-50 px-[7px] py-[2.5px] text-[10px] font-extrabold text-brand-600">
                   직관러
                 </span>
+                {isAdmin ? (
+                  <span className="rounded-md bg-[#0F172A] px-[7px] py-[2.5px] text-[10px] font-extrabold tracking-wider text-[#FFD77A]">
+                    MASTER
+                  </span>
+                ) : null}
                 <span className="rounded-md bg-brand-50 px-[7px] py-[2.5px] text-[10px] font-extrabold text-brand-600">
                   직관 {games.length}회
                 </span>

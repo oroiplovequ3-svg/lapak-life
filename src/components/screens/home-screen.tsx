@@ -585,8 +585,8 @@ export function HomeScreen({ onCompose, highlightedPostId, onGoSeat, onGoFood }:
             src="/images/lapak-mascot-hero.png"
             alt=""
             aria-hidden
-            width={192}
-            height={260}
+            width={440}
+            height={543}
             className="pointer-events-none -mb-[7px] h-[124px] w-auto flex-none select-none drop-shadow-[0_10px_16px_rgba(3,20,50,.32)]"
           />
         </div>

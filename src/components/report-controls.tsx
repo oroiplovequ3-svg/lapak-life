@@ -1,10 +1,13 @@
 "use client";
 
 import { Icon } from "@/components/icons";
+import { useToast } from "@/components/providers/toast-provider";
 
 /**
  * 신고 관련 공통 UI.
  * - ReportButton: 모든 게시물에 붙는 신고 버튼 (1건 이상이면 "신고 N")
+ *   본인 글·마스터가 관리 중인 글에서도 항상 표시되며(0건이면 "신고 0"),
+ *   누르면 신고 시트 대신 누적 신고 현황만 안내합니다.
  * - HiddenBadge: 신고 10건 이상으로 자동 숨김된 콘텐츠임을 마스터에게 알리는 배지
  * - RestoreButton: 마스터가 숨김을 풀 때 누르는 버튼
  *
@@ -14,7 +17,11 @@ import { Icon } from "@/components/icons";
 export function ReportButton({
   count,
   onReport,
-  /** 내 글·마스터가 관리 중인 글이면 신고 버튼 대신 누적 수만 보여 줍니다 */
+  /**
+   * 내 글·마스터가 관리 중인 글 — 표시는 항상 하되(0건이면 "신고 0"),
+   * 누르면 신고 시트 대신 신고 현황만 알려 줍니다.
+   * (DB RLS 상 본인 글 신고는 막혀 있어 실제 신고 접수는 타인 글에서만 됩니다.)
+   */
   manage = false,
   size = "md",
   className = "",
@@ -25,21 +32,32 @@ export function ReportButton({
   size?: "sm" | "md";
   className?: string;
 }) {
-  const label = count > 0 ? `신고 ${count}` : "신고";
+  const toast = useToast();
+  const label = count > 0 ? `신고 ${count}` : manage ? "신고 0" : "신고";
   const scale =
     size === "sm"
       ? "px-1.5 py-1 text-[10px]"
       : "px-2 py-[5px] text-[10.5px]";
 
   if (manage) {
-    if (count <= 0) return null;
+    const hint = "본인·관리 중인 글은 신고할 수 없어요";
+    const message =
+      count > 0 ? `${hint} · 누적 신고 ${count}건` : `${hint} · 아직 신고 없음`;
     return (
-      <span
-        className={`inline-flex flex-none items-center gap-[3px] rounded-md bg-[#FEF3F2] font-extrabold text-[#B42318] ${scale} ${className}`}
+      <button
+        type="button"
+        onClick={() => toast(message)}
+        title="본인·관리 중인 글의 신고 현황"
+        aria-label={`신고 현황 ${count}건 (본인·관리 중인 글은 신고 불가)`}
+        className={`inline-flex flex-none items-center gap-[3px] rounded-md font-extrabold transition ${
+          count > 0
+            ? "bg-[#FEF3F2] text-[#B42318] hover:bg-[#FEE4E2]"
+            : "bg-[#F2F4F7] text-[#667085] hover:bg-[#EAECF0]"
+        } ${scale} ${className}`}
       >
         <Icon name="shield" size={11} strokeWidth={2.1} />
         {label}
-      </span>
+      </button>
     );
   }
 

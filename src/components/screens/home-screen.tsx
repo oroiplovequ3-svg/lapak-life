@@ -552,33 +552,38 @@ export function HomeScreen({ onCompose, highlightedPostId, onGoSeat, onGoFood }:
       )}
 
       <section className="relative overflow-hidden rounded-[22px] bg-gradient-to-br from-[#063E84] via-brand to-brand-500 px-[17px] pb-[15px] pt-[17px] text-white shadow-brand">
-        <Image
-          src="/images/lapak-mascot-hero.png"
-          alt=""
-          aria-hidden
-          width={192}
-          height={260}
-          className="pointer-events-none absolute bottom-[56px] right-2 h-[130px] w-auto select-none"
-        />
         <div className="pointer-events-none absolute -right-14 -top-[72px] h-[190px] w-[190px] rounded-full bg-white/[.18] blur-[1px]" />
         <div className="pointer-events-none absolute -bottom-20 -left-[30px] h-[170px] w-[170px] rounded-full border-[26px] border-white/[.06]" />
-        <div className="relative flex items-center gap-1.5 text-[11.5px] font-bold text-white/80">
-          <span className="inline-flex items-center gap-[5px] rounded-full bg-white/[.16] px-[9px] py-[3px] text-[10.5px] font-extrabold tracking-wide">
-            <i className="h-[5px] w-[5px] animate-blink rounded-full bg-[#5CE1A0] shadow-[0_0_0_3px_rgba(92,225,160,.22)]" />
-            2026 시즌
-          </span>
-          <span>라팍 · 오프시즌</span>
+        {/* 글과 마스코트를 한 줄에 두고, 마스코트 발끝을 글 마지막 줄에 맞춰 CTA 버튼 바로 위에 서게 합니다. */}
+        <div className="relative flex items-end gap-1.5">
+          <div className="min-w-0 flex-1">
+            <div className="flex items-center gap-1.5 text-[11.5px] font-bold text-white/80">
+              <span className="inline-flex items-center gap-[5px] rounded-full bg-white/[.16] px-[9px] py-[3px] text-[10.5px] font-extrabold tracking-wide">
+                <i className="h-[5px] w-[5px] animate-blink rounded-full bg-[#5CE1A0] shadow-[0_0_0_3px_rgba(92,225,160,.22)]" />
+                2026 시즌
+              </span>
+              <span>라팍 · 오프시즌</span>
+            </div>
+            <h2 className="mt-2.5 text-[22px] font-extrabold leading-[1.28] tracking-tight3">
+              12년 만의 정상,
+              <br />
+              <span className="text-[#FFD77A]">V9</span>의 계절이 끝났다
+            </h2>
+            <p className="mt-1.5 text-[12.5px] leading-relaxed text-white/80">
+              한국시리즈 4승 1패 · 정규시즌 2위
+              <br />
+              다음 시즌 직관 준비는 여기서 시작해요.
+            </p>
+          </div>
+          <Image
+            src="/images/lapak-mascot-hero.png"
+            alt=""
+            aria-hidden
+            width={192}
+            height={260}
+            className="pointer-events-none -mb-[7px] h-[124px] w-auto flex-none select-none drop-shadow-[0_10px_16px_rgba(3,20,50,.32)]"
+          />
         </div>
-        <h2 className="relative mt-2.5 text-[22px] font-extrabold leading-[1.28] tracking-tight3">
-          12년 만의 정상,
-          <br />
-          <span className="text-[#FFD77A]">V9</span>의 계절이 끝났다
-        </h2>
-        <p className="relative mt-1.5 text-[12.5px] leading-relaxed text-white/80">
-          한국시리즈 4승 1패 · 정규시즌 2위
-          <br />
-          다음 시즌 직관 준비는 여기서 시작해요.
-        </p>
         <div className="relative mt-3.5 flex gap-2">
           <button
             type="button"

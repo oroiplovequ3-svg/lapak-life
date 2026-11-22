@@ -9,19 +9,30 @@ export interface FeedFilter {
   bg: string;
 }
 
-/** 피드 카테고리 칩 (프로토타입 CATS 그대로) */
+/** 피드 카테고리 칩 (전체 · 직관후기 · 실시간현장 · 소통해요 · 굿즈 · 이벤트) */
 export const FEED_FILTERS: FeedFilter[] = [
   { id: "all", label: "전체", color: "#074CA1", bg: "#EEF4FD" },
   { id: "review", label: "직관후기", color: "#0A58CA", bg: "#EAF1FD" },
   { id: "live", label: "실시간현장", color: "#D92D20", bg: "#FEF3F2" },
   { id: "talk", label: "소통해요", color: "#039855", bg: "#ECFDF3" },
   { id: "goods", label: "굿즈", color: "#7A5AF8", bg: "#F4F3FF" },
+  { id: "event", label: "이벤트", color: "#C11574", bg: "#FDF2FA" },
 ];
 
 /** 글쓰기에서 고를 수 있는 카테고리 (전체 제외) */
 export const WRITE_CATEGORIES: Category[] = FEED_FILTERS.filter(
   (f): f is Category => f.id !== "all",
 );
+
+/** 마스터만 고를 수 있는 카테고리 — DB(018)의 RLS 도 같은 규칙으로 이벤트 글을 막습니다 */
+export const ADMIN_ONLY_CATEGORY_IDS: CategoryId[] = ["event"];
+
+/** 글쓰기 시트에 실제로 보여 줄 카테고리 — 마스터에게만 이벤트가 함께 보입니다 */
+export function writeCategoriesFor(isAdmin: boolean): Category[] {
+  return WRITE_CATEGORIES.filter(
+    (category) => isAdmin || !ADMIN_ONLY_CATEGORY_IDS.includes(category.id),
+  );
+}
 
 /** 예전 카테고리 값 → 지금 값 (질문·굿즈·티켓 개편 전 데이터 대비) */
 const LEGACY_CATEGORY_IDS: Record<string, CategoryId> = {

@@ -652,8 +652,17 @@ export function HomeScreen({ onCompose, highlightedPostId, onGoSeat, onGoFood }:
           ))
         ) : (
           <div className="rounded-md2 border border-dashed border-[#D9DEE7] bg-[#FBFCFE] px-4 py-[22px] text-center">
-            <div className="mb-[7px] text-[26px]">💬</div>
-            {posts.length > 0 ? (
+            <div className="mb-[7px] text-[26px]">{filter === "event" ? "🎉" : "💬"}</div>
+            {filter === "event" ? (
+              <>
+                <p className="text-[13px] font-extrabold text-ink-2">
+                  아직 등록된 이벤트가 없어요
+                </p>
+                <p className="mt-1 text-[11.5px] leading-relaxed text-ink-faint">
+                  이벤트 소식이 준비되면 운영자가 이곳에 올려드릴게요.
+                </p>
+              </>
+            ) : posts.length > 0 ? (
               <>
                 <p className="text-[13px] font-extrabold text-ink-2">
                   이 카테고리에 아직 글이 없어요

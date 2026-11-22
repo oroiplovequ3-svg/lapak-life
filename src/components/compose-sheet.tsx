@@ -6,7 +6,7 @@ import { Icon } from "@/components/icons";
 import { useApp } from "@/components/providers/app-provider";
 import { useToast } from "@/components/providers/toast-provider";
 import { Sheet } from "@/components/sheet";
-import { WRITE_CATEGORIES } from "@/lib/data/categories";
+import { writeCategoriesFor } from "@/lib/data/categories";
 import { zoneFullName, ZONE_ORDER } from "@/lib/data/zones";
 import {
   MAX_POST_PHOTOS,
@@ -33,6 +33,8 @@ export function ComposeSheet({ open, onClose, editing = null, onPosted }: Compos
   const toast = useToast();
   const fileRef = useRef<HTMLInputElement>(null);
   const [category, setCategory] = useState<CategoryId>("review");
+  /** 마스터만 이벤트를 고를 수 있습니다 (DB RLS 도 같은 규칙) */
+  const categories = writeCategoriesFor(isAdmin);
   const [seatZone, setSeatZone] = useState("");
   const [body, setBody] = useState("");
   const [photos, setPhotos] = useState<PreparedPhoto[]>([]);
@@ -135,7 +137,7 @@ export function ComposeSheet({ open, onClose, editing = null, onPosted }: Compos
     >
       <span className="text-xs font-extrabold text-ink-2">카테고리</span>
       <div className="flex flex-wrap gap-1.5">
-        {WRITE_CATEGORIES.map((c) => (
+        {categories.map((c) => (
           <button
             key={c.id}
             type="button"

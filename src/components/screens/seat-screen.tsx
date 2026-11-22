@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 
 import { Avatar } from "@/components/avatar";
 import { DeleteButton } from "@/components/delete-button";
@@ -36,6 +36,50 @@ interface SeatScreenProps {
 /** '전체 구역'에서 후기를 쓸 때 미리 골라 둘 기본 구역 (홈 응원 3루 테이블) */
 const DEFAULT_REVIEW_ZONE = "T3";
 
+/** 후기 목록 한 페이지에 보여줄 개수 */
+const REVIEWS_PER_PAGE = 5;
+
+/** 페이지 버튼 목록 — 페이지가 많으면 현재 위치 주변만 숫자로 보여줍니다. */
+function pageNumbers(current: number, total: number): (number | "gap")[] {
+  if (total <= 7) return Array.from({ length: total }, (_, i) => i + 1);
+  const nums = [...new Set([1, total, current - 1, current, current + 1])]
+    .filter((n) => n >= 1 && n <= total)
+    .sort((a, b) => a - b);
+  const out: (number | "gap")[] = [];
+  nums.forEach((n, i) => {
+    if (i > 0 && n - nums[i - 1] > 1) out.push("gap");
+    out.push(n);
+  });
+  return out;
+}
+
+/** 후기 페이지 이동 버튼 (<, >) */
+function PageArrow({
+  label,
+  disabled,
+  onClick,
+  children,
+}: {
+  label: string;
+  disabled: boolean;
+  onClick: () => void;
+  children: ReactNode;
+}) {
+  return (
+    <button
+      type="button"
+      aria-label={label}
+      disabled={disabled}
+      onClick={onClick}
+      className={`grid h-7 w-7 place-items-center rounded-[9px] transition active:scale-[.96] ${
+        disabled ? "cursor-default text-[#D5DAE1]" : "text-ink-muted hover:bg-[#F3F5F9]"
+      }`}
+    >
+      {children}
+    </button>
+  );
+}
+
 export function SeatScreen({
   selectedZone,
   onSelectZone,
@@ -50,15 +94,27 @@ export function SeatScreen({
   /** 신고 중인 후기 */
   const [reportReview, setReportReview] = useState<ZoneReview | null>(null);
   const [lightbox, setLightbox] = useState<PhotoLightboxState | null>(null);
+  /** 후기 목록 페이지 (5개씩) */
+  const [reviewPage, setReviewPage] = useState(1);
   const pickerRef = useRef<HTMLElement | null>(null);
   const listRef = useRef<HTMLDivElement | null>(null);
   const selectedRowRef = useRef<HTMLButtonElement | null>(null);
   const detailRef = useRef<HTMLElement | null>(null);
+  const reviewsRef = useRef<HTMLDivElement | null>(null);
+  /** 좌석 선택기(도면·목록)에서 구역을 고르면 그 구역 카드로 이동시킵니다. */
+  const jumpAfterPick = useRef(false);
   const zone =
     selected === "all" ? null : zones.find((z) => z.code === selected) ?? ZONE_BY_CODE[selected];
   const filteredReviews = useMemo(
     () => (selected === "all" ? reviews : reviews.filter((r) => r.zoneCode === selected)),
     [reviews, selected],
+  );
+  const reviewPageCount = Math.max(1, Math.ceil(filteredReviews.length / REVIEWS_PER_PAGE));
+  // 후기 삭제·추가로 목록이 줄면 페이지가 범위를 넘지 않게 맞춰요.
+  const currentReviewPage = Math.min(reviewPage, reviewPageCount);
+  const pagedReviews = filteredReviews.slice(
+    (currentReviewPage - 1) * REVIEWS_PER_PAGE,
+    currentReviewPage * REVIEWS_PER_PAGE,
   );
   const zoneName = selected === "all" ? "전체 구역" : zone?.short ?? selected;
   const family = zoneFamily(zone?.code);
@@ -93,35 +149,227 @@ export function SeatScreen({
     return () => window.clearTimeout(timer);
   }, [focusNonce]);
 
+  // 구역이 바뀌면 그 구역 후기 목록은 1페이지부터 보여줘요.
+  useEffect(() => {
+    setReviewPage(1);
+  }, [selected]);
+
+  // 선택기에서 구역을 고르면 선택기가 접히고, 고른 구역의 시야·후기가 바로 보이게 올려요.
+  useEffect(() => {
+    if (!jumpAfterPick.current) return;
+    jumpAfterPick.current = false;
+    const timer = window.setTimeout(() => {
+      if (selected === "all") {
+        reviewsRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+        return;
+      }
+      detailRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+    }, 200);
+    return () => window.clearTimeout(timer);
+  }, [selected]);
+
+  function goReviewPage(next: number) {
+    const target = Math.min(Math.max(1, next), reviewPageCount);
+    if (target === currentReviewPage) return;
+    setReviewPage(target);
+    reviewsRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+  }
+
   function choose(code: string) {
     onSelectZone(code);
     setPickerOpen(false);
+    jumpAfterPick.current = true;
   }
 
   function pickFromMap(code: string) {
     onSelectZone(code);
     setPickerOpen(false);
+    jumpAfterPick.current = true;
   }
 
   return (
     <div className="flex flex-col gap-3.5 px-4 pb-[30px] pt-3.5">
-      <section className="rounded-md2 border border-line bg-gradient-to-b from-white to-[#F8FAFD] px-2.5 pb-3 pt-2.5 shadow-card">
-        <div className="flex items-center justify-between gap-2 px-1 pb-2">
-          <span className="flex min-w-0 items-center gap-1.5 whitespace-nowrap text-[12.5px] font-extrabold text-ink-2">
-            <Icon name="seat" size={15} strokeWidth={2} />
-            라이온즈파크 좌석배치도
+      <div
+        ref={reviewsRef}
+        className="flex scroll-mt-3 items-center justify-between gap-2.5 px-0.5"
+      >
+        <h2 className="flex min-w-0 items-center gap-1.5 text-[15.5px] font-extrabold tracking-tight2">
+          직관 시야 후기
+          <span className="text-xs font-bold text-ink-faint">{filteredReviews.length}</span>
+        </h2>
+        {onWriteReview ? (
+          <button
+            type="button"
+            onClick={writeReview}
+            aria-label="직관 시야 후기 작성"
+            className="flex flex-none items-center gap-1 rounded-full bg-brand px-2.5 py-[6px] text-[11.5px] font-extrabold tracking-tight2 text-white shadow-brand transition active:scale-[.97]"
+          >
+            <Icon name="plus" size={12} strokeWidth={2.6} />
+            후기 작성
+          </button>
+        ) : null}
+      </div>
+
+      {selected === "all" ? null : (
+        <div className="-mt-1.5 flex items-center gap-1.5 px-0.5">
+          <span className="flex min-w-0 items-center gap-1 rounded-full bg-brand-50 px-2 py-[3px] text-[10.5px] font-extrabold text-brand-600">
+            <span className="truncate">
+              {zone?.emoji} {zoneName} 후기만 보는 중
+            </span>
           </span>
-          <span className="flex-none whitespace-nowrap rounded-lg bg-brand-50 px-2 py-[3px] text-[11px] font-extrabold text-brand-600">
-            {zoneName}
-          </span>
+          <button
+            type="button"
+            onClick={() => choose("all")}
+            className="flex-none rounded-full px-1.5 py-[3px] text-[10.5px] font-bold text-ink-faint underline decoration-[#C4CBD6] underline-offset-2 transition active:scale-[.97]"
+          >
+            전체 구역 보기
+          </button>
         </div>
-        <SeatMap selected={selected} onSelect={pickFromMap} />
-        <p className="mt-2 border-t border-line-soft pt-2 text-center text-[10px] font-bold text-ink-faint">
-          {selected === "all"
-            ? "도면의 구역을 누르면 시야 특징과 후기가 나와요"
-            : `${zoneName} 선택됨 · 도면에서 다른 구역도 눌러보세요`}
-        </p>
-      </section>
+      )}
+
+      <div className="flex flex-col gap-2.5">
+        {filteredReviews.length ? (
+          pagedReviews.map((review) => (
+            <article
+              key={review.id}
+              className="rounded-md2 border border-line bg-white p-[13px] shadow-card"
+            >
+              <div className="flex items-center gap-2">
+                <Avatar
+                  nickname={review.nickname}
+                  avatarUrl={review.avatarUrl}
+                  size={32}
+                  className={
+                    review.mine
+                      ? "bg-gradient-to-br from-brand-500 to-brand text-xs text-white"
+                      : "bg-brand-50 text-xs text-brand"
+                  }
+                />
+                <div className="min-w-0 flex-1">
+                  <div className="flex flex-wrap items-center gap-1">
+                    <span className="text-[13.5px] font-extrabold tracking-tight">
+                      {review.nickname}
+                    </span>
+                    <span
+                      className={`rounded-md px-1.5 py-0.5 text-[10px] font-extrabold ${
+                        review.mine ? "bg-brand text-white" : "bg-brand-50 text-brand-600"
+                      }`}
+                    >
+                      {review.badge}
+                    </span>
+                  </div>
+                  <div className="mt-0.5 text-[11px] text-ink-faint">
+                    {zoneFullName(review.zoneCode)} · {formatRelativeTime(review.createdAt)}
+                  </div>
+                </div>
+                <Stars value={review.stars} />
+                {review.mine || isAdmin ? (
+                  <span className="ml-[-2px] flex flex-none items-center">
+                    <button
+                      type="button"
+                      aria-label="후기 수정"
+                      onClick={() => setEditingReview(review)}
+                      className="rounded-lg p-1.5 text-[#C4CBD6] transition hover:text-brand"
+                    >
+                      <Icon name="edit" size={14} />
+                    </button>
+                    <DeleteButton what="후기" size={14} onDelete={() => deleteReview(review.id)} />
+                  </span>
+                ) : (
+                  <button
+                    type="button"
+                    onClick={() => setReportReview(review)}
+                    className="ml-[-2px] flex-none rounded-lg px-1.5 py-1 text-[10px] font-bold text-[#B9C0CB] transition hover:text-[#B42318]"
+                  >
+                    신고
+                  </button>
+                )}
+              </div>
+              <p className="mt-[9px] break-keep text-[13.5px] leading-relaxed text-[#1D2939]">
+                {review.body}
+              </p>
+              <PhotoTiles
+                urls={review.photoUrls ?? []}
+                onOpen={(index) => setLightbox({ urls: review.photoUrls, index })}
+                label="후기 사진"
+              />
+              {review.seatDetail ? (
+                <span className="mt-[9px] inline-block rounded-md bg-[#F3F8FF] px-[7px] py-0.5 text-[11px] font-bold text-brand-600">
+                  {review.seatDetail}
+                </span>
+              ) : null}
+            </article>
+          ))
+        ) : (
+          <div className="rounded-md2 border border-dashed border-[#D9DEE7] bg-[#FBFCFE] px-4 py-[22px] text-center">
+            <div className="mb-[7px] text-[26px]">👀</div>
+            <p className="text-[13px] font-extrabold text-ink-2">
+              {selected === "all" ? "아직 등록된 후기가 없어요" : "이 구역 후기가 아직 없어요"}
+            </p>
+            <p className="mt-1 text-[11.5px] leading-relaxed text-ink-faint">
+              {selected === "all"
+                ? "첫 직관 시야 후기를 남겨보세요."
+                : `${zoneName} 첫 직관 시야 후기를 남겨보세요.`}
+            </p>
+            {onWriteReview ? (
+              <button
+                type="button"
+                onClick={writeReview}
+                className="mt-3 inline-flex items-center gap-1 rounded-[11px] bg-brand px-3.5 py-[9px] text-[12px] font-extrabold text-white shadow-brand transition active:scale-[.98]"
+              >
+                <Icon name="plus" size={12} strokeWidth={2.6} />
+                후기 작성
+              </button>
+            ) : null}
+          </div>
+        )}
+      </div>
+
+      {filteredReviews.length > REVIEWS_PER_PAGE ? (
+        <nav
+          aria-label="직관 시야 후기 페이지"
+          className="flex items-center justify-center gap-1.5 rounded-md2 border border-line bg-white px-2 py-1.5 shadow-card"
+        >
+          <PageArrow
+            label="이전 페이지"
+            disabled={currentReviewPage === 1}
+            onClick={() => goReviewPage(currentReviewPage - 1)}
+          >
+            <Icon name="chevron" size={12} strokeWidth={2.8} className="rotate-180" />
+          </PageArrow>
+          {pageNumbers(currentReviewPage, reviewPageCount).map((n, index) =>
+            n === "gap" ? (
+              <span
+                key={`gap-${index}`}
+                className="px-0.5 text-[11px] font-bold text-[#B9C0CB]"
+              >
+                …
+              </span>
+            ) : (
+              <button
+                key={n}
+                type="button"
+                aria-current={n === currentReviewPage ? "page" : undefined}
+                onClick={() => goReviewPage(n)}
+                className={`grid h-7 min-w-[28px] place-items-center rounded-[9px] px-1.5 text-[11.5px] font-extrabold transition active:scale-[.96] ${
+                  n === currentReviewPage
+                    ? "bg-brand text-white shadow-brand"
+                    : "text-ink-muted hover:bg-[#F3F5F9]"
+                }`}
+              >
+                {n}
+              </button>
+            ),
+          )}
+          <PageArrow
+            label="다음 페이지"
+            disabled={currentReviewPage === reviewPageCount}
+            onClick={() => goReviewPage(currentReviewPage + 1)}
+          >
+            <Icon name="chevron" size={12} strokeWidth={2.8} />
+          </PageArrow>
+        </nav>
+      ) : null}
 
       <section
         ref={pickerRef}
@@ -158,11 +406,24 @@ export function SeatScreen({
         </button>
 
         {pickerOpen ? (
-          <div className="animate-fadeIn border-t border-line-soft bg-[#FBFCFE] px-2 pb-2 pt-1.5">
+          <div className="animate-fadeIn border-t border-line-soft bg-[#FBFCFE] px-2 pb-2 pt-2">
+            <div className="mb-1.5 flex items-center justify-between gap-2 px-1">
+              <span className="flex min-w-0 items-center gap-1.5 whitespace-nowrap text-[12px] font-extrabold text-ink-2">
+                <Icon name="seat" size={14} strokeWidth={2} />
+                라이온즈파크 좌석배치도
+              </span>
+              <span className="flex-none whitespace-nowrap rounded-lg bg-white px-2 py-[3px] text-[11px] font-extrabold text-brand-600 shadow-[inset_0_0_0_1px_#DDE7F6]">
+                {zoneName}
+              </span>
+            </div>
+            <SeatMap selected={selected} onSelect={pickFromMap} />
+            <p className="mt-1.5 text-center text-[10px] font-bold leading-relaxed text-ink-faint">
+              도면의 구역을 누르면 바로 선택돼요 · 아래 목록에서도 고를 수 있어요
+            </p>
             <div
               id="seat-zone-picker"
               ref={listRef}
-              className="max-h-[280px] overflow-y-auto overscroll-contain"
+              className="mt-1.5 max-h-[200px] overflow-y-auto overscroll-contain border-t border-line-soft pt-1"
             >
               <button
                 type="button"
@@ -239,10 +500,14 @@ export function SeatScreen({
               ))}
             </div>
             <p className="px-2 pt-1.5 text-center text-[9.5px] font-bold text-[#B9C0CB]">
-              위아래로 넘겨 구역을 고르면 바로 아래 시야·후기가 바뀌어요
+              위아래로 넘겨 구역을 고르면 그 구역 시야·후기로 바로 바뀌어요
             </p>
           </div>
-        ) : null}
+        ) : (
+          <p className="border-t border-line-soft bg-[#FBFCFE] px-3 py-2 text-center text-[10px] font-bold text-ink-faint">
+            누르면 라이온즈파크 좌석배치도가 펼쳐져요
+          </p>
+        )}
       </section>
 
       {zone ? (
@@ -383,122 +648,6 @@ export function SeatScreen({
           </div>
         </>
       )}
-
-      <div className="flex items-center justify-between gap-2.5 px-0.5">
-        <h2 className="flex items-center gap-1.5 text-[15.5px] font-extrabold tracking-tight2">
-          직관 시야 후기
-          <span className="text-xs font-bold text-ink-faint">{filteredReviews.length}</span>
-        </h2>
-        {onWriteReview ? (
-          <button
-            type="button"
-            onClick={writeReview}
-            aria-label="직관 시야 후기 작성"
-            className="flex flex-none items-center gap-1 rounded-full bg-brand px-2.5 py-[6px] text-[11.5px] font-extrabold tracking-tight2 text-white shadow-brand transition active:scale-[.97]"
-          >
-            <Icon name="plus" size={12} strokeWidth={2.6} />
-            후기 작성
-          </button>
-        ) : null}
-      </div>
-
-      <div className="flex flex-col gap-2.5">
-        {filteredReviews.length ? (
-          filteredReviews.map((review) => (
-            <article
-              key={review.id}
-              className="rounded-md2 border border-line bg-white p-[13px] shadow-card"
-            >
-              <div className="flex items-center gap-2">
-                <Avatar
-                  nickname={review.nickname}
-                  avatarUrl={review.avatarUrl}
-                  size={32}
-                  className={
-                    review.mine
-                      ? "bg-gradient-to-br from-brand-500 to-brand text-xs text-white"
-                      : "bg-brand-50 text-xs text-brand"
-                  }
-                />
-                <div className="min-w-0 flex-1">
-                  <div className="flex flex-wrap items-center gap-1">
-                    <span className="text-[13.5px] font-extrabold tracking-tight">
-                      {review.nickname}
-                    </span>
-                    <span
-                      className={`rounded-md px-1.5 py-0.5 text-[10px] font-extrabold ${
-                        review.mine ? "bg-brand text-white" : "bg-brand-50 text-brand-600"
-                      }`}
-                    >
-                      {review.badge}
-                    </span>
-                  </div>
-                  <div className="mt-0.5 text-[11px] text-ink-faint">
-                    {zoneFullName(review.zoneCode)} · {formatRelativeTime(review.createdAt)}
-                  </div>
-                </div>
-                <Stars value={review.stars} />
-                {review.mine || isAdmin ? (
-                  <span className="ml-[-2px] flex flex-none items-center">
-                    <button
-                      type="button"
-                      aria-label="후기 수정"
-                      onClick={() => setEditingReview(review)}
-                      className="rounded-lg p-1.5 text-[#C4CBD6] transition hover:text-brand"
-                    >
-                      <Icon name="edit" size={14} />
-                    </button>
-                    <DeleteButton what="후기" size={14} onDelete={() => deleteReview(review.id)} />
-                  </span>
-                ) : (
-                  <button
-                    type="button"
-                    onClick={() => setReportReview(review)}
-                    className="ml-[-2px] flex-none rounded-lg px-1.5 py-1 text-[10px] font-bold text-[#B9C0CB] transition hover:text-[#B42318]"
-                  >
-                    신고
-                  </button>
-                )}
-              </div>
-              <p className="mt-[9px] break-keep text-[13.5px] leading-relaxed text-[#1D2939]">
-                {review.body}
-              </p>
-              <PhotoTiles
-                urls={review.photoUrls ?? []}
-                onOpen={(index) => setLightbox({ urls: review.photoUrls, index })}
-                label="후기 사진"
-              />
-              {review.seatDetail ? (
-                <span className="mt-[9px] inline-block rounded-md bg-[#F3F8FF] px-[7px] py-0.5 text-[11px] font-bold text-brand-600">
-                  {review.seatDetail}
-                </span>
-              ) : null}
-            </article>
-          ))
-        ) : (
-          <div className="rounded-md2 border border-dashed border-[#D9DEE7] bg-[#FBFCFE] px-4 py-[22px] text-center">
-            <div className="mb-[7px] text-[26px]">👀</div>
-            <p className="text-[13px] font-extrabold text-ink-2">
-              {selected === "all" ? "아직 등록된 후기가 없어요" : "이 구역 후기가 아직 없어요"}
-            </p>
-            <p className="mt-1 text-[11.5px] leading-relaxed text-ink-faint">
-              {selected === "all"
-                ? "첫 직관 시야 후기를 남겨보세요."
-                : `${zoneName} 첫 직관 시야 후기를 남겨보세요.`}
-            </p>
-            {onWriteReview ? (
-              <button
-                type="button"
-                onClick={writeReview}
-                className="mt-3 inline-flex items-center gap-1 rounded-[11px] bg-brand px-3.5 py-[9px] text-[12px] font-extrabold text-white shadow-brand transition active:scale-[.98]"
-              >
-                <Icon name="plus" size={12} strokeWidth={2.6} />
-                후기 작성
-              </button>
-            ) : null}
-          </div>
-        )}
-      </div>
 
       <p className="break-keep px-2.5 pt-1 text-center text-[10.5px] leading-relaxed text-[#AEB6C2]">
         가격·구역명은 2026 시즌 공개 자료 기준이며 시즌마다 달라질 수 있어요.

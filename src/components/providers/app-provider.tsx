@@ -911,13 +911,14 @@ export function AppProvider({ children }: { children: ReactNode }) {
       if (!ensureCanWrite("댓글을 남기")) return false;
 
       try {
-        const comment = await repo.addUserFoodComment(foodId, text, author);
-        const nextList = [...(userFoodCommentsByFood[foodId] ?? []), comment];
-        setUserFoodCommentsByFood((prev) => ({ ...prev, [foodId]: nextList }));
+        await repo.addUserFoodComment(foodId, text, author);
+        // 방금 단 댓글만 붙이면 (아직 안 불러온) 다른 댓글이 빠지므로 목록을 다시 읽습니다.
+        const list = await repo.loadUserFoodComments(foodId, userRef.current?.id ?? null);
+        setUserFoodCommentsByFood((prev) => ({ ...prev, [foodId]: list }));
         setUserFoodCommentsLoaded((prev) => ({ ...prev, [foodId]: true }));
         setUserFoods((prev) =>
           prev.map((food) =>
-            food.id === foodId ? { ...food, commentCount: nextList.length } : food,
+            food.id === foodId ? { ...food, commentCount: list.length } : food,
           ),
         );
         return true;
@@ -926,7 +927,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
         return false;
       }
     },
-    [repo, ensureCanWrite, author, userFoodCommentsByFood, toast],
+    [repo, ensureCanWrite, author, toast],
   );
 
   const updateUserFoodComment = useCallback(

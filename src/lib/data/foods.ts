@@ -169,12 +169,12 @@ export const FOODS: Food[] = [
     emoji: "🌮",
     thumbBg: "linear-gradient(150deg,#FFF6E0,#FFE1A8)",
     price: "18,000원~",
-    loc: "3F 내야 (3루 측) · 2F 외야 (버스 부스)",
+    loc: "2F 외야 (버스 부스)",
     rating: 4.2,
     wait: 1,
     waitTxt: "보통",
     menu: "비리아타코 19,000 · 우삼겹타코 18,000 · 파히타플레이트 42,000 · 하이볼 6,000",
-    tip: "2026 신규 입점 멕시칸 타코·하이볼. 3층 내야 3루 쪽과 2층 외야 캠핑존 아래 대형 버스 부스에서 만나볼 수 있어요.",
+    tip: "2026 신규 입점 멕시칸 타코·하이볼. 2층 외야 캠핑존 아래 대형 버스 부스에서 만나볼 수 있어요.",
     inStadium: true,
     sortOrder: 11,
   },
@@ -536,7 +536,7 @@ export const FOOD_GROUPS: FoodGroup[] = [
     short: "2F 외야",
     hint: "연막창·만재네·하바네로(버스)·맥주부스",
     inside: true,
-    codes: ["yeon", "manjae", "beer"],
+    codes: ["yeon", "manjae", "havanero", "beer"],
   },
   {
     id: "f3",
@@ -547,7 +547,6 @@ export const FOOD_GROUPS: FoodGroup[] = [
     codes: [
       "tongdak",
       "raon",
-      "havanero",
       "jjinppang",
       "jeonseol",
       "altong",
@@ -642,7 +641,7 @@ export const FLOOR_GUIDE: { title: string; items: string }[] = [
   {
     title: "3F 내야석",
     items:
-      "노랑통닭, 라온's 스위트파크, 역전우동, 하바네로, 북촌손만두, 대신땅콩빵, 전설꼬치, 알통떡강정, 장여사 나뭇잎만두, 서문빙수, 해피치즈스마일, 이쁜여우 핫도그, 소프텔리에, 호남원조식당 무침회, CU, 버터우드",
+      "노랑통닭, 라온's 스위트파크, 역전우동, 북촌손만두, 대신땅콩빵, 전설꼬치, 알통떡강정, 장여사 나뭇잎만두, 서문빙수, 해피치즈스마일, 이쁜여우 핫도그, 소프텔리에, 호남원조식당 무침회, CU, 버터우드",
   },
   { title: "4F 스윗박스", items: "블루문, 맥주부스" },
   {

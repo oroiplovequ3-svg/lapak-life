@@ -34,6 +34,10 @@
    - `supabase/migrations/007_grants.sql`
    - `supabase/migrations/008_post_categories.sql`
    - `supabase/migrations/009_profile_avatars.sql` (프로필 사진 Storage 버킷 `avatars`)
+   - `supabase/migrations/010_unique_nickname.sql` (닉네임 중복 방지 인덱스·확인 함수)
+   - `supabase/migrations/011_admin_master.sql` (마스터 계정 표·`is_admin()`·수정/삭제 정책)
+     - 실행 뒤 마스터로 쓸 구글 계정을 **SQL Editor 에서 한 번만** 넣습니다(이메일은 저장소에 남기지 않음):
+       `insert into public.app_admins (email) values ('<마스터 이메일>') on conflict (email) do nothing;`
 5. 왼쪽 **Table Editor** 에서 `zones`(8행) · `foods`(14행) 가 채워졌는지 확인합니다.
 
 ## 3. 구글 OAuth 클라이언트 만들기 (10분, 무료)
@@ -103,6 +107,7 @@ npm run dev                  # http://localhost:3000
 
 - [ ] Google Cloud **승인된 리디렉션 URI** 에 `https://<프로젝트ID>.supabase.co/auth/v1/callback` 이 있는지 (이미 3-3에서 했으면 패스)
 - [ ] Supabase **Redirect URLs** 에 `https://<내프로젝트>.vercel.app/auth/callback` 이 있는지
+- [ ] `010_unique_nickname.sql` · `011_admin_master.sql` 까지 실행됐는지 (닉네임 중복 방지·마스터 계정)
 - [ ] `009_profile_avatars.sql` 까지 실행됐는지 (안 했으면 프로필 사진을 올릴 때 오류가 납니다)
 - [ ] `004_user_foods.sql` · `005_user_parkings.sql` 까지 실행됐는지 (안 했으면 직관러 섹션은 비어 보입니다)
 - [ ] Vercel의 `NEXT_PUBLIC_SITE_URL`을 최종 주소로 맞추고 **Redeploy**

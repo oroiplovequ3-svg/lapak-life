@@ -106,7 +106,8 @@ grant execute on function public.is_nickname_available(text, uuid) to anon, auth
 
 -- 6) 회원가입 트리거 보강 -------------------------------------------
 -- 구글 계정 이름이 이미 누가 쓰는 이름이면 그대로 넣다가 가입이 실패하므로,
--- 겹치면 '이름2', '이름3' … 처럼 번호를 붙여 저장합니다.
+-- 겹칠 때는 '이름2', '이름3' … 처럼 번호를 붙여 저장합니다.
+-- 동시에 같은 이름으로 가입하는 경우(유니크 인덱스 23505)도 번호를 붙여 다시 시도합니다.
 create or replace function public.handle_new_user()
 returns trigger
 language plpgsql
@@ -127,27 +128,30 @@ begin
   base := left(base, 16);
   candidate := base;
 
-  while exists (
-    select 1 from public.profiles where lower(btrim(nickname)) = lower(candidate)
-  ) loop
-    n := n + 1;
-    candidate := left(base, greatest(1, 16 - length(n::text))) || n::text;
-    if n > 99 then
-      candidate := left(base, 10) || '-' || substr(replace(gen_random_uuid()::text, '-', ''), 1, 4);
+  loop
+    begin
+      insert into public.profiles (id, nickname, avatar_url)
+      values (
+        new.id,
+        candidate,
+        coalesce(
+          nullif(new.raw_user_meta_data ->> 'avatar_url', ''),
+          nullif(new.raw_user_meta_data ->> 'picture', '')
+        )
+      )
+      on conflict (id) do nothing;
       exit;
-    end if;
+    exception when unique_violation then
+      -- 같은 순간에 같은 이름으로 가입한 사람이 있으면 번호를 붙여 다시 넣어 봅니다.
+      n := n + 1;
+      if n > 99 then
+        candidate := left(base, 10) || '-' || substr(replace(gen_random_uuid()::text, '-', ''), 1, 4);
+      else
+        candidate := left(base, greatest(1, 16 - length(n::text))) || n::text;
+      end if;
+    end;
   end loop;
 
-  insert into public.profiles (id, nickname, avatar_url)
-  values (
-    new.id,
-    candidate,
-    coalesce(
-      nullif(new.raw_user_meta_data ->> 'avatar_url', ''),
-      nullif(new.raw_user_meta_data ->> 'picture', '')
-    )
-  )
-  on conflict (id) do nothing;
   return new;
 end;
 $$;

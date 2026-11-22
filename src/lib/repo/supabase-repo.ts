@@ -1371,10 +1371,39 @@ export class SupabaseRepository implements Repository {
   }
 
   /**
-   * 회원 탈퇴 — 서버 함수(delete_own_account)가 내 사진·콘텐츠·프로필·계정을
-   * 한 트랜잭션으로 지우고, 끝나면 이 브라우저의 세션도 정리합니다.
+   * 회원 탈퇴 — 내 사진·콘텐츠·프로필·계정을 한 번에 지웁니다.
+   *
+   * 1) Storage API 로 내 폴더(uid/…)의 파일을 먼저 지웁니다.
+   *    (DB 행만 지우면 실제 파일이 버킷에 남기 때문에, 파일은 Storage API 로 지워야 합니다.)
+   * 2) 서버 함수(delete_own_account)가 남은 파일 행·콘텐츠·프로필·계정을 정리합니다.
+   * 3) 끝나면 이 브라우저의 세션도 정리합니다.
    */
   async deleteOwnAccount(): Promise<void> {
+    const { data: authData } = await this.supabase.auth.getUser();
+    const userId = authData.user?.id ?? null;
+    if (userId) {
+      for (const bucket of [
+        AVATAR_BUCKET,
+        CHECKIN_PHOTO_BUCKET,
+        REVIEW_PHOTO_BUCKET,
+        USER_FOOD_PHOTO_BUCKET,
+        POST_PHOTO_BUCKET,
+      ]) {
+        try {
+          const { data: files } = await this.supabase.storage
+            .from(bucket)
+            .list(userId, { limit: 100 });
+          const paths = (files ?? [])
+            .map((file) => file.name)
+            .filter((name): name is string => Boolean(name))
+            .map((name) => `${userId}/${name}`);
+          if (paths.length) await this.supabase.storage.from(bucket).remove(paths);
+        } catch {
+          // 파일 정리에 실패해도 아래 RPC 가 남은 행을 정리합니다.
+        }
+      }
+    }
+
     const { error } = await this.supabase.rpc("delete_own_account");
     if (error) {
       if (error.code === "42883") {

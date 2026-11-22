@@ -339,7 +339,7 @@ export function SeatScreen({
             </div>
             <SeatMap selected={selected} onSelect={pickFromMap} />
             <p className="mt-1.5 text-center text-[10px] font-bold leading-relaxed text-ink-faint">
-              도면의 구역을 누르면 바로 선택돼요 · 아래 목록에서도 고를 수 있어요
+              도면의 구역을 누르면 바로 선택돼요 · 좁은 띠는 근처를 눌러도 가까운 구역이 선택돼요
             </p>
             <div
               id="seat-zone-picker"

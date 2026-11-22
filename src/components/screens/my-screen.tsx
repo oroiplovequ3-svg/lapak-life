@@ -469,6 +469,12 @@ export function MyScreen({ onOpenPost, onCompose, onAddGame, onEditGame }: MyScr
       </p>
 
       <div className="flex items-center justify-center gap-2 pb-0.5 text-[10.5px] font-semibold text-[#9AA3B0]">
+        <Link href="/terms" className="underline underline-offset-2">
+          이용약관
+        </Link>
+        <span aria-hidden="true" className="text-[#CBD2DC]">
+          ·
+        </span>
         <Link href="/privacy" className="underline underline-offset-2">
           개인정보처리방침
         </Link>

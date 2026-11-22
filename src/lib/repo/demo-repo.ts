@@ -8,7 +8,9 @@ import {
 import { SEED_USER_FOODS, SEED_USER_PARKINGS } from "@/lib/data/user-community";
 import { ZONES } from "@/lib/data/zones";
 import type {
+  AdminUserSummary,
   Author,
+  BanStatus,
   Comment,
   Food,
   Game,
@@ -830,6 +832,7 @@ export class DemoRepository implements Repository {
       found: false,
       body: "",
       nickname: "",
+      userId: null,
       postId: null,
       foodId: null,
       zoneCode: null,
@@ -845,5 +848,22 @@ export class DemoRepository implements Repository {
   /** 데모 모드에는 서버 계정이 없어 탈퇴할 계정도 없습니다. */
   async deleteOwnAccount(): Promise<void> {
     throw new Error("데모 모드에서는 탈퇴할 계정이 없어요. 구글 로그인 후 이용해 주세요.");
+  }
+
+  /* ── 회원 정지 — 데모 모드에는 마스터도 서버 계정도 없습니다. ── */
+  async getMyBanStatus(): Promise<BanStatus> {
+    return { banned: false, reason: null };
+  }
+
+  async listUsers(): Promise<AdminUserSummary[]> {
+    return [];
+  }
+
+  async banUser(): Promise<void> {
+    throw new Error("데모 모드에서는 회원을 정지할 수 없어요. 구글 로그인 후 이용해 주세요.");
+  }
+
+  async unbanUser(): Promise<void> {
+    throw new Error("데모 모드에서는 회원 정지를 해제할 수 없어요. 구글 로그인 후 이용해 주세요.");
   }
 }

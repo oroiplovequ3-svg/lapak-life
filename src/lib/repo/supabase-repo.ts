@@ -4,7 +4,9 @@ import { normalizeCategory } from "@/lib/data/categories";
 import { FOODS } from "@/lib/data/foods";
 import { ZONES } from "@/lib/data/zones";
 import type {
+  AdminUserSummary,
   Author,
+  BanStatus,
   Comment,
   Food,
   Game,
@@ -295,6 +297,22 @@ function mapUserFoodComment(row: AnyRow, viewerId: string | null): UserFoodComme
 
 function fail(context: string, error: { message: string } | null): never {
   throw new Error(`${context}: ${error?.message ?? "알 수 없는 오류"}`);
+}
+
+/** 017 회원 정지 마이그레이션이 아직 적용되지 않았을 때 보여 줄 안내 */
+export const BAN_NOT_READY_MESSAGE =
+  "회원 정지 기능이 아직 준비되지 않았어요. 잠시 뒤 다시 시도해 주세요.";
+
+/** RPC 함수가 DB에 없을 때(42883) 또는 PostgREST 가 못 찾을 때(PGRST202) */
+function isMissingFunctionError(
+  error: { code?: string; message?: string } | null | undefined,
+): boolean {
+  if (!error) return false;
+  return (
+    error.code === "42883" ||
+    error.code === "PGRST202" ||
+    /could not find the function|does not exist/i.test(error.message ?? "")
+  );
 }
 
 /** 닉네임 유니크 인덱스에 걸린 오류인지 (23505 unique_violation) */
@@ -1398,13 +1416,14 @@ export class SupabaseRepository implements Repository {
       foodId: null,
       zoneCode: null,
       hidden: false,
+      userId: null,
     };
 
     if (targetType === "post" || targetType === "comment") {
       if (targetType === "post") {
         const { data, error } = await this.supabase
           .from("posts")
-          .select("id, body, is_hidden, profiles(nickname)")
+          .select("id, user_id, body, is_hidden, profiles(nickname)")
           .eq("id", targetId)
           .maybeSingle();
         if (error) fail("신고된 내용을 불러오지 못했습니다", error);
@@ -1414,6 +1433,7 @@ export class SupabaseRepository implements Repository {
           found: true,
           body: str(row.body),
           nickname: embeddedProfile(row).nickname,
+          userId: str(row.user_id) || null,
           postId: targetId,
           foodId: null,
           zoneCode: null,
@@ -1423,7 +1443,7 @@ export class SupabaseRepository implements Repository {
 
       const { data, error } = await this.supabase
         .from("comments")
-        .select("id, body, post_id, is_hidden, profiles(nickname)")
+        .select("id, user_id, body, post_id, is_hidden, profiles(nickname)")
         .eq("id", targetId)
         .maybeSingle();
       if (error) fail("신고된 내용을 불러오지 못했습니다", error);
@@ -1433,6 +1453,7 @@ export class SupabaseRepository implements Repository {
         found: true,
         body: str(row.body),
         nickname: embeddedProfile(row).nickname,
+        userId: str(row.user_id) || null,
         postId: str(row.post_id) || null,
         foodId: null,
         zoneCode: null,
@@ -1443,7 +1464,7 @@ export class SupabaseRepository implements Repository {
     if (targetType === "review") {
       const { data, error } = await this.supabase
         .from("zone_reviews")
-        .select("id, body, zone_code, is_hidden, profiles(nickname)")
+        .select("id, user_id, body, zone_code, is_hidden, profiles(nickname)")
         .eq("id", targetId)
         .maybeSingle();
       if (error) fail("신고된 내용을 불러오지 못했습니다", error);
@@ -1453,6 +1474,7 @@ export class SupabaseRepository implements Repository {
         found: true,
         body: str(row.body),
         nickname: embeddedProfile(row).nickname,
+        userId: str(row.user_id) || null,
         postId: null,
         foodId: null,
         zoneCode: str(row.zone_code) || null,
@@ -1463,7 +1485,7 @@ export class SupabaseRepository implements Repository {
     if (targetType === "user_food") {
       const { data, error } = await this.supabase
         .from("user_foods")
-        .select("id, name, menu, tip, is_hidden, profiles(nickname)")
+        .select("id, user_id, name, menu, tip, is_hidden, profiles(nickname)")
         .eq("id", targetId)
         .maybeSingle();
       if (error) fail("신고된 내용을 불러오지 못했습니다", error);
@@ -1473,6 +1495,7 @@ export class SupabaseRepository implements Repository {
         found: true,
         body: [str(row.name), str(row.menu), str(row.tip)].filter(Boolean).join(" · "),
         nickname: embeddedProfile(row).nickname,
+        userId: str(row.user_id) || null,
         postId: null,
         foodId: targetId,
         zoneCode: null,
@@ -1483,7 +1506,7 @@ export class SupabaseRepository implements Repository {
     if (targetType === "user_food_comment") {
       const { data, error } = await this.supabase
         .from("user_food_comments")
-        .select("id, body, food_id, is_hidden, profiles(nickname)")
+        .select("id, user_id, body, food_id, is_hidden, profiles(nickname)")
         .eq("id", targetId)
         .maybeSingle();
       if (error) fail("신고된 내용을 불러오지 못했습니다", error);
@@ -1493,6 +1516,7 @@ export class SupabaseRepository implements Repository {
         found: true,
         body: str(row.body),
         nickname: embeddedProfile(row).nickname,
+        userId: str(row.user_id) || null,
         postId: null,
         foodId: str(row.food_id) || null,
         zoneCode: null,
@@ -1502,7 +1526,7 @@ export class SupabaseRepository implements Repository {
 
     const { data, error } = await this.supabase
       .from("user_parkings")
-      .select("id, name, location, tip, is_hidden, profiles(nickname)")
+      .select("id, user_id, name, location, tip, is_hidden, profiles(nickname)")
       .eq("id", targetId)
       .maybeSingle();
     if (error) fail("신고된 내용을 불러오지 못했습니다", error);
@@ -1512,6 +1536,7 @@ export class SupabaseRepository implements Repository {
       found: true,
       body: [str(row.name), str(row.location), str(row.tip)].filter(Boolean).join(" · "),
       nickname: embeddedProfile(row).nickname,
+      userId: str(row.user_id) || null,
       postId: null,
       foodId: null,
       zoneCode: null,
@@ -1575,5 +1600,63 @@ export class SupabaseRepository implements Repository {
       fail("회원 탈퇴를 처리하지 못했습니다", error);
     }
     await this.supabase.auth.signOut().catch(() => undefined);
+  }
+
+  /* ── 회원 영구 정지 (마스터) ────────────────────────────── */
+
+  /**
+   * 내가 정지된 계정인지 — 함수가 아직 없거나 응답이 이상하면 '정지 아님'으로 보고
+   * 로그인 자체를 막지 않습니다. (정지 판단은 DB 함수가 최종적으로 합니다)
+   */
+  async getMyBanStatus(): Promise<BanStatus> {
+    const { data, error } = await this.supabase.rpc("get_my_ban_status");
+    if (error) return { banned: false, reason: null };
+    const row = (Array.isArray(data) ? data[0] : data) as AnyRow | null | undefined;
+    if (!row) return { banned: false, reason: null };
+    return {
+      banned: row.banned === true,
+      reason: str(row.reason) || null,
+    };
+  }
+
+  /** 마스터만 — 회원 목록 (admin_list_users) */
+  async listUsers(): Promise<AdminUserSummary[]> {
+    const { data, error } = await this.supabase.rpc("admin_list_users");
+    if (error) {
+      if (isMissingFunctionError(error)) throw new Error(BAN_NOT_READY_MESSAGE);
+      if (error.code === "42501") throw new Error("마스터만 회원 목록을 볼 수 있어요");
+      fail("회원 목록을 불러오지 못했습니다", error);
+    }
+    return ((data ?? []) as AnyRow[]).map((row) => ({
+      userId: str(row.user_id),
+      nickname: str(row.nickname) || "라팍팬",
+      email: str(row.email) || null,
+      createdAt: str(row.created_at) || new Date().toISOString(),
+      isBanned: row.is_banned === true,
+      banReason: str(row.ban_reason) || null,
+    }));
+  }
+
+  /** 마스터만 — 회원 영구 정지 (admin_ban_user) */
+  async banUser(userId: string, reason: string | null): Promise<void> {
+    const { error } = await this.supabase.rpc("admin_ban_user", {
+      p_target_user_id: userId,
+      p_reason: reason && reason.trim() ? reason.trim() : null,
+    });
+    if (!error) return;
+    if (isMissingFunctionError(error)) throw new Error(BAN_NOT_READY_MESSAGE);
+    if (error.code === "42501") throw new Error("마스터만 회원을 정지할 수 있어요");
+    fail("회원을 정지하지 못했습니다", error);
+  }
+
+  /** 마스터만 — 영구 정지 해제 (admin_unban_user) */
+  async unbanUser(userId: string): Promise<void> {
+    const { error } = await this.supabase.rpc("admin_unban_user", {
+      p_target_user_id: userId,
+    });
+    if (!error) return;
+    if (isMissingFunctionError(error)) throw new Error(BAN_NOT_READY_MESSAGE);
+    if (error.code === "42501") throw new Error("마스터만 정지를 해제할 수 있어요");
+    fail("정지를 해제하지 못했습니다", error);
   }
 }

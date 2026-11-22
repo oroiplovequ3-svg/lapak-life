@@ -303,6 +303,8 @@ export interface ReportTargetPreview {
   body: string;
   /** 쓴 사람 닉네임 */
   nickname: string;
+  /** 쓴 사람 계정 id — 마스터가 이 회원을 바로 영구 정지할 때 씁니다 */
+  userId?: string | null;
   /** 댓글이면 부모 글 id (글로 바로 이동할 때) */
   postId: string | null;
   /** 직관러 맛집 댓글이면 부모 맛집 id (맛집·주차 탭으로 이동할 때) */
@@ -311,6 +313,22 @@ export interface ReportTargetPreview {
   zoneCode: string | null;
   /** 신고 누적으로 숨김 처리된 대상인지 (마스터만 복구·삭제 결정) */
   hidden?: boolean;
+}
+
+/** 마스터 회원 관리 — 회원 한 명의 요약 (admin_list_users) */
+export interface AdminUserSummary {
+  userId: string;
+  nickname: string;
+  email: string | null;
+  createdAt: string;
+  isBanned: boolean;
+  banReason: string | null;
+}
+
+/** 내가 영구 정지된 계정인지 (get_my_ban_status) */
+export interface BanStatus {
+  banned: boolean;
+  reason: string | null;
 }
 
 export interface NewReportInput {

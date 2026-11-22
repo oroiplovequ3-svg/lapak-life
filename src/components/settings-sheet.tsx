@@ -9,7 +9,7 @@ import { ProfileSheet } from "@/components/profile-sheet";
 import { useApp } from "@/components/providers/app-provider";
 import { useToast } from "@/components/providers/toast-provider";
 import { Sheet } from "@/components/sheet";
-import type { Report, ReportTargetPreview } from "@/lib/types";
+import type { AdminUserSummary, Report, ReportTargetPreview } from "@/lib/types";
 
 const APP_VERSION = "인블루 (INBLUE) · v1.2";
 
@@ -143,6 +143,57 @@ function ReportAction({
   );
 }
 
+/** 영구 정지 2단계 확인 — 사유를 적고 확정해야 정지됩니다. */
+function BanConfirm({
+  nickname,
+  busy,
+  onCancel,
+  onConfirm,
+}: {
+  nickname: string;
+  busy: boolean;
+  onCancel: () => void;
+  onConfirm: (reason: string) => void;
+}) {
+  const [reason, setReason] = useState("");
+  return (
+    <div className="mt-2 w-full rounded-[10px] border border-[#FECDCA] bg-[#FEF3F2] px-2.5 py-2">
+      <p className="text-[11px] font-extrabold text-[#B42318]">
+        {nickname}님을 영구 정지할까요?
+      </p>
+      <p className="mt-1 wrap-any text-[10px] leading-relaxed text-[#B42318]/80">
+        이 회원의 글·댓글·후기·맛집·주차 팁이 모두 숨겨지고, 재로그인과 같은
+        이메일 재가입도 막힙니다.
+      </p>
+      <input
+        value={reason}
+        maxLength={100}
+        onChange={(event) => setReason(event.target.value)}
+        placeholder="정지 사유 (선택 · 마스터 메모)"
+        className="mt-1.5 w-full rounded-[8px] border border-[#FDA29B] bg-white px-2 py-[6px] text-[11px] text-ink outline-none"
+      />
+      <div className="mt-1.5 flex gap-1.5">
+        <button
+          type="button"
+          onClick={() => onConfirm(reason)}
+          disabled={busy}
+          className="flex-1 rounded-[8px] bg-[#B42318] py-1.5 text-[10.5px] font-extrabold text-white disabled:opacity-60"
+        >
+          {busy ? "정지 중…" : "정지 확정"}
+        </button>
+        <button
+          type="button"
+          onClick={onCancel}
+          disabled={busy}
+          className="flex-1 rounded-[8px] bg-white py-1.5 text-[10.5px] font-extrabold text-ink-2 ring-1 ring-line disabled:opacity-60"
+        >
+          취소
+        </button>
+      </div>
+    </div>
+  );
+}
+
 interface SettingsSheetProps {
   open: boolean;
   onClose: () => void;
@@ -174,6 +225,9 @@ export function SettingsSheet({ open, onClose, onOpenReportTarget }: SettingsShe
     deleteUserParking,
     restoreReportedContent,
     deleteOwnAccount,
+    listUsers,
+    banUser,
+    unbanUser,
   } = useApp();
   const toast = useToast();
   const [profileOpen, setProfileOpen] = useState(false);
@@ -189,6 +243,20 @@ export function SettingsSheet({ open, onClose, onOpenReportTarget }: SettingsShe
   /** 회원 탈퇴 확인 창 */
   const [accountDeleteOpen, setAccountDeleteOpen] = useState(false);
   const [deletingAccount, setDeletingAccount] = useState(false);
+
+  /* ── 회원 관리 (마스터) ──────────────────────────────────── */
+  const [membersOpen, setMembersOpen] = useState(false);
+  const [members, setMembers] = useState<AdminUserSummary[]>([]);
+  const [membersLoading, setMembersLoading] = useState(false);
+  const [membersError, setMembersError] = useState<string | null>(null);
+  /** 지금 정지/해제를 처리 중인 회원 */
+  const [busyMember, setBusyMember] = useState<string | null>(null);
+  /** 영구 정지 2단계 확인을 기다리는 회원 (회원 목록 · 신고 카드 공용) */
+  const [confirmBan, setConfirmBan] = useState<{
+    userId: string;
+    nickname: string;
+    from: "member" | "report";
+  } | null>(null);
 
   const refreshReports = useCallback(async () => {
     setReportsLoading(true);
@@ -235,8 +303,66 @@ export function SettingsSheet({ open, onClose, onOpenReportTarget }: SettingsShe
       setReportsOpen(false);
       setAccountDeleteOpen(false);
       setConfirmReport(null);
+      setMembersOpen(false);
+      setConfirmBan(null);
     }
   }, [open]);
+
+  /* ── 회원 관리 ─────────────────────────────────────────────── */
+  const refreshMembers = useCallback(async () => {
+    setMembersLoading(true);
+    setMembersError(null);
+    try {
+      const list = await listUsers();
+      setMembers(list);
+    } catch (error) {
+      setMembers([]);
+      setMembersError(
+        error instanceof Error ? error.message : "회원 목록을 불러오지 못했어요",
+      );
+    } finally {
+      setMembersLoading(false);
+    }
+  }, [listUsers]);
+
+  useEffect(() => {
+    if (!open || !isAdmin || !membersOpen) return;
+    void refreshMembers();
+  }, [open, isAdmin, membersOpen, refreshMembers]);
+
+  /** 2단계 확인 뒤 실제 정지 — 글·후기 숨김까지 끝나면 목록과 신고함을 새로 읽습니다. */
+  const submitBan = async (userId: string, reason: string) => {
+    if (busyMember) return;
+    setBusyMember(userId);
+    const ok = await banUser(userId, reason.trim() || null);
+    setBusyMember(null);
+    if (!ok) return;
+    setConfirmBan(null);
+    setMembers((prev) =>
+      prev.map((member) =>
+        member.userId === userId
+          ? { ...member, isBanned: true, banReason: reason.trim() || null }
+          : member,
+      ),
+    );
+    if (reportsOpen) await refreshReports();
+  };
+
+  /** 영구 정지 해제 */
+  const submitUnban = async (userId: string) => {
+    if (busyMember) return;
+    setBusyMember(userId);
+    const ok = await unbanUser(userId);
+    setBusyMember(null);
+    if (!ok) return;
+    setMembers((prev) =>
+      prev.map((member) =>
+        member.userId === userId
+          ? { ...member, isBanned: false, banReason: null }
+          : member,
+      ),
+    );
+  };
 
   const signedIn = Boolean(user);
   const me = user ?? profile;
@@ -402,6 +528,7 @@ export function SettingsSheet({ open, onClose, onOpenReportTarget }: SettingsShe
           </div>
 
           {isAdmin ? (
+            <>
             <div className="border-t border-line-soft">
               <MenuRow
                 icon="shield"
@@ -527,6 +654,20 @@ export function SettingsSheet({ open, onClose, onOpenReportTarget }: SettingsShe
                                       onClick={() => void changeStatus(report, "dismissed")}
                                     />
                                   )}
+                                  {preview?.userId ? (
+                                    <ReportAction
+                                      label="작성자 정지"
+                                      tone="danger"
+                                      disabled={busyMember === preview.userId}
+                                      onClick={() =>
+                                        setConfirmBan({
+                                          userId: preview.userId as string,
+                                          nickname: preview.nickname,
+                                          from: "report",
+                                        })
+                                      }
+                                    />
+                                  ) : null}
                                   <ReportAction
                                     label="처리 완료"
                                     disabled={busyReport === report.id}
@@ -541,6 +682,18 @@ export function SettingsSheet({ open, onClose, onOpenReportTarget }: SettingsShe
                                 />
                               )}
                             </div>
+
+                            {confirmBan?.from === "report" &&
+                            preview?.userId === confirmBan.userId ? (
+                              <BanConfirm
+                                nickname={confirmBan.nickname}
+                                busy={busyMember === confirmBan.userId}
+                                onCancel={() => setConfirmBan(null)}
+                                onConfirm={(reason) =>
+                                  void submitBan(confirmBan.userId, reason)
+                                }
+                              />
+                            ) : null}
                           </div>
                         );
                       })}
@@ -556,6 +709,105 @@ export function SettingsSheet({ open, onClose, onOpenReportTarget }: SettingsShe
                 </div>
               ) : null}
             </div>
+
+            <div className="border-t border-line-soft">
+              <MenuRow
+                icon="my"
+                label="회원 관리"
+                hint={membersOpen ? "접기" : "정지·해제"}
+                onClick={() => setMembersOpen((value) => !value)}
+              />
+              {membersOpen ? (
+                <div className="border-t border-line-soft bg-[#FBFCFE] px-3.5 py-3">
+                  {membersLoading ? (
+                    <p className="py-2 text-center text-[11.5px] text-ink-faint">불러오는 중…</p>
+                  ) : membersError ? (
+                    <div className="rounded-[11px] border border-[#FECDCA] bg-[#FEF3F2] px-3 py-2.5">
+                      <p className="text-[11.5px] font-extrabold text-[#B42318]">
+                        회원 목록을 불러오지 못했어요
+                      </p>
+                      <p className="mt-1 wrap-any text-[10.5px] leading-relaxed text-[#B42318]/80">
+                        {membersError}
+                      </p>
+                    </div>
+                  ) : members.length === 0 ? (
+                    <p className="py-2 text-center text-[11.5px] text-ink-faint">
+                      아직 가입한 회원이 없어요.
+                    </p>
+                  ) : (
+                    <div className="flex max-h-[340px] flex-col gap-2 overflow-y-auto">
+                      {members.map((member) => (
+                        <div
+                          key={member.userId}
+                          className="rounded-[11px] border border-line bg-white px-3 py-2.5"
+                        >
+                          <div className="flex items-center gap-1.5">
+                            <span className="wrap-any text-[12px] font-extrabold text-ink">
+                              {member.nickname}
+                            </span>
+                            {member.isBanned ? (
+                              <span className="flex-none rounded-md bg-[#FEF3F2] px-1.5 py-[1px] text-[9.5px] font-extrabold text-[#B42318]">
+                                정지됨
+                              </span>
+                            ) : null}
+                            <span className="ml-auto flex-none text-[10px] font-semibold text-ink-faint">
+                              {new Date(member.createdAt).toLocaleDateString("ko-KR")} 가입
+                            </span>
+                          </div>
+                          <p className="mt-0.5 wrap-any text-[10.5px] text-ink-faint">
+                            {member.email ?? "이메일 없음"}
+                            {member.banReason ? ` · 사유: ${member.banReason}` : ""}
+                          </p>
+                          <div className="mt-1.5 flex flex-wrap items-center gap-1.5">
+                            {member.isBanned ? (
+                              <ReportAction
+                                label={busyMember === member.userId ? "해제 중…" : "정지 해제"}
+                                tone="brand"
+                                disabled={busyMember === member.userId}
+                                onClick={() => void submitUnban(member.userId)}
+                              />
+                            ) : (
+                              <ReportAction
+                                label="영구 정지"
+                                tone="danger"
+                                disabled={busyMember === member.userId}
+                                onClick={() =>
+                                  setConfirmBan({
+                                    userId: member.userId,
+                                    nickname: member.nickname,
+                                    from: "member",
+                                  })
+                                }
+                              />
+                            )}
+                            <span className="text-[9px] font-semibold text-[#B9C0CB]">
+                              {member.userId.slice(0, 8)}…
+                            </span>
+                          </div>
+                          {confirmBan?.from === "member" &&
+                          confirmBan.userId === member.userId ? (
+                            <BanConfirm
+                              nickname={member.nickname}
+                              busy={busyMember === member.userId}
+                              onCancel={() => setConfirmBan(null)}
+                              onConfirm={(reason) => void submitBan(member.userId, reason)}
+                            />
+                          ) : null}
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                  <button
+                    type="button"
+                    onClick={() => void refreshMembers()}
+                    className="mt-2 w-full rounded-[10px] bg-white py-2 text-[11px] font-extrabold text-ink-muted ring-1 ring-line"
+                  >
+                    새로고침
+                  </button>
+                </div>
+              ) : null}
+            </div>
+            </>
           ) : null}
         </div>
 

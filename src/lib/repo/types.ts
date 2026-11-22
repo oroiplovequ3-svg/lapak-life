@@ -1,5 +1,7 @@
 import type {
+  AdminUserSummary,
   Author,
+  BanStatus,
   Comment,
   Food,
   Game,
@@ -127,6 +129,16 @@ export interface Repository {
   /* ── 계정 ────────────────────────────────────────────────── */
   /** 회원 탈퇴 — 내 콘텐츠·사진과 계정을 서버에서 지웁니다 (delete_own_account RPC) */
   deleteOwnAccount(): Promise<void>;
+
+  /* ── 회원 정지 (마스터) ──────────────────────────────────── */
+  /** 로그인한 내가 영구 정지된 계정인지 (get_my_ban_status) */
+  getMyBanStatus(): Promise<BanStatus>;
+  /** 마스터만 — 회원 목록 (관리 패널) */
+  listUsers(): Promise<AdminUserSummary[]>;
+  /** 마스터만 — 회원 영구 정지 (admin_ban_user) */
+  banUser(userId: string, reason: string | null): Promise<void>;
+  /** 마스터만 — 영구 정지 해제 (admin_unban_user) */
+  unbanUser(userId: string): Promise<void>;
 }
 
 export const DEMO_AUTHOR: Author = {

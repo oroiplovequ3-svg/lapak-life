@@ -29,7 +29,10 @@ export async function GET(request: NextRequest) {
 
   const { error } = await supabase.auth.exchangeCodeForSession(code);
   if (error) {
-    return NextResponse.redirect(`${origin}/?auth_error=${encodeURIComponent(error.message)}`);
+    // 영구 정지된 계정은 Supabase Auth 가 "User is banned" 로 밀어냅니다.
+    const banned = /banned/i.test(error.message) || error.code === "user_banned";
+    const message = banned ? "운영 정책 위반으로 영구 정지된 계정입니다." : error.message;
+    return NextResponse.redirect(`${origin}/?auth_error=${encodeURIComponent(message)}`);
   }
 
   return NextResponse.redirect(`${origin}${next.startsWith("/") ? next : "/"}`);

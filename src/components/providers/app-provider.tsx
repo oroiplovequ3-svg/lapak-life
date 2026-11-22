@@ -20,6 +20,7 @@ import { DEMO_AUTHOR, type Repository, type SaveTargetType } from "@/lib/repo/ty
 import { getSupabaseBrowserClient } from "@/lib/supabase/client";
 import { getSiteUrl, isSupabaseConfigured } from "@/lib/supabase/config";
 import type {
+  AdminUserSummary,
   AppUser,
   Author,
   Comment,
@@ -128,10 +129,21 @@ interface AppContextValue {
   /* 계정 */
   deleteOwnAccount: () => Promise<boolean>;
 
+  /* 회원 영구 정지 (마스터) */
+  /** 마스터만 — 회원 목록 (닉네임·가입일·정지 여부) */
+  listUsers: () => Promise<AdminUserSummary[]>;
+  /** 마스터만 — 회원 영구 정지. 성공하면 목록·피드를 새로 읽어 옵니다 */
+  banUser: (userId: string, reason: string | null) => Promise<boolean>;
+  /** 마스터만 — 영구 정지 해제 */
+  unbanUser: (userId: string) => Promise<boolean>;
+
   reload: () => Promise<void>;
 }
 
 export type ReportSubmitResult = "ok" | "duplicate" | "error";
+
+/** 영구 정지된 계정이 로그인·세션을 가질 때 보여 주는 안내 */
+export const BANNED_ACCOUNT_MESSAGE = "운영 정책 위반으로 영구 정지된 계정입니다.";
 
 const AppContext = createContext<AppContextValue | null>(null);
 
@@ -349,13 +361,44 @@ export function AppProvider({ children }: { children: ReactNode }) {
     };
   }, [repo, user?.id]);
 
+  /* ── 2-2. 영구 정지 계정 감지 — 안내 후 자동 로그아웃 ───────── */
+  const banCheckedRef = useRef<string | null>(null);
+  useEffect(() => {
+    if (!user?.id) {
+      banCheckedRef.current = null;
+      return;
+    }
+    if (!repo) return;
+    if (banCheckedRef.current === user.id) return;
+    banCheckedRef.current = user.id;
+    let active = true;
+    repo
+      .getMyBanStatus()
+      .then(async (status) => {
+        if (!active || !status.banned) return;
+        toast(BANNED_ACCOUNT_MESSAGE);
+        const supabase = getSupabaseBrowserClient();
+        await supabase?.auth.signOut().catch(() => undefined);
+        if (active) setUser(null);
+      })
+      .catch(() => {});
+    return () => {
+      active = false;
+    };
+  }, [repo, user?.id, toast]);
+
   /* ── 3. OAuth 콜백 오류 안내 ────────────────────────────────── */
   useEffect(() => {
     if (typeof window === "undefined") return;
     const url = new URL(window.location.href);
     const authError = url.searchParams.get("auth_error");
     if (!authError) return;
-    toast(`로그인에 실패했어요: ${authError}`);
+    // 정지된 계정으로 로그인을 시도한 경우에는 사유문 하나만 보여 줍니다.
+    if (/영구 정지|banned/i.test(authError)) {
+      toast(BANNED_ACCOUNT_MESSAGE);
+    } else {
+      toast(`로그인에 실패했어요: ${authError}`);
+    }
     url.searchParams.delete("auth_error");
     window.history.replaceState({}, "", url.pathname + (url.search ? url.search : "") + url.hash);
   }, [toast]);
@@ -1146,6 +1189,43 @@ export function AppProvider({ children }: { children: ReactNode }) {
     }
   }, [repo, reload, toast]);
 
+  /* ── 13. 회원 영구 정지 (마스터) ──────────────────────────── */
+  const listUsers = useCallback(async () => {
+    if (!repo) return [];
+    return repo.listUsers();
+  }, [repo]);
+
+  const banUser = useCallback(
+    async (userId: string, reason: string | null) => {
+      if (!repo) return false;
+      try {
+        await repo.banUser(userId, reason);
+        toast("회원을 영구 정지했어요. 공개 글·후기도 함께 숨김 처리됐어요.");
+        await reload();
+        return true;
+      } catch (error) {
+        toast(errorMessage(error));
+        return false;
+      }
+    },
+    [repo, reload, toast],
+  );
+
+  const unbanUser = useCallback(
+    async (userId: string) => {
+      if (!repo) return false;
+      try {
+        await repo.unbanUser(userId);
+        toast("영구 정지를 해제했어요.");
+        return true;
+      } catch (error) {
+        toast(errorMessage(error));
+        return false;
+      }
+    },
+    [repo, toast],
+  );
+
   const value = useMemo<AppContextValue>(
     () => ({
       configured: isSupabaseConfigured,
@@ -1206,6 +1286,9 @@ export function AppProvider({ children }: { children: ReactNode }) {
       loadReportTarget,
       restoreReportedContent,
       deleteOwnAccount,
+      listUsers,
+      banUser,
+      unbanUser,
       reload,
     }),
     [
@@ -1265,6 +1348,9 @@ export function AppProvider({ children }: { children: ReactNode }) {
       loadReportTarget,
       restoreReportedContent,
       deleteOwnAccount,
+      listUsers,
+      banUser,
+      unbanUser,
       reload,
     ],
   );

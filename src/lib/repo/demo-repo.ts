@@ -477,7 +477,9 @@ export class DemoRepository implements Repository {
       reportCount: this.reportCountOf("review", review.id),
       isHidden: false,
     }));
-    return assignPostNos(merged);
+    return assignPostNos(merged).sort(
+      (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime(),
+    );
   }
 
   async createReview(input: NewReviewInput, author: Author): Promise<ZoneReview> {
@@ -640,7 +642,9 @@ export class DemoRepository implements Repository {
       reportCount: this.reportCountOf("user_food", food.id),
       isHidden: false,
     }));
-    return assignPostNos(merged);
+    return assignPostNos(merged).sort(
+      (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime(),
+    );
   }
 
   /* ── 직관러 맛집 댓글 (데모 모드) ────────────────────────── */
@@ -773,7 +777,9 @@ export class DemoRepository implements Repository {
       reportCount: this.reportCountOf("user_parking", parking.id),
       isHidden: false,
     }));
-    return assignPostNos(merged);
+    return assignPostNos(merged).sort(
+      (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime(),
+    );
   }
 
   async createUserParking(

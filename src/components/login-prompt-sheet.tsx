@@ -58,6 +58,15 @@ export function LoginPromptSheet() {
         >
           개인정보처리방침
         </Link>
+        {" · "}
+        <Link
+          href="/terms"
+          target="_blank"
+          rel="noopener noreferrer"
+          className="font-extrabold text-brand-600 underline underline-offset-2"
+        >
+          이용약관
+        </Link>
       </p>
     </Sheet>
   );

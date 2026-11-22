@@ -1,10 +1,11 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 
 import { Avatar } from "@/components/avatar";
 import { DeleteButton } from "@/components/delete-button";
 import { Icon, Stars } from "@/components/icons";
+import { Pagination } from "@/components/pagination";
 import {
   PhotoLightbox,
   PhotoTiles,
@@ -38,47 +39,6 @@ const DEFAULT_REVIEW_ZONE = "T3";
 
 /** 후기 목록 한 페이지에 보여줄 개수 */
 const REVIEWS_PER_PAGE = 5;
-
-/** 페이지 버튼 목록 — 페이지가 많으면 현재 위치 주변만 숫자로 보여줍니다. */
-function pageNumbers(current: number, total: number): (number | "gap")[] {
-  if (total <= 7) return Array.from({ length: total }, (_, i) => i + 1);
-  const nums = [...new Set([1, total, current - 1, current, current + 1])]
-    .filter((n) => n >= 1 && n <= total)
-    .sort((a, b) => a - b);
-  const out: (number | "gap")[] = [];
-  nums.forEach((n, i) => {
-    if (i > 0 && n - nums[i - 1] > 1) out.push("gap");
-    out.push(n);
-  });
-  return out;
-}
-
-/** 후기 페이지 이동 버튼 (<, >) */
-function PageArrow({
-  label,
-  disabled,
-  onClick,
-  children,
-}: {
-  label: string;
-  disabled: boolean;
-  onClick: () => void;
-  children: ReactNode;
-}) {
-  return (
-    <button
-      type="button"
-      aria-label={label}
-      disabled={disabled}
-      onClick={onClick}
-      className={`grid h-7 w-7 place-items-center rounded-[9px] transition active:scale-[.96] ${
-        disabled ? "cursor-default text-[#D5DAE1]" : "text-ink-muted hover:bg-[#F3F5F9]"
-      }`}
-    >
-      {children}
-    </button>
-  );
-}
 
 export function SeatScreen({
   selectedZone,
@@ -247,7 +207,7 @@ export function SeatScreen({
                 />
                 <div className="min-w-0 flex-1">
                   <div className="flex flex-wrap items-center gap-1">
-                    <span className="text-[13.5px] font-extrabold tracking-tight">
+                    <span className="wrap-any text-[13.5px] font-extrabold tracking-tight">
                       {review.nickname}
                     </span>
                     <span
@@ -258,7 +218,7 @@ export function SeatScreen({
                       {review.badge}
                     </span>
                   </div>
-                  <div className="mt-0.5 text-[11px] text-ink-faint">
+                  <div className="mt-0.5 wrap-any text-[11px] text-ink-faint">
                     {zoneFullName(review.zoneCode)} · {formatRelativeTime(review.createdAt)}
                   </div>
                 </div>
@@ -285,7 +245,7 @@ export function SeatScreen({
                   </button>
                 )}
               </div>
-              <p className="mt-[9px] break-keep text-[13.5px] leading-relaxed text-[#1D2939]">
+              <p className="mt-[9px] wrap-any text-[13.5px] leading-relaxed text-[#1D2939]">
                 {review.body}
               </p>
               <PhotoTiles
@@ -294,7 +254,7 @@ export function SeatScreen({
                 label="후기 사진"
               />
               {review.seatDetail ? (
-                <span className="mt-[9px] inline-block rounded-md bg-[#F3F8FF] px-[7px] py-0.5 text-[11px] font-bold text-brand-600">
+                <span className="mt-[9px] inline-block max-w-full wrap-any rounded-md bg-[#F3F8FF] px-[7px] py-0.5 text-[11px] font-bold text-brand-600">
                   {review.seatDetail}
                 </span>
               ) : null}
@@ -325,51 +285,12 @@ export function SeatScreen({
         )}
       </div>
 
-      {filteredReviews.length > REVIEWS_PER_PAGE ? (
-        <nav
-          aria-label="직관 시야 후기 페이지"
-          className="flex items-center justify-center gap-1.5 rounded-md2 border border-line bg-white px-2 py-1.5 shadow-card"
-        >
-          <PageArrow
-            label="이전 페이지"
-            disabled={currentReviewPage === 1}
-            onClick={() => goReviewPage(currentReviewPage - 1)}
-          >
-            <Icon name="chevron" size={12} strokeWidth={2.8} className="rotate-180" />
-          </PageArrow>
-          {pageNumbers(currentReviewPage, reviewPageCount).map((n, index) =>
-            n === "gap" ? (
-              <span
-                key={`gap-${index}`}
-                className="px-0.5 text-[11px] font-bold text-[#B9C0CB]"
-              >
-                …
-              </span>
-            ) : (
-              <button
-                key={n}
-                type="button"
-                aria-current={n === currentReviewPage ? "page" : undefined}
-                onClick={() => goReviewPage(n)}
-                className={`grid h-7 min-w-[28px] place-items-center rounded-[9px] px-1.5 text-[11.5px] font-extrabold transition active:scale-[.96] ${
-                  n === currentReviewPage
-                    ? "bg-brand text-white shadow-brand"
-                    : "text-ink-muted hover:bg-[#F3F5F9]"
-                }`}
-              >
-                {n}
-              </button>
-            ),
-          )}
-          <PageArrow
-            label="다음 페이지"
-            disabled={currentReviewPage === reviewPageCount}
-            onClick={() => goReviewPage(currentReviewPage + 1)}
-          >
-            <Icon name="chevron" size={12} strokeWidth={2.8} />
-          </PageArrow>
-        </nav>
-      ) : null}
+      <Pagination
+        page={currentReviewPage}
+        pageCount={reviewPageCount}
+        onChange={goReviewPage}
+        label="직관 시야 후기 페이지"
+      />
 
       <section
         ref={pickerRef}
@@ -586,7 +507,7 @@ export function SeatScreen({
                 <span className="w-[22px] flex-none text-sm leading-[1.4]">{fi}</span>
                 <div>
                   <div className="text-[10.5px] font-extrabold text-ink-faint">{fl}</div>
-                  <div className="mt-0.5 break-keep text-[13px] leading-relaxed text-ink-2">{ft}</div>
+                  <div className="mt-0.5 wrap-any text-[13px] leading-relaxed text-ink-2">{ft}</div>
                 </div>
               </div>
             ))}
@@ -641,7 +562,7 @@ export function SeatScreen({
                 <span className="w-[22px] flex-none text-sm leading-[1.4]">{fi}</span>
                 <div>
                   <div className="text-[10.5px] font-extrabold text-ink-faint">{fl}</div>
-                  <div className="mt-0.5 break-keep text-[13px] leading-relaxed text-ink-2">{ft}</div>
+                  <div className="mt-0.5 wrap-any text-[13px] leading-relaxed text-ink-2">{ft}</div>
                 </div>
               </div>
             ))}

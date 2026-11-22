@@ -21,6 +21,7 @@ import type {
   Post,
   ProfileUpdate,
   Report,
+  ReportTargetPreview,
   Saves,
   UserFood,
   UserParking,
@@ -725,7 +726,17 @@ export class DemoRepository implements Repository {
     return [];
   }
 
-  async resolveReport(): Promise<void> {
+  async setReportStatus(): Promise<void> {
     throw new Error("데모 모드에서는 신고를 처리할 수 없어요.");
+  }
+
+  /** 데모 모드 신고는 대상 미리보기를 따로 보관하지 않습니다. */
+  async loadReportTarget(): Promise<ReportTargetPreview> {
+    return { found: false, body: "", nickname: "", postId: null, zoneCode: null };
+  }
+
+  /** 데모 모드에는 서버 계정이 없어 탈퇴할 계정도 없습니다. */
+  async deleteOwnAccount(): Promise<void> {
+    throw new Error("데모 모드에서는 탈퇴할 계정이 없어요. 구글 로그인 후 이용해 주세요.");
   }
 }

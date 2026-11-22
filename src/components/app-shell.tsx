@@ -15,7 +15,7 @@ import { FoodScreen } from "@/components/screens/food-screen";
 import { HomeScreen } from "@/components/screens/home-screen";
 import { MyScreen } from "@/components/screens/my-screen";
 import { SeatScreen } from "@/components/screens/seat-screen";
-import type { FoodFocus, FoodFocusKind, Game } from "@/lib/types";
+import type { FoodFocus, FoodFocusKind, Game, Report, ReportTargetPreview } from "@/lib/types";
 
 type Tab = "home" | "seat" | "food" | "my";
 
@@ -104,8 +104,7 @@ export function AppShell() {
     scrollScreenTop();
   };
 
-  const openFoodFromSearch = (kind: FoodFocusKind, id: string) => {
-    const nonce = Date.now();
+  const openFoodFromSearch = (kind: FoodFocusKind, id: string) => {    const nonce = Date.now();
     setFoodFocus({ kind, id, nonce });
     setTab("food");
     scrollScreenTop();
@@ -113,6 +112,36 @@ export function AppShell() {
     window.setTimeout(() => {
       setFoodFocus((current) => (current?.nonce === nonce ? null : current));
     }, 1000);
+  };
+
+  /** 설정 → 신고 관리에서 '대상 보기' — 글·후기·맛집·주차 팁으로 바로 이동합니다. */
+  const openReportTarget = (
+    report: Report,
+    preview: ReportTargetPreview | null,
+  ) => {
+    setSettingsOpen(false);
+    switch (report.targetType) {
+      case "post":
+        openMyPost(report.targetId);
+        break;
+      case "comment":
+        if (preview?.postId) openMyPost(preview.postId);
+        break;
+      case "review":
+        if (preview?.zoneCode) {
+          setSeatZone(preview.zoneCode);
+          setSeatFocusNonce((value) => value + 1);
+        }
+        setTab("seat");
+        scrollScreenTop();
+        break;
+      case "user_food":
+        openFoodFromSearch("user-food", report.targetId);
+        break;
+      case "user_parking":
+        openFoodFromSearch("user-parking", report.targetId);
+        break;
+    }
   };
 
   return (
@@ -267,7 +296,11 @@ export function AppShell() {
         onOpenZone={openZoneFromSearch}
         onOpenFood={openFoodFromSearch}
       />
-      <SettingsSheet open={settingsOpen} onClose={() => setSettingsOpen(false)} />
+      <SettingsSheet
+        open={settingsOpen}
+        onClose={() => setSettingsOpen(false)}
+        onOpenReportTarget={openReportTarget}
+      />
       <LoginPromptSheet />
     </div>
   );

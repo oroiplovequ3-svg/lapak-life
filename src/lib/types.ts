@@ -246,8 +246,23 @@ export interface Report {
   reason: string;
   /** 사용자가 덧붙인 설명 (선택) */
   detail: string;
-  status: "open" | "resolved";
+  /** open=접수됨 · resolved=삭제 등으로 처리 완료 · dismissed=문제 없음으로 기각 */
+  status: "open" | "resolved" | "dismissed";
   createdAt: string;
+}
+
+/** 신고 대상의 본문 미리보기 — 마스터가 신고 목록에서 내용을 바로 확인할 때 씁니다. */
+export interface ReportTargetPreview {
+  /** 대상이 아직 남아 있는지 (지워졌으면 false) */
+  found: boolean;
+  /** 본문·이름 등 한두 줄 미리보기 */
+  body: string;
+  /** 쓴 사람 닉네임 */
+  nickname: string;
+  /** 댓글이면 부모 글 id (글로 바로 이동할 때) */
+  postId: string | null;
+  /** 시야 후기면 구역 코드 (좌석 시야 탭으로 이동할 때) */
+  zoneCode: string | null;
 }
 
 export interface NewReportInput {

@@ -34,6 +34,8 @@ import type {
   Post,
   ProfileUpdate,
   Report,
+  ReportTargetPreview,
+  ReportTargetType,
   Saves,
   UserFood,
   UserParking,
@@ -104,11 +106,22 @@ interface AppContextValue {
   deleteUserParking: (parkingId: string) => Promise<void>;
 
   /* 신고 — 누구나 접수, 목록·처리는 마스터만 */
-  createReport: (input: NewReportInput) => Promise<boolean>;
+  /** "duplicate" = 이미 신고한 항목 (시트를 닫고 안내만) */
+  createReport: (input: NewReportInput) => Promise<ReportSubmitResult>;
   loadReports: () => Promise<Report[]>;
-  resolveReport: (reportId: string) => Promise<boolean>;
+  setReportStatus: (reportId: string, status: Report["status"]) => Promise<boolean>;
+  loadReportTarget: (
+    targetType: ReportTargetType,
+    targetId: string,
+  ) => Promise<ReportTargetPreview>;
+
+  /* 계정 */
+  deleteOwnAccount: () => Promise<boolean>;
+
   reload: () => Promise<void>;
 }
+
+export type ReportSubmitResult = "ok" | "duplicate" | "error";
 
 const AppContext = createContext<AppContextValue | null>(null);
 
@@ -909,40 +922,49 @@ export function AppProvider({ children }: { children: ReactNode }) {
 
   /* ── 11. 신고 ──────────────────────────────────────────────── */
   const createReport = useCallback(
-    async (input: NewReportInput) => {
-      if (!repo) return false;
+    async (input: NewReportInput): Promise<ReportSubmitResult> => {
+      if (!repo) return "error";
       const reporterId = userRef.current?.id ?? null;
       if (!reporterId) {
         setAuthPrompt({ open: true, reason: "신고하려면 구글 로그인이 필요해요" });
-        return false;
+        return "error";
       }
       try {
         await repo.createReport(input, reporterId);
         toast("신고를 접수했어요. 확인 후 처리할게요.");
-        return true;
+        return "ok";
       } catch (error) {
-        toast(errorMessage(error));
-        return false;
+        const message = errorMessage(error);
+        if (message.includes("이미 신고한")) {
+          // 이미 접수된 항목 — 안내만 하고 신고 시트는 깔끔히 닫습니다.
+          toast("이미 신고 접수된 항목이에요");
+          return "duplicate";
+        }
+        toast(message);
+        return "error";
       }
     },
     [repo, toast],
   );
 
+  /** 신고 목록 읽기 — 실패를 숨기지 않고 그대로 던져 마스터 화면에 보여 줍니다. */
   const loadReports = useCallback(async () => {
-    if (!repo) return [];
-    try {
-      return await repo.loadReports();
-    } catch {
-      return [];
-    }
+    if (!repo) throw new Error("저장소가 아직 준비되지 않았어요.");
+    return repo.loadReports();
   }, [repo]);
 
-  const resolveReport = useCallback(
-    async (reportId: string) => {
+  const setReportStatus = useCallback(
+    async (reportId: string, status: Report["status"]) => {
       if (!repo) return false;
       try {
-        await repo.resolveReport(reportId);
-        toast("신고를 처리 완료로 표시했어요");
+        await repo.setReportStatus(reportId, status);
+        toast(
+          status === "dismissed"
+            ? "신고를 기각했어요"
+            : status === "resolved"
+              ? "신고를 처리 완료로 표시했어요"
+              : "신고를 다시 열었어요",
+        );
         return true;
       } catch (error) {
         toast(errorMessage(error));
@@ -951,6 +973,31 @@ export function AppProvider({ children }: { children: ReactNode }) {
     },
     [repo, toast],
   );
+
+  const loadReportTarget = useCallback(
+    async (targetType: ReportTargetType, targetId: string) => {
+      if (!repo) {
+        return { found: false, body: "", nickname: "", postId: null, zoneCode: null };
+      }
+      return repo.loadReportTarget(targetType, targetId);
+    },
+    [repo],
+  );
+
+  /* ── 12. 회원 탈퇴 ─────────────────────────────────────────── */
+  const deleteOwnAccount = useCallback(async () => {
+    if (!repo) return false;
+    try {
+      await repo.deleteOwnAccount();
+      setUser(null);
+      await reload();
+      toast("회원 탈퇴를 마쳤어요. 그동안 인블루와 함께해 주셔서 고마웠어요.");
+      return true;
+    } catch (error) {
+      toast(errorMessage(error));
+      return false;
+    }
+  }, [repo, reload, toast]);
 
   const value = useMemo<AppContextValue>(
     () => ({
@@ -1002,7 +1049,9 @@ export function AppProvider({ children }: { children: ReactNode }) {
       deleteUserParking,
       createReport,
       loadReports,
-      resolveReport,
+      setReportStatus,
+      loadReportTarget,
+      deleteOwnAccount,
       reload,
     }),
     [
@@ -1052,7 +1101,9 @@ export function AppProvider({ children }: { children: ReactNode }) {
       deleteUserParking,
       createReport,
       loadReports,
-      resolveReport,
+      setReportStatus,
+      loadReportTarget,
+      deleteOwnAccount,
       reload,
     ],
   );

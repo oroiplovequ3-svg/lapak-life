@@ -41,6 +41,16 @@ select {
   letter-spacing: inherit;
 }
 
+/* 사용자가 쓴 글·댓글·후기·꿀팁처럼 자유 입력 텍스트에 씁니다.
+   한국어는 어절 단위로 끊되(keep-all), 링크처럼 공백 없는 긴 문자열은
+   어디서든 끊어 390px 화면 밖으로 넘치지 않게 합니다. */
+@layer utilities {
+  .wrap-any {
+    word-break: keep-all;
+    overflow-wrap: anywhere;
+  }
+}
+
 /* 데스크톱에서 기기 프레임 느낌 */
 @media (min-width: 520px) {
   body {

@@ -17,6 +17,8 @@ import type {
   Post,
   ProfileUpdate,
   Report,
+  ReportTargetPreview,
+  ReportTargetType,
   Saves,
   UserFood,
   UserParking,
@@ -787,7 +789,9 @@ export class SupabaseRepository implements Repository {
           (item) => item.gameIndex === gameIndex && item.photoIndex === photoIndex,
         );
         if (!target) return value;
-        return signedByPath.get(target.path) ?? "";
+        // 서명에 실패한 사진은 빼지 않고 원래 값을 남깁니다. 화면(PhotoTiles)이
+        // 깨진 아이콘 대신 "사진을 불러오지 못했어요" 안내를 보여 줍니다.
+        return signedByPath.get(target.path) ?? value;
       });
       return { ...game, photoUrls: photoUrls.filter(Boolean) };
     });
@@ -1230,23 +1234,154 @@ export class SupabaseRepository implements Repository {
       .select("id, target_type, target_id, reason, detail, status, created_at")
       .order("created_at", { ascending: false })
       .limit(100);
-    if (error) return [];
-    return ((data ?? []) as AnyRow[]).map((row) => ({
-      id: str(row.id),
-      targetType: str(row.target_type) as Report["targetType"],
-      targetId: str(row.target_id),
-      reason: str(row.reason),
-      detail: str(row.detail),
-      status: row.status === "resolved" ? "resolved" : "open",
-      createdAt: str(row.created_at) || new Date().toISOString(),
-    }));
+    if (error) fail("신고 목록을 불러오지 못했습니다", error);
+    return ((data ?? []) as AnyRow[]).map((row) => {
+      const status = str(row.status);
+      return {
+        id: str(row.id),
+        targetType: str(row.target_type) as Report["targetType"],
+        targetId: str(row.target_id),
+        reason: str(row.reason),
+        detail: str(row.detail),
+        status:
+          status === "resolved" || status === "dismissed"
+            ? (status as Report["status"])
+            : "open",
+        createdAt: str(row.created_at) || new Date().toISOString(),
+      };
+    });
   }
 
-  async resolveReport(reportId: string): Promise<void> {
+  /** 신고 처리 — 처리 완료(resolved) · 기각(dismissed) · 다시 열기(open) */
+  async setReportStatus(reportId: string, status: Report["status"]): Promise<void> {
     const { error } = await this.supabase
       .from("reports")
-      .update({ status: "resolved", resolved_at: new Date().toISOString() })
+      .update({
+        status,
+        resolved_at: status === "open" ? null : new Date().toISOString(),
+      })
       .eq("id", reportId);
     if (error) fail("신고를 처리하지 못했습니다", error);
+  }
+
+  /**
+   * 신고된 대상 미리보기 — 마스터가 8자 UUID만 보고 추측하지 않도록
+   * 본문·작성자·이동에 필요한 정보(글 id, 구역 코드)를 읽어 옵니다.
+   * 테이블은 공개 읽기 대상이라 마스터 화면에서 바로 조회됩니다.
+   */
+  async loadReportTarget(
+    targetType: ReportTargetType,
+    targetId: string,
+  ): Promise<ReportTargetPreview> {
+    const empty: ReportTargetPreview = {
+      found: false,
+      body: "",
+      nickname: "",
+      postId: null,
+      zoneCode: null,
+    };
+
+    if (targetType === "post" || targetType === "comment") {
+      if (targetType === "post") {
+        const { data, error } = await this.supabase
+          .from("posts")
+          .select("id, body, profiles(nickname)")
+          .eq("id", targetId)
+          .maybeSingle();
+        if (error) fail("신고된 내용을 불러오지 못했습니다", error);
+        if (!data) return empty;
+        const row = data as AnyRow;
+        return {
+          found: true,
+          body: str(row.body),
+          nickname: embeddedProfile(row).nickname,
+          postId: targetId,
+          zoneCode: null,
+        };
+      }
+
+      const { data, error } = await this.supabase
+        .from("comments")
+        .select("id, body, post_id, profiles(nickname)")
+        .eq("id", targetId)
+        .maybeSingle();
+      if (error) fail("신고된 내용을 불러오지 못했습니다", error);
+      if (!data) return empty;
+      const row = data as AnyRow;
+      return {
+        found: true,
+        body: str(row.body),
+        nickname: embeddedProfile(row).nickname,
+        postId: str(row.post_id) || null,
+        zoneCode: null,
+      };
+    }
+
+    if (targetType === "review") {
+      const { data, error } = await this.supabase
+        .from("zone_reviews")
+        .select("id, body, zone_code, profiles(nickname)")
+        .eq("id", targetId)
+        .maybeSingle();
+      if (error) fail("신고된 내용을 불러오지 못했습니다", error);
+      if (!data) return empty;
+      const row = data as AnyRow;
+      return {
+        found: true,
+        body: str(row.body),
+        nickname: embeddedProfile(row).nickname,
+        postId: null,
+        zoneCode: str(row.zone_code) || null,
+      };
+    }
+
+    if (targetType === "user_food") {
+      const { data, error } = await this.supabase
+        .from("user_foods")
+        .select("id, name, tip, place, profiles(nickname)")
+        .eq("id", targetId)
+        .maybeSingle();
+      if (error) fail("신고된 내용을 불러오지 못했습니다", error);
+      if (!data) return empty;
+      const row = data as AnyRow;
+      return {
+        found: true,
+        body: [str(row.name), str(row.place), str(row.tip)].filter(Boolean).join(" · "),
+        nickname: embeddedProfile(row).nickname,
+        postId: null,
+        zoneCode: null,
+      };
+    }
+
+    const { data, error } = await this.supabase
+      .from("user_parkings")
+      .select("id, name, location, tip, profiles(nickname)")
+      .eq("id", targetId)
+      .maybeSingle();
+    if (error) fail("신고된 내용을 불러오지 못했습니다", error);
+    if (!data) return empty;
+    const row = data as AnyRow;
+    return {
+      found: true,
+      body: [str(row.name), str(row.location), str(row.tip)].filter(Boolean).join(" · "),
+      nickname: embeddedProfile(row).nickname,
+      postId: null,
+      zoneCode: null,
+    };
+  }
+
+  /**
+   * 회원 탈퇴 — 서버 함수(delete_own_account)가 내 사진·콘텐츠·프로필·계정을
+   * 한 트랜잭션으로 지우고, 끝나면 이 브라우저의 세션도 정리합니다.
+   */
+  async deleteOwnAccount(): Promise<void> {
+    const { error } = await this.supabase.rpc("delete_own_account");
+    if (error) {
+      if (error.code === "42883") {
+        throw new Error("회원 탈퇴 기능이 아직 준비되지 않았어요. 운영자에게 문의해 주세요.");
+      }
+      fail("회원 탈퇴를 처리하지 못했습니다", error);
+    }
+    await this.supabase.auth.signOut().catch(() => undefined);
   }
 }

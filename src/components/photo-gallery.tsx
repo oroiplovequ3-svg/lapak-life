@@ -1,10 +1,42 @@
 "use client";
 
+import { useState } from "react";
+
 import { Icon } from "@/components/icons";
 
 export interface PhotoLightboxState {
   urls: string[];
   index: number;
+}
+
+/**
+ * 사진 한 장 — 불러오지 못하면 깨진 아이콘 대신 안내 상자를 보여 줍니다.
+ * (서명 URL 만료·삭제된 파일·느린 회선에서 사진이 조용히 사라지지 않게)
+ */
+function PhotoImage({ url, alt }: { url: string; alt: string }) {
+  const [failed, setFailed] = useState(false);
+
+  if (failed) {
+    return (
+      <div className="flex h-full w-full flex-col items-center justify-center gap-1 bg-[#F2F4F7] px-2 text-center">
+        <Icon name="info" size={17} strokeWidth={1.9} className="text-[#98A2B3]" />
+        <span className="wrap-any text-[10.5px] font-bold leading-relaxed text-[#98A2B3]">
+          사진을 불러오지 못했어요
+        </span>
+      </div>
+    );
+  }
+
+  return (
+    // eslint-disable-next-line @next/next/no-img-element
+    <img
+      src={url}
+      alt={alt}
+      loading="lazy"
+      onError={() => setFailed(true)}
+      className="h-full w-full object-cover"
+    />
+  );
 }
 
 /**
@@ -30,16 +62,10 @@ export function PhotoTiles({
         type="button"
         onClick={() => onOpen(0)}
         aria-label={`${label} 크게 보기`}
+        style={{ height: singleHeight }}
         className="mt-2.5 block w-full overflow-hidden rounded-[12px] border border-line bg-[#F5F7FA] active:opacity-90"
       >
-        {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img
-          src={urls[0]}
-          alt={label}
-          loading="lazy"
-          className="w-full object-cover"
-          style={{ height: singleHeight }}
-        />
+        <PhotoImage url={urls[0]} alt={label} />
       </button>
     );
   }
@@ -54,13 +80,7 @@ export function PhotoTiles({
           aria-label={`${label} ${index + 1} 크게 보기`}
           className="aspect-square overflow-hidden rounded-[11px] border border-line bg-[#F5F7FA] active:opacity-90"
         >
-          {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img
-            src={url}
-            alt={`${label} ${index + 1}`}
-            loading="lazy"
-            className="h-full w-full object-cover"
-          />
+          <PhotoImage url={url} alt={`${label} ${index + 1}`} />
         </button>
       ))}
     </div>

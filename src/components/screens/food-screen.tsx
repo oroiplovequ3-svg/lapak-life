@@ -40,7 +40,7 @@ function SectionHead({
         <h2 className="text-[15.5px] font-extrabold tracking-tight2">
           {title} <span className="text-[11.5px] font-extrabold text-ink-faint">{count}</span>
         </h2>
-        <p className="mt-[2px] break-keep text-[10.5px] font-semibold text-ink-faint">{sub}</p>
+        <p className="mt-[2px] wrap-any text-[10.5px] font-semibold text-ink-faint">{sub}</p>
       </div>
       <button
         type="button"
@@ -82,12 +82,12 @@ function UserFoodCard({
         </div>
         <div className="min-w-0 flex-1">
           <div className="flex flex-wrap items-baseline gap-x-[7px] gap-y-0.5">
-            <h3 className="text-[13.5px] font-extrabold tracking-tight2">{food.name}</h3>
+            <h3 className="min-w-0 wrap-any text-[13.5px] font-extrabold tracking-tight2">{food.name}</h3>
             <span className="rounded-md bg-[#F2F8FF] px-1.5 py-[1px] text-[10px] font-extrabold text-[#0B4A96]">
               {food.inStadium ? "구장 안" : "구장 밖"}
             </span>
           </div>
-          <div className="mt-[3px] flex items-center gap-1 text-[10.5px] font-semibold text-ink-faint">
+          <div className="mt-[3px] flex min-w-0 items-center gap-1 wrap-any text-[10.5px] font-semibold text-ink-faint">
             <Stars value={food.rating} size={10} />
             <Avatar
               nickname={food.nickname}
@@ -98,12 +98,12 @@ function UserFoodCard({
             <span className="ml-0.5">{food.nickname}</span>
           </div>
           {food.menu ? (
-            <p className="mt-1.5 break-keep text-[11.5px] font-extrabold text-brand-600">
+            <p className="mt-1.5 wrap-any text-[11.5px] font-extrabold text-brand-600">
               {food.menu}
             </p>
           ) : null}
           {food.tip ? (
-            <div className="mt-1.5 break-keep rounded-[9px] bg-[#F8FAFC] px-[9px] py-[7px] text-[11.5px] leading-[1.5] text-[#475467]">
+            <div className="mt-1.5 wrap-any rounded-[9px] bg-[#F8FAFC] px-[9px] py-[7px] text-[11.5px] leading-[1.5] text-[#475467]">
               💡 {food.tip}
             </div>
           ) : null}
@@ -165,7 +165,7 @@ function UserParkingCard({
         </div>
         <div className="min-w-0 flex-1">
           <div className="flex flex-wrap items-baseline gap-x-[7px] gap-y-0.5">
-            <h3 className="text-[13.5px] font-extrabold tracking-tight2">{parking.name}</h3>
+            <h3 className="min-w-0 wrap-any text-[13.5px] font-extrabold tracking-tight2">{parking.name}</h3>
             <span
               className={`rounded-md px-1.5 py-[1px] text-[10px] font-extrabold ${
                 parking.isFree ? "bg-[#ECFDF3] text-[#027A48]" : "bg-[#FFFAEB] text-[#B54708]"
@@ -174,7 +174,7 @@ function UserParkingCard({
               {parking.isFree ? "무료" : parking.feeNote || "유료"}
             </span>
           </div>
-          <div className="mt-[3px] flex items-center gap-1 break-keep text-[10.5px] font-semibold text-ink-faint">
+          <div className="mt-[3px] flex min-w-0 items-center gap-1 wrap-any text-[10.5px] font-semibold text-ink-faint">
             <Avatar
               nickname={parking.nickname}
               avatarUrl={parking.avatarUrl}
@@ -184,7 +184,7 @@ function UserParkingCard({
             <span>{[parking.location, parking.walkTime, parking.nickname].filter(Boolean).join(" · ")}</span>
           </div>
           {parking.tip ? (
-            <div className="mt-1.5 break-keep rounded-[9px] bg-[#F8FAFC] px-[9px] py-[7px] text-[11.5px] leading-[1.5] text-[#475467]">
+            <div className="mt-1.5 wrap-any rounded-[9px] bg-[#F8FAFC] px-[9px] py-[7px] text-[11.5px] leading-[1.5] text-[#475467]">
               💡 {parking.tip}
             </div>
           ) : null}
@@ -423,7 +423,7 @@ function FoodOverview({ foods }: { foods: Food[] }) {
       <section className="relative overflow-hidden rounded-lg2 bg-gradient-to-br from-brand via-brand-600 to-brand-500 px-4 py-4 text-white shadow-brand">
         <div className="pointer-events-none absolute -bottom-[60px] -right-10 h-[150px] w-[150px] rounded-full bg-white/[.07]" />
         <div className="relative text-lg font-extrabold tracking-tight3">🍽️ 라팍 먹거리 한눈에</div>
-        <div className="relative mt-[5px] break-keep text-[11.5px] font-semibold text-white/80">
+        <div className="relative mt-[5px] wrap-any text-[11.5px] font-semibold text-white/80">
           구장 안 {inside}곳 · 구장 밖 {outside}곳 · 2026 시즌 식음매장 안내 기준
         </div>
         <div className="relative mt-3.5 grid grid-cols-3 gap-[7px]">
@@ -459,7 +459,7 @@ function FoodOverview({ foods }: { foods: Food[] }) {
             <span className="w-[22px] flex-none text-sm leading-[1.4]">{emoji}</span>
             <div>
               <div className="text-[10.5px] font-extrabold text-ink-faint">{title}</div>
-              <div className="mt-0.5 break-keep text-[12.5px] leading-relaxed text-ink-2">
+              <div className="mt-0.5 wrap-any text-[12.5px] leading-relaxed text-ink-2">
                 {body}
               </div>
             </div>
@@ -507,7 +507,7 @@ function FoodCard({ food }: { food: Food }) {
             ) : null}
           </div>
           <div className="mt-[3px] text-[11px] font-semibold text-ink-muted">📍 {food.loc}</div>
-          <p className="mt-1.5 break-keep text-xs leading-relaxed text-ink-2">{food.menu}</p>
+          <p className="mt-1.5 wrap-any text-xs leading-relaxed text-ink-2">{food.menu}</p>
           <div className="mt-2 flex flex-wrap items-center gap-2">
             <span className="rounded-md bg-[#FFFAEB] px-1.5 py-0.5 text-[11px] font-extrabold text-[#B54708]">
               ★ {food.rating.toFixed(1)}
@@ -519,7 +519,7 @@ function FoodCard({ food }: { food: Food }) {
               {food.inStadium ? "구장 안" : "구장 밖"}
             </span>
           </div>
-          <div className="mt-2 break-keep rounded-[9px] bg-[#F8FAFC] px-[9px] py-[7px] text-[11.5px] leading-[1.5] text-[#475467]">
+          <div className="mt-2 wrap-any rounded-[9px] bg-[#F8FAFC] px-[9px] py-[7px] text-[11.5px] leading-[1.5] text-[#475467]">
             💡 {food.tip}
           </div>
         </div>
@@ -622,7 +622,7 @@ export function FoodScreen({ focus }: { focus?: FoodFocus | null }) {
       {loadError ? (
         <div className="rounded-md2 border border-[#FECDCA] bg-[#FEF3F2] p-4 text-center">
           <p className="text-[13px] font-extrabold text-[#B42318]">정보를 불러오지 못했어요</p>
-          <p className="mt-1 break-keep text-[11.5px] leading-relaxed text-[#B42318]/80">
+          <p className="mt-1 wrap-any text-[11.5px] leading-relaxed text-[#B42318]/80">
             {loadError}
           </p>
           <button
@@ -696,12 +696,12 @@ export function FoodScreen({ focus }: { focus?: FoodFocus | null }) {
                 </div>
               ))}
               {card.warn ? (
-                <div className="mt-2.5 break-keep rounded-[11px] bg-[#FEF3F2] px-[11px] py-2.5 text-xs leading-relaxed text-[#B42318]">
+                <div className="mt-2.5 wrap-any rounded-[11px] bg-[#FEF3F2] px-[11px] py-2.5 text-xs leading-relaxed text-[#B42318]">
                   ⚠️ {card.warn}
                 </div>
               ) : null}
               {card.tip ? (
-                <div className="mt-2.5 break-keep rounded-[11px] bg-[#F2F8FF] px-[11px] py-2.5 text-xs leading-relaxed text-[#0B4A96]">
+                <div className="mt-2.5 wrap-any rounded-[11px] bg-[#F2F8FF] px-[11px] py-2.5 text-xs leading-relaxed text-[#0B4A96]">
                   💡 {card.tip}
                 </div>
               ) : null}
@@ -744,7 +744,7 @@ export function FoodScreen({ focus }: { focus?: FoodFocus | null }) {
             </div>
           )}
 
-          <p className="break-keep px-2.5 pt-1 text-center text-[10.5px] leading-relaxed text-[#AEB6C2]">
+          <p className="wrap-any px-2.5 pt-1 text-center text-[10.5px] leading-relaxed text-[#AEB6C2]">
             주차 요금·운영 시간은 2026 시즌 구단 공지 기준입니다. 방문 전 구단 앱 공지와 티켓링크 예약
             페이지를 다시 확인하세요.
           </p>
@@ -779,7 +779,7 @@ export function FoodScreen({ focus }: { focus?: FoodFocus | null }) {
                 <div className="text-[13px] font-extrabold text-[#0B4A96]">
                   직관러가 직접 다녀온 맛집
                 </div>
-                <div className="mt-[3px] break-keep text-[11.5px] leading-relaxed text-ink-faint">
+                <div className="mt-[3px] wrap-any text-[11.5px] leading-relaxed text-ink-faint">
                   구장 안팎에서 먹어본 메뉴와 팁을 남겨주세요. 직접 올린 글은 내가 삭제할 수 있어요.
                 </div>
               </div>
@@ -880,7 +880,7 @@ export function FoodScreen({ focus }: { focus?: FoodFocus | null }) {
           ) : null}
 
           {tab !== "user" ? (
-            <p className="break-keep px-2.5 pt-1 text-center text-[10.5px] leading-relaxed text-[#AEB6C2]">
+            <p className="wrap-any px-2.5 pt-1 text-center text-[10.5px] leading-relaxed text-[#AEB6C2]">
               매장·위치·메뉴는 2026 시즌 구단 식음매장 안내와 직관 후기 기준이에요. 가격·운영은 바뀔 수 있으니 방문 전 구단 공지로 확인하세요. 평점·웨이팅은 앱 자체 표본입니다.
             </p>
           ) : null}

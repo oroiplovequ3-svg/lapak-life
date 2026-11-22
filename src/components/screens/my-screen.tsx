@@ -57,7 +57,9 @@ export function MyScreen({ onOpenPost, onCompose, onAddGame, onEditGame }: MyScr
     const lose = games.filter((game) => game.scoreFor < game.scoreAgainst).length;
     const draw = games.length - win - lose;
     const total = games.length;
-    const rate = total ? Math.round((win / total) * 1000) / 10 : 0;
+    // KBO 승률은 무승부를 분모에서 뺌니다: 승 / (승 + 패). 무만 있으면 "-"로 보입니다.
+    const decided = win + lose;
+    const rate = decided > 0 ? Math.round((win / decided) * 1000) / 10 : null;
     const avgFor = total
       ? Math.round((games.reduce((sum, game) => sum + game.scoreFor, 0) / total) * 10) / 10
       : 0;
@@ -231,13 +233,13 @@ export function MyScreen({ onOpenPost, onCompose, onAddGame, onEditGame }: MyScr
           <span className="pb-[3px] text-[11.5px] font-bold text-white/70">
             {summary.win}승 {summary.lose}패
             {summary.draw ? ` ${summary.draw}무` : ""} · 승률{" "}
-            {summary.total ? `${summary.rate}%` : "-"}
+            {summary.rate === null ? "-" : `${summary.rate}%`}
           </span>
         </div>
         <div className="relative mt-3.5 h-[7px] overflow-hidden rounded-full bg-white/20">
           <i
             className="block h-full rounded-full bg-gradient-to-r from-white to-[#BFDCFF]"
-            style={{ width: `${summary.rate}%` }}
+            style={{ width: `${summary.rate ?? 0}%` }}
           />
         </div>
         <div className="relative mt-2.5 flex justify-between gap-2 text-[11px] font-bold text-white/80">
@@ -426,7 +428,7 @@ export function MyScreen({ onOpenPost, onCompose, onAddGame, onEditGame }: MyScr
                   />
                 </span>
               </div>
-              <p className="mt-[5px] line-clamp-2 break-keep text-[13px] leading-relaxed text-[#1D2939]">
+              <p className="mt-[5px] line-clamp-2 wrap-any text-[13px] leading-relaxed text-[#1D2939]">
                 {post.body}
               </p>
               <div className="mt-[7px] flex items-center gap-[5px] text-[10.5px] font-semibold text-ink-faint">
@@ -462,7 +464,7 @@ export function MyScreen({ onOpenPost, onCompose, onAddGame, onEditGame }: MyScr
         </div>
       )}
 
-      <p className="break-keep px-2.5 pt-1 text-center text-[10.5px] leading-relaxed text-[#AEB6C2]">
+      <p className="wrap-any px-2.5 pt-1 text-center text-[10.5px] leading-relaxed text-[#AEB6C2]">
         직관 성적은 이 앱에 저장한 기록만 계산됩니다.
       </p>
 

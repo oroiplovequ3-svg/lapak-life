@@ -1,6 +1,5 @@
 import type { Metadata, Viewport } from "next";
 
-import { AppProvider } from "@/components/providers/app-provider";
 import { ToastProvider } from "@/components/providers/toast-provider";
 
 import "./globals.css";
@@ -58,9 +57,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
   return (
     <html lang="ko">
       <body className="bg-[#E7EBF2] font-sans text-ink antialiased">
-        <ToastProvider>
-          <AppProvider>{children}</AppProvider>
-        </ToastProvider>
+        <ToastProvider>{children}</ToastProvider>
       </body>
     </html>
   );

@@ -1,8 +1,30 @@
 "use client";
 
-import { useEffect, useState, type ReactNode } from "react";
+import { useEffect, useId, useState, type ReactNode } from "react";
 
 import { Icon } from "@/components/icons";
+
+/**
+ * 지금 열려 있는 시트 순서(마지막이 가장 위).
+ * 시트가 겹치면(예: 신고 시트 위에 로그인 유도) ESC 는 맨 위 시트만 닫습니다.
+ * 예전에는 시트마다 document keydown 을 따로 들어 한 번에 둘 다 닫혔습니다.
+ */
+const openSheetStack: string[] = [];
+
+function pushSheet(id: string) {
+  const at = openSheetStack.indexOf(id);
+  if (at >= 0) openSheetStack.splice(at, 1);
+  openSheetStack.push(id);
+}
+
+function removeSheet(id: string) {
+  const at = openSheetStack.indexOf(id);
+  if (at >= 0) openSheetStack.splice(at, 1);
+}
+
+function isTopSheet(id: string): boolean {
+  return openSheetStack[openSheetStack.length - 1] === id;
+}
 
 interface SheetProps {
   open: boolean;
@@ -27,21 +49,36 @@ export function Sheet({
   children,
 }: SheetProps) {
   const [asking, setAsking] = useState(false);
+  const sheetId = useId();
 
   useEffect(() => {
     if (!open) setAsking(false);
   }, [open]);
 
+  // 열린 순서를 기억해, ESC 가 가장 위 시트만 닫도록 합니다.
+  useEffect(() => {
+    if (!open) return;
+    pushSheet(sheetId);
+    return () => removeSheet(sheetId);
+  }, [open, sheetId]);
+
   useEffect(() => {
     if (!open) return;
     const onKey = (event: KeyboardEvent) => {
       if (event.key !== "Escape") return;
+      if (!isTopSheet(sheetId)) return;
+      event.stopPropagation();
+      // 닫기 확인 창이 떠 있으면 그 창만 닫습니다(입력은 그대로).
+      if (asking) {
+        setAsking(false);
+        return;
+      }
       if (dirty) setAsking(true);
       else onClose();
     };
     document.addEventListener("keydown", onKey);
     return () => document.removeEventListener("keydown", onKey);
-  }, [open, onClose, dirty]);
+  }, [open, onClose, dirty, asking, sheetId]);
 
   if (!open) return null;
 

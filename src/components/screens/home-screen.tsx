@@ -1,13 +1,14 @@
 "use client";
 
 import Image from "next/image";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 
 import { Avatar } from "@/components/avatar";
 import { ComposeSheet } from "@/components/compose-sheet";
 import { DeleteButton } from "@/components/delete-button";
 import { Icon } from "@/components/icons";
 import { PostMedia } from "@/components/media-illustration";
+import { Pagination } from "@/components/pagination";
 import {
   PhotoLightbox,
   PhotoTiles,
@@ -17,9 +18,41 @@ import { useApp } from "@/components/providers/app-provider";
 import { useToast } from "@/components/providers/toast-provider";
 import { ReportSheet } from "@/components/report-sheet";
 import { categoryOf, FEED_FILTERS, type FilterId } from "@/lib/data/categories";
+import { ZONE_BY_CODE } from "@/lib/data/zones";
 import { isSupabaseConfigured } from "@/lib/supabase/config";
 import { formatRelativeTime } from "@/lib/utils";
 import type { Comment, Post } from "@/lib/types";
+
+/** 라팍톡 피드 한 페이지에 보여줄 글 수 (전체·카테고리 모두 5개씩) */
+const POSTS_PER_PAGE = 5;
+
+/**
+ * 카드 상세 줄에 쓸 좌석 문구 — 바로 위 배지가 이미 같은 구역(예: 스윗박스)을
+ * 보여 주므로 "스윗박스 / 스윗박스"처럼 두 번 나오지 않게 구역 이름을 덜어냅니다.
+ */
+function seatDetailText(post: Post): string {
+  const detail = (post.seatDetail ?? "").trim();
+  if (!detail) return "";
+  const zone = post.seatZone ? ZONE_BY_CODE[post.seatZone] : undefined;
+  const names = [
+    post.badge !== "나" ? post.badge : null,
+    zone?.short,
+    zone?.name,
+    zone?.sub,
+  ]
+    .filter((name): name is string => Boolean(name && name.trim()))
+    .sort((a, b) => b.length - a.length);
+  for (const name of names) {
+    if (detail === name) return "";
+    if (detail.startsWith(name)) {
+      return detail
+        .slice(name.length)
+        .replace(/^[\s·,/]+/, "")
+        .trim();
+    }
+  }
+  return detail;
+}
 
 function CommentRow({
   comment,
@@ -97,7 +130,7 @@ function CommentRow({
         </div>
       ) : (
         <div className="flex min-w-0 flex-1 items-start gap-1">
-          <p className="min-w-0 flex-1 break-keep pt-px text-[12.5px] leading-relaxed text-ink-2">
+          <p className="min-w-0 flex-1 wrap-any pt-px text-[12.5px] leading-relaxed text-ink-2">
             <span className="mr-[5px] text-xs font-extrabold text-ink">{comment.nickname}</span>
             {comment.body}
           </p>
@@ -166,6 +199,7 @@ function PostCard({
 
   const comments = commentsByPost[post.id] ?? [];
   const canManage = post.mine || isAdmin;
+  const seatDetail = seatDetailText(post);
 
   /** 이 글의 공유 링크 — /?post=딥링크로 들어오면 이 글로 바로 이동합니다. */
   const shareUrl = () =>
@@ -226,8 +260,8 @@ function PostCard({
           }
         />
         <div className="min-w-0 flex-1">
-          <div className="flex flex-wrap items-center gap-1">
-            <span className="text-[13.5px] font-extrabold tracking-tight">{post.nickname}</span>
+          <div className="flex min-w-0 flex-wrap items-center gap-1">
+            <span className="wrap-any text-[13.5px] font-extrabold tracking-tight">{post.nickname}</span>
             <span
               className={`rounded-md px-1.5 py-0.5 text-[10px] font-extrabold ${
                 post.mine ? "bg-brand text-white" : "bg-brand-50 text-brand-600"
@@ -237,8 +271,8 @@ function PostCard({
             </span>
           </div>
           <div className="mt-0.5 flex flex-wrap items-center gap-[5px] text-[11px] text-ink-faint">
-            {post.seatDetail ? <span>{post.seatDetail}</span> : null}
-            {post.seatDetail ? <span className="h-0.5 w-0.5 rounded-full bg-[#D0D5DD]" /> : null}
+            {seatDetail ? <span className="wrap-any">{seatDetail}</span> : null}
+            {seatDetail ? <span className="h-0.5 w-0.5 rounded-full bg-[#D0D5DD]" /> : null}
             <span>{formatRelativeTime(post.createdAt)}</span>
           </div>
         </div>
@@ -263,7 +297,7 @@ function PostCard({
         ) : null}
       </div>
 
-      <p className="mt-[9px] whitespace-pre-wrap break-keep text-sm leading-[1.65] text-[#1D2939]">
+      <p className="mt-[9px] whitespace-pre-wrap wrap-any text-sm leading-[1.65] text-[#1D2939]">
         {post.body}
       </p>
 
@@ -393,6 +427,9 @@ export function HomeScreen({ onCompose, highlightedPostId, onGoSeat, onGoFood }:
   const [bannerClosed, setBannerClosed] = useState(false);
   /** 수정 중인 글 (있으면 수정 시트를 엽니다) */
   const [editingPost, setEditingPost] = useState<Post | null>(null);
+  /** 지금 보고 있는 페이지 (5개씩) */
+  const [page, setPage] = useState(1);
+  const feedRef = useRef<HTMLDivElement | null>(null);
 
   // 검색·내 글에서 특정 글로 들어오면, 지금 고른 카테고리에 가려 보이지 않는 일이 없도록
   // 전체 필터로 돌려 놓습니다.
@@ -408,7 +445,58 @@ export function HomeScreen({ onCompose, highlightedPostId, onGoSeat, onGoFood }:
     return result;
   }, [posts]);
 
-  const list = filter === "all" ? posts : posts.filter((post) => post.category === filter);
+  const list = useMemo(
+    () => (filter === "all" ? posts : posts.filter((post) => post.category === filter)),
+    [posts, filter],
+  );
+  const pageCount = Math.max(1, Math.ceil(list.length / POSTS_PER_PAGE));
+  // 글이 지워지거나 카테고리를 바꿔 페이지 수가 줄면 범위를 넘지 않게 맞춥니다.
+  const currentPage = Math.min(page, pageCount);
+  const pagedList = list.slice(
+    (currentPage - 1) * POSTS_PER_PAGE,
+    currentPage * POSTS_PER_PAGE,
+  );
+
+  // 카테고리를 바꾸면 그 카테고리의 첫 페이지부터 보여줍니다.
+  useEffect(() => {
+    setPage(1);
+  }, [filter]);
+
+  // 새 글을 쓰면 맨 위(1페이지)로 돌아가 방금 쓴 글이 보이게 합니다.
+  const prevCount = useRef(posts.length);
+  useEffect(() => {
+    if (posts.length > prevCount.current) setPage(1);
+    prevCount.current = posts.length;
+  }, [posts.length]);
+
+  // 공유 링크(?post=)나 신고 관리에서 들어온 글이 2페이지 뒤에 있으면 그 페이지로 이동하고,
+  // 화면에 그려진 뒤 그 카드로 스크롤합니다.
+  const jumpedFor = useRef<string | null>(null);
+  useEffect(() => {
+    if (!highlightedPostId) {
+      jumpedFor.current = null;
+      return;
+    }
+    if (jumpedFor.current === highlightedPostId) return;
+    const index = posts.findIndex((post) => post.id === highlightedPostId);
+    if (index < 0) return;
+    jumpedFor.current = highlightedPostId;
+    setPage(Math.floor(index / POSTS_PER_PAGE) + 1);
+    const timer = window.setTimeout(() => {
+      document
+        .querySelector(`[data-post-id="${highlightedPostId}"]`)
+        ?.scrollIntoView({ behavior: "smooth", block: "center" });
+    }, 240);
+    return () => window.clearTimeout(timer);
+  }, [highlightedPostId, posts]);
+
+  /** 페이지를 바꾸면 피드 맨 위로 올라갑니다. */
+  function goPage(next: number) {
+    const target = Math.min(Math.max(1, next), pageCount);
+    if (target === currentPage) return;
+    setPage(target);
+    feedRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+  }
 
   return (
     <div className="flex flex-col gap-3.5 px-4 pb-[30px] pt-3.5">
@@ -497,11 +585,11 @@ export function HomeScreen({ onCompose, highlightedPostId, onGoSeat, onGoFood }:
         ))}
       </div>
 
-      <div className="flex flex-col gap-2.5">
+      <div ref={feedRef} className="flex scroll-mt-3 flex-col gap-2.5">
         {loadError ? (
           <div className="rounded-md2 border border-[#FECDCA] bg-[#FEF3F2] p-4 text-center">
             <p className="text-[13px] font-extrabold text-[#B42318]">글을 불러오지 못했어요</p>
-            <p className="mt-1 break-keep text-[11.5px] leading-relaxed text-[#B42318]/80">
+            <p className="mt-1 wrap-any text-[11.5px] leading-relaxed text-[#B42318]/80">
               {loadError}
             </p>
             <button
@@ -522,7 +610,7 @@ export function HomeScreen({ onCompose, highlightedPostId, onGoSeat, onGoFood }:
             ))}
           </>
         ) : list.length ? (
-          list.map((post) => (
+          pagedList.map((post) => (
             <PostCard
               key={post.id}
               post={post}
@@ -554,8 +642,15 @@ export function HomeScreen({ onCompose, highlightedPostId, onGoSeat, onGoFood }:
         )}
       </div>
 
-      <p className="break-keep px-2.5 pt-1 text-center text-[10.5px] leading-relaxed text-[#AEB6C2]">
-        인블루 · 실시간으로 글이 올라가는 삼성 라이온즈 팬 커뮤니티입니다.
+      <Pagination
+        page={currentPage}
+        pageCount={pageCount}
+        onChange={goPage}
+        label="라팍톡 글 목록 페이지"
+      />
+
+      <p className="wrap-any px-2.5 pt-1 text-center text-[10.5px] leading-relaxed text-[#AEB6C2]">
+        인블루 · 삼성 라이온즈 팬이라면 누구나 글을 남길 수 있는 커뮤니티입니다.
       </p>
 
       <button

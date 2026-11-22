@@ -24,6 +24,17 @@ const TARGET_LABEL: Record<ReportTargetType, string> = {
   user_parking: "주차 팁",
 };
 
+/** 목적격 조사 — "글을" / "댓글을" / "시야 후기를" 처럼 받침에 맞춰 붙입니다. */
+function objectParticle(word: string): string {
+  const last = word.trim().slice(-1);
+  const code = last.charCodeAt(0);
+  if (code >= 0xac00 && code <= 0xd7a3) {
+    const hasFinal = (code - 0xac00) % 28 !== 0;
+    return `${word}${hasFinal ? "을" : "를"}`;
+  }
+  return `${word}을`;
+}
+
 interface ReportSheetProps {
   open: boolean;
   onClose: () => void;
@@ -55,21 +66,26 @@ export function ReportSheet({
 
   const submit = async () => {
     if (submitting) return;
+    // '기타'는 무엇이 문제인지 한 줄이라도 적어야 접수됩니다.
+    if (reason === "기타" && !detail.trim()) return;
     setSubmitting(true);
-    const ok = await createReport({
+    const result = await createReport({
       targetType,
       targetId,
       reason,
-      detail: reason === "기타" ? detail.trim() : detail.trim(),
+      detail: detail.trim(),
     });
     setSubmitting(false);
-    if (ok) onClose();
+    // 이미 신고한 항목이어도 시트는 닫아, 같은 오류를 반복해서 보지 않게 합니다.
+    if (result === "ok" || result === "duplicate") onClose();
   };
+
+  const needsDetail = reason === "기타" && !detail.trim();
 
   return (
     <Sheet open={open} title="신고하기" onClose={onClose}>
-      <p className="break-keep rounded-[12px] bg-[#F8FAFC] px-3 py-2.5 text-[11.5px] leading-relaxed text-ink-muted">
-        {TARGET_LABEL[targetType]}을(를) 신고합니다.
+      <p className="wrap-any rounded-[12px] bg-[#F8FAFC] px-3 py-2.5 text-[11.5px] leading-relaxed text-ink-muted">
+        {objectParticle(TARGET_LABEL[targetType])} 신고합니다.
         {targetHint ? (
           <>
             <br />
@@ -97,7 +113,10 @@ export function ReportSheet({
       </div>
 
       <span className="text-xs font-extrabold text-ink-2">
-        설명 <span className="text-[10.5px] font-bold text-ink-faint">(선택)</span>
+        설명{" "}
+        <span className="text-[10.5px] font-bold text-ink-faint">
+          {reason === "기타" ? "(기타는 꼭 적어주세요)" : "(선택)"}
+        </span>
       </span>
       <textarea
         value={detail}
@@ -108,7 +127,7 @@ export function ReportSheet({
         className="w-full resize-none rounded-[14px] border border-line bg-[#FAFBFC] px-[13px] py-3 text-[13px] leading-relaxed text-ink outline-none focus:border-[#C7D7F0] focus:bg-white"
       />
 
-      <p className="break-keep text-[10.5px] leading-relaxed text-ink-faint">
+      <p className="wrap-any text-[10.5px] leading-relaxed text-ink-faint">
         신고는 운영자(마스터)만 확인합니다. 같은 항목은 한 번만 신고할 수 있어요.
       </p>
 
@@ -123,7 +142,7 @@ export function ReportSheet({
         <button
           type="button"
           onClick={() => void submit()}
-          disabled={submitting}
+          disabled={submitting || needsDetail}
           className="flex flex-1 items-center justify-center gap-1.5 rounded-[13px] bg-[#B42318] py-3 text-[13px] font-extrabold text-white shadow disabled:bg-[#E4E7EC] disabled:text-ink-faint disabled:shadow-none"
         >
           <Icon name="shield" size={14} strokeWidth={2.1} />

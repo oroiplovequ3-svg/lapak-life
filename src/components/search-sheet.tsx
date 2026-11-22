@@ -374,7 +374,7 @@ export function SearchSheet({ open, onClose, onOpenPost, onOpenZone, onOpenFood 
           <p className="text-[13px] font-extrabold text-ink-2">
             ‘{query.trim()}’에 맞는 결과가 없어요
           </p>
-          <p className="mt-1 break-keep text-[11.5px] leading-relaxed text-ink-faint">
+          <p className="mt-1 wrap-any text-[11.5px] leading-relaxed text-ink-faint">
             구역은 ‘3루’, 매장은 ‘치킨’, 주차는 ‘주차장’처럼 짧게 넣어 보세요.
           </p>
         </div>

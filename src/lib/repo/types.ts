@@ -12,6 +12,8 @@ import type {
   Post,
   ProfileUpdate,
   Report,
+  ReportTargetPreview,
+  ReportTargetType,
   Saves,
   UserFood,
   UserParking,
@@ -102,8 +104,17 @@ export interface Repository {
   createReport(input: NewReportInput, reporterId: string): Promise<void>;
   /** 마스터만 — 접수된 신고 목록 */
   loadReports(): Promise<Report[]>;
-  /** 마스터만 — 신고를 처리 완료로 */
-  resolveReport(reportId: string): Promise<void>;
+  /** 마스터만 — 신고 상태 바꾸기 (처리 완료 · 기각) */
+  setReportStatus(reportId: string, status: Report["status"]): Promise<void>;
+  /** 마스터만 — 신고된 대상의 본문 미리보기 (지워졌으면 found=false) */
+  loadReportTarget(
+    targetType: ReportTargetType,
+    targetId: string,
+  ): Promise<ReportTargetPreview>;
+
+  /* ── 계정 ────────────────────────────────────────────────── */
+  /** 회원 탈퇴 — 내 콘텐츠·사진과 계정을 서버에서 지웁니다 (delete_own_account RPC) */
+  deleteOwnAccount(): Promise<void>;
 }
 
 export const DEMO_AUTHOR: Author = {

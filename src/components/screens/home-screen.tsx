@@ -602,20 +602,22 @@ export function HomeScreen({ onCompose, highlightedPostId, onGoSeat, onGoFood }:
         </div>
       </section>
 
-      <div className="-mx-4 flex gap-[7px] overflow-x-auto px-4 pb-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+      {/* 칩 6개가 390px 한 줄(358px)에는 다 들어가지 않아 가로 스크롤로 마지막 칩이 잘렸습니다.
+          390·430px 모두에서 3×2 그리드로 한 번에 다 보이게 두고, 칩 안 글자는 줄바꿈하지 않습니다. */}
+      <div className="grid grid-cols-3 gap-[6px]">
         {FEED_FILTERS.map((c) => (
           <button
             key={c.id}
             type="button"
             onClick={() => setFilter(c.id)}
-            className={`inline-flex flex-none items-center gap-[5px] rounded-full border px-[13px] py-2 text-[12.5px] font-bold transition ${
+            className={`flex items-center justify-center gap-[5px] whitespace-nowrap rounded-full border px-2 py-2 text-[12.5px] font-bold transition ${
               filter === c.id
                 ? "border-brand bg-brand text-white shadow-[0_3px_10px_-2px_rgba(7,76,161,.5)]"
                 : "border-line bg-white text-[#475467]"
             }`}
           >
             {c.label}
-            <span className="ml-px text-[10.5px] font-extrabold opacity-70">
+            <span className="text-[10.5px] font-extrabold opacity-70">
               {counts[c.id] ?? 0}
             </span>
           </button>
@@ -699,14 +701,18 @@ export function HomeScreen({ onCompose, highlightedPostId, onGoSeat, onGoFood }:
         인블루 · 삼성 라이온즈 팬이라면 누구나 글을 남길 수 있는 커뮤니티입니다.
       </p>
 
-      <button
-        type="button"
-        onClick={onCompose}
-        aria-label="새 글 쓰기"
-        className="fixed bottom-[calc(72px+env(safe-area-inset-bottom))] right-[max(16px,calc(50%-199px))] z-30 grid h-[54px] w-[54px] place-items-center rounded-full bg-gradient-to-br from-brand-500 to-brand text-white shadow-[0_10px_22px_-6px_rgba(7,76,161,.7),0_2px_6px_rgba(16,24,40,.12)] transition active:scale-90"
-      >
-        <Icon name="plus" size={24} strokeWidth={2.2} />
-      </button>
+      {/* FAB는 뷰포트가 아니라 앱 컨테이너(최대 430px) 기준으로 앉아야 합니다.
+          바깥 레이어를 컨테이너 폭에 맞춰 두어 390·430·데스크톱 모두 오른쪽 안쪽 16px에 놓입니다. */}
+      <div className="pointer-events-none fixed inset-x-0 bottom-[calc(72px+env(safe-area-inset-bottom))] z-30 mx-auto flex w-full max-w-[430px] justify-end px-4">
+        <button
+          type="button"
+          onClick={onCompose}
+          aria-label="새 글 쓰기"
+          className="pointer-events-auto grid h-[54px] w-[54px] place-items-center rounded-full bg-gradient-to-br from-brand-500 to-brand text-white shadow-[0_10px_22px_-6px_rgba(7,76,161,.7),0_2px_6px_rgba(16,24,40,.12)] transition active:scale-90"
+        >
+          <Icon name="plus" size={24} strokeWidth={2.2} />
+        </button>
+      </div>
 
       <ComposeSheet
         open={Boolean(editingPost)}

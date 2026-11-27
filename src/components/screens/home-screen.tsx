@@ -618,7 +618,7 @@ export function HomeScreen({ onCompose, highlightedPostId, onGoSeat, onGoFood }:
             key={c.id}
             type="button"
             onClick={() => setFilter(c.id)}
-            className={`flex flex-none items-center justify-center gap-[5px] whitespace-nowrap rounded-full border px-2 py-2 text-[12.5px] font-bold transition ${
+            className={`flex min-w-16 flex-none items-center justify-center gap-[5px] whitespace-nowrap rounded-full border px-2 py-2 text-[12.5px] font-bold transition ${
               filter === c.id
                 ? "border-brand bg-brand text-white shadow-[0_3px_10px_-2px_rgba(7,76,161,.5)]"
                 : "border-line bg-white text-[#475467]"

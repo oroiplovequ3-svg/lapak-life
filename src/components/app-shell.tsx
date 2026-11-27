@@ -1,7 +1,7 @@
 "use client";
 
 import Image from "next/image";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
 import { ComposeSheet } from "@/components/compose-sheet";
 import { GameSheet } from "@/components/game-sheet";
@@ -16,8 +16,16 @@ import { HomeScreen } from "@/components/screens/home-screen";
 import { MyScreen } from "@/components/screens/my-screen";
 import { SeatScreen } from "@/components/screens/seat-screen";
 import type { FoodFocus, FoodFocusKind, Game, Report, ReportTargetPreview } from "@/lib/types";
+import {
+  DEFAULT_FOOD_LINK,
+  buildAppSearch,
+  foodLinkKey,
+  readAppUrl,
+  type AppTab,
+  type FoodLink,
+} from "@/lib/url-state";
 
-type Tab = "home" | "seat" | "food" | "my";
+type Tab = AppTab;
 
 const TABS: { id: Tab; label: string; icon: IconName }[] = [
   { id: "home", label: "라팍톡", icon: "home" },
@@ -40,12 +48,28 @@ const SUBS: Record<Tab, string> = {
   my: "직관 기록과 저장한 것들",
 };
 
+/** '전체 구역'에서 후기를 쓸 때 미리 골라 둘 기본 구역 (홈 응원 3루 테이블) */
+const DEFAULT_REVIEW_ZONE = "T3";
+
+/** 딥링크(?tab=food&userFood=…)로 들어왔을 때 그 카드로 스크롤할 목표 */
+function focusFromFoodLink(link: FoodLink): FoodFocus | null {
+  const nonce = Date.now();
+  if (link.seg === "parking") {
+    if (link.parking) return { kind: "user-parking", id: link.parking, nonce };
+    if (link.guide) return { kind: "parking-guide", id: link.guide, nonce };
+    return null;
+  }
+  if (link.userFood) return { kind: "user-food", id: link.userFood, nonce };
+  if (link.food) return { kind: "stadium", id: link.food, nonce };
+  return null;
+}
+
 export function AppShell() {
   const { isAdmin, posts } = useApp();
   const [tab, setTab] = useState<Tab>("home");
   const [composeOpen, setComposeOpen] = useState(false);
   const [reviewOpen, setReviewOpen] = useState(false);
-  const [reviewZone, setReviewZone] = useState<string>("T3");
+  const [reviewZone, setReviewZone] = useState<string>(DEFAULT_REVIEW_ZONE);
   const [gameOpen, setGameOpen] = useState(false);
   /** 수정 중인 직관 기록 (있으면 기록 시트를 수정 모드로 엽니다) */
   const [editingGame, setEditingGame] = useState<Game | null>(null);
@@ -56,25 +80,64 @@ export function AppShell() {
   const [seatZone, setSeatZone] = useState<string>("all");
   const [seatFocusNonce, setSeatFocusNonce] = useState(0);
   const [foodFocus, setFoodFocus] = useState<FoodFocus | null>(null);
+  // 맛집·주차 화면의 지금 상태 (주소창 ?tab=food&… 와 같은 값)
+  const [foodLink, setFoodLink] = useState<FoodLink>(DEFAULT_FOOD_LINK);
+  /** 탭을 옮길 때만 히스토리에 쌓고, 같은 화면 안의 선택은 주소만 바꿉니다. */
+  const pushHistory = useRef(false);
 
   const scrollScreenTop = () => {
     document.getElementById("screen")?.scrollTo({ top: 0 });
   };
 
+  /* 주소창 → 화면. 딥링크로 바로 들어오거나 브라우저 뒤로가기(popstate)를 눌렀을 때. */
+  useEffect(() => {
+    const apply = () => {
+      const next = readAppUrl(window.location.search);
+      setTab(next.tab);
+      setSeatZone(next.zone);
+      setHighlightId(next.post);
+      setFoodLink((current) =>
+        foodLinkKey(current) === foodLinkKey(next.food) ? current : next.food,
+      );
+      if (next.tab === "food") {
+        const focus = focusFromFoodLink(next.food);
+        if (focus) setFoodFocus(focus);
+      }
+      pushHistory.current = false;
+    };
+    apply();
+    window.addEventListener("popstate", apply);
+    return () => window.removeEventListener("popstate", apply);
+  }, []);
+
+  /* 화면 → 주소창. 탭 이동은 뒤로가기로 돌아올 수 있게 push, 구역·매장 선택은 replace. */
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const target = `${window.location.pathname}${buildAppSearch({
+      tab,
+      zone: seatZone,
+      post: highlightId,
+      food: foodLink,
+    })}`;
+    const current = `${window.location.pathname}${window.location.search}`;
+    if (target === current) {
+      pushHistory.current = false;
+      return;
+    }
+    if (pushHistory.current) {
+      window.history.pushState(null, "", target);
+    } else {
+      window.history.replaceState(null, "", target);
+    }
+    pushHistory.current = false;
+  }, [tab, seatZone, foodLink, highlightId]);
+
   /** 하단 탭 이동 — 이전 탭에서 내려둔 스크롤 위치를 이어받지 않도록 맨 위로 올립니다. */
   const goTab = (next: Tab) => {
+    pushHistory.current = next !== tab;
     setTab(next);
     scrollScreenTop();
   };
-
-  /* 공유 링크(?post=글id)로 들어오면 그 글로 바로 이동합니다. */
-  useEffect(() => {
-    if (typeof window === "undefined") return;
-    const id = new URLSearchParams(window.location.search).get("post");
-    if (!id) return;
-    setHighlightId(id);
-    setTab("home");
-  }, []);
 
   useEffect(() => {
     if (!highlightId || tab !== "home") return;
@@ -87,6 +150,7 @@ export function AppShell() {
   }, [highlightId, tab, posts.length]);
 
   const openMyPost = (postId: string) => {
+    pushHistory.current = tab !== "home" || highlightId !== postId;
     setHighlightId(postId);
     setTab("home");
     window.setTimeout(() => {
@@ -98,14 +162,27 @@ export function AppShell() {
 
   /* 검색 결과에서 바로 이동 */
   const openZoneFromSearch = (zoneCode: string) => {
+    pushHistory.current = tab !== "seat";
     setSeatZone(zoneCode);
     setSeatFocusNonce((value) => value + 1);
     setTab("seat");
     scrollScreenTop();
   };
 
-  const openFoodFromSearch = (kind: FoodFocusKind, id: string) => {    const nonce = Date.now();
+  const openFoodFromSearch = (kind: FoodFocusKind, id: string) => {
+    const nonce = Date.now();
+    pushHistory.current = tab !== "food";
     setFoodFocus({ kind, id, nonce });
+    setFoodLink((current) => ({
+      ...current,
+      seg: kind === "user-parking" || kind === "parking-guide" ? "parking" : "food",
+      ftab: kind === "user-food" ? "user" : kind === "stadium" ? "stadium" : current.ftab,
+      filter: kind === "stadium" ? "all" : current.filter,
+      food: kind === "stadium" ? id : null,
+      userFood: kind === "user-food" ? id : null,
+      parking: kind === "user-parking" ? id : null,
+      guide: kind === "parking-guide" ? id : null,
+    }));
     setTab("food");
     scrollScreenTop();
     // 잠시 뒤 목표를 비워, 탭을 다시 열 때 엉뚱한 곳으로 또 스크롤하지 않게 합니다.
@@ -129,6 +206,7 @@ export function AppShell() {
         break;
       case "review":
         if (preview?.zoneCode) {
+          pushHistory.current = tab !== "seat";
           setSeatZone(preview.zoneCode);
           setSeatFocusNonce((value) => value + 1);
         }
@@ -193,7 +271,8 @@ export function AppShell() {
               type="button"
               aria-label="직관 시야 후기 작성"
               onClick={() => {
-                setReviewZone("T3");
+                // 지금 보고 있는 구역을 그대로 후기 구역으로 이어받습니다.
+                setReviewZone(seatZone === "all" ? DEFAULT_REVIEW_ZONE : seatZone);
                 setReviewOpen(true);
               }}
               className="grid h-9 w-9 place-items-center rounded-xl text-[#475467]"
@@ -235,7 +314,17 @@ export function AppShell() {
             }}
           />
         ) : null}
-        {tab === "food" ? <FoodScreen focus={foodFocus} /> : null}
+        {tab === "food" ? (
+          <FoodScreen
+            focus={foodFocus}
+            link={foodLink}
+            onLinkChange={(next) =>
+              setFoodLink((current) =>
+                foodLinkKey(current) === foodLinkKey(next) ? current : next,
+              )
+            }
+          />
+        ) : null}
         {tab === "my" ? (
           <MyScreen
             onOpenPost={openMyPost}

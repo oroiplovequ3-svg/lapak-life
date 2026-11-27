@@ -13,6 +13,7 @@ import {
 } from "@/components/photo-gallery";
 import { PostNo } from "@/components/post-no";
 import { useApp } from "@/components/providers/app-provider";
+import { useToast } from "@/components/providers/toast-provider";
 import { HiddenBadge, ReportButton, RestoreButton } from "@/components/report-controls";
 import { ReportSheet } from "@/components/report-sheet";
 import { ReviewSheet } from "@/components/review-sheet";
@@ -23,7 +24,8 @@ import {
   zoneFamily,
   zoneFullName,
 } from "@/lib/data/zones";
-import { formatRelativeTime } from "@/lib/utils";
+import { formatRelativeTime, copyText } from "@/lib/utils";
+import { zoneShareUrl } from "@/lib/url-state";
 import type { ZoneReview } from "@/lib/types";
 
 interface SeatScreenProps {
@@ -50,6 +52,7 @@ export function SeatScreen({
 }: SeatScreenProps) {
   const { zones, reviews, saves, toggleSaveZone, deleteReview, isAdmin, restoreReportedContent } =
     useApp();
+  const toast = useToast();
   const selected = selectedZone;
   const [pickerOpen, setPickerOpen] = useState(false);
   /** 수정 중인 후기 (있으면 수정 시트를 엽니다) */
@@ -85,6 +88,27 @@ export function SeatScreen({
   const family = zoneFamily(zone?.code);
   const reviewZone = selected === "all" ? DEFAULT_REVIEW_ZONE : selected;
   const writeReview = () => onWriteReview?.(reviewZone);
+
+  /** 지금 보는 구역을 그대로 공유 — 폰이면 공유 시트, 아니면 링크 복사 */
+  const shareZone = async (code: string) => {
+    const name = zoneFullName(code);
+    const url = zoneShareUrl(window.location.origin, code);
+    if (typeof navigator.share === "function") {
+      try {
+        await navigator.share({
+          title: `인블루 · ${name}`,
+          text: `${name} 시야와 직관 후기를 인블루에서 봐요.`,
+          url,
+        });
+        return;
+      } catch (error) {
+        // 공유를 그만둔 경우에는 아무 것도 하지 않습니다.
+        if ((error as { name?: string })?.name === "AbortError") return;
+      }
+    }
+    const ok = await copyText(url);
+    toast(ok ? "구역 링크를 복사했어요" : "링크를 복사하지 못했어요");
+  };
 
   // 목록을 열면 화면이 선택기 전체를 보여주게 올리고,
   // 지금 고른 구역이 스크롤 가운데에 오도록 맞춰요.
@@ -460,8 +484,19 @@ export function SeatScreen({
             className="relative overflow-hidden rounded-lg2 bg-gradient-to-br from-brand via-brand-600 to-brand-500 px-4 py-4 text-white shadow-brand"
           >
             <div className="pointer-events-none absolute -bottom-[60px] -right-10 h-[150px] w-[150px] rounded-full bg-white/[.07]" />
-            <div className="relative text-lg font-extrabold tracking-tight3">
-              {zone.emoji} {zone.name}
+            <div className="relative flex items-start justify-between gap-2">
+              <div className="min-w-0 text-lg font-extrabold tracking-tight3">
+                {zone.emoji} {zone.name}
+              </div>
+              <button
+                type="button"
+                onClick={() => void shareZone(zone.code)}
+                aria-label={`${zone.name} 링크 공유`}
+                className="flex flex-none items-center gap-1 rounded-full bg-white/[.18] px-2.5 py-[5px] text-[10.5px] font-extrabold text-white/90 transition active:scale-[.97]"
+              >
+                <Icon name="share" size={12} strokeWidth={2.1} />
+                공유
+              </button>
             </div>
             {zone.sub ? (
               <div className="relative mt-1 flex items-center gap-1.5">

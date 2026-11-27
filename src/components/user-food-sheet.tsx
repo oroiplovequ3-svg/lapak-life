@@ -131,6 +131,25 @@ export function UserFoodSheet({ open, onClose, editing = null }: UserFoodSheetPr
       dirtyMessage={
         editing ? "수정 중인 맛집 정보가 사라져요. 닫을까요?" : "작성 중인 맛집 정보가 사라져요. 닫을까요?"
       }
+      footer={
+        <div className="flex gap-2">
+          <button
+            type="button"
+            onClick={onClose}
+            className="flex-1 rounded-[13px] bg-white py-3 text-[13px] font-extrabold text-ink-2 ring-1 ring-line"
+          >
+            취소
+          </button>
+          <button
+            type="button"
+            onClick={submit}
+            disabled={!valid || submitting || busy}
+            className="flex-1 rounded-[13px] bg-brand py-3 text-[13px] font-extrabold text-white shadow-brand disabled:bg-[#E4E7EC] disabled:text-ink-faint disabled:shadow-none"
+          >
+            {submitting ? "저장 중…" : editing ? "수정 완료" : "맛집 등록"}
+          </button>
+        </div>
+      }
     >
       <span className="text-xs font-extrabold text-ink-2">가게 이름</span>
       <input
@@ -202,7 +221,7 @@ export function UserFoodSheet({ open, onClose, editing = null }: UserFoodSheetPr
         rows={3}
         onChange={(event) => setTip(event.target.value)}
         placeholder="예: 8회 이후엔 반값 세일, 줄 서는 시간대는 6시 전후예요."
-        className="w-full resize-none rounded-[13px] border border-line bg-[#FAFBFC] px-3 py-[11px] text-[13px] leading-relaxed text-ink outline-none focus:border-[#C7D7F0] focus:bg-white"
+        className="min-h-[96px] w-full shrink-0 resize-none rounded-[13px] border border-line bg-[#FAFBFC] px-3 py-[11px] text-[13px] leading-relaxed text-ink outline-none focus:border-[#C7D7F0] focus:bg-white"
       />
       <div className="-mt-2 text-right text-[10.5px] font-bold text-[#B4BCC9]">
         {tip.length} / 120
@@ -276,24 +295,6 @@ export function UserFoodSheet({ open, onClose, editing = null }: UserFoodSheetPr
         최대 {MAX_USER_FOOD_PHOTOS}장 · 폰으로 찍은 사진도 등록할 때 자동으로 줄여서 올려요.
         {photos.length ? ` 지금 ${formatPhotoSize(totalSize)}` : ""}
       </p>
-
-      <div className="flex gap-2 pt-0.5">
-        <button
-          type="button"
-          onClick={onClose}
-          className="flex-1 rounded-[13px] bg-white py-3 text-[13px] font-extrabold text-ink-2 ring-1 ring-line"
-        >
-          취소
-        </button>
-        <button
-          type="button"
-          onClick={submit}
-          disabled={!valid || submitting || busy}
-          className="flex-1 rounded-[13px] bg-brand py-3 text-[13px] font-extrabold text-white shadow-brand disabled:bg-[#E4E7EC] disabled:text-ink-faint disabled:shadow-none"
-        >
-          {submitting ? "저장 중…" : editing ? "수정 완료" : "맛집 등록"}
-        </button>
-      </div>
 
       {editing && !editing.mine && isAdmin ? (
         <p className="break-keep text-[10.5px] font-bold leading-relaxed text-[#B54708]">

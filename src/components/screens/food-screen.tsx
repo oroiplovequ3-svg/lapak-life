@@ -26,9 +26,19 @@ import type {
   UserFoodComment,
   UserParking,
 } from "@/lib/types";
+import { foodLinkKey, type FoodLink, type FoodSegment } from "@/lib/url-state";
 
 type FoodFilter = "all" | "in" | "out";
 type FoodTab = "all" | "user" | "stadium";
+
+interface FoodScreenProps {
+  /** 검색 등에서 특정 카드로 바로 이동할 때 */
+  focus?: FoodFocus | null;
+  /** 주소창(?tab=food&…)에서 읽은 지금 상태 */
+  link: FoodLink;
+  /** 화면에서 바뀐 상태를 주소창에 남깁니다 */
+  onLinkChange?: (link: FoodLink) => void;
+}
 
 function SectionHead({
   title,
@@ -787,7 +797,7 @@ function FoodCard({ food }: { food: Food }) {
   );
 }
 
-export function FoodScreen({ focus }: { focus?: FoodFocus | null }) {
+export function FoodScreen({ focus, link, onLinkChange }: FoodScreenProps) {
   const {
     foods,
     userFoods,
@@ -799,10 +809,12 @@ export function FoodScreen({ focus }: { focus?: FoodFocus | null }) {
     loadError,
     reload,
   } = useApp();
-  const [segment, setSegment] = useState<"food" | "parking">("food");
-  const [tab, setTab] = useState<FoodTab>("all");
-  const [filter, setFilter] = useState<FoodFilter>("all");
-  const [picked, setPicked] = useState<string>("all");
+  const [segment, setSegment] = useState<FoodSegment>(link.seg);
+  const [tab, setTab] = useState<FoodTab>(link.ftab);
+  const [filter, setFilter] = useState<FoodFilter>(link.filter);
+  const [picked, setPicked] = useState<string>(link.food ?? "all");
+  /** 화면 상태와 주소창 상태가 같은지 견주는 열쇠 */
+  const linkKeyRef = useRef(foodLinkKey(link));
   const [foodSheetOpen, setFoodSheetOpen] = useState(false);
   const [parkingSheetOpen, setParkingSheetOpen] = useState(false);
   /** 수정 중인 맛집·주차 팁 (있으면 수정 시트를 엽니다) */
@@ -817,6 +829,35 @@ export function FoodScreen({ focus }: { focus?: FoodFocus | null }) {
     id: string;
     hint: string;
   } | null>(null);
+
+  // 주소창(딥링크·뒤로가기) 값이 바뀌면 화면도 그 값으로 맞춥니다.
+  useEffect(() => {
+    const key = foodLinkKey(link);
+    if (key === linkKeyRef.current) return;
+    linkKeyRef.current = key;
+    setSegment(link.seg);
+    setTab(link.ftab);
+    setFilter(link.filter);
+    setPicked(link.food ?? "all");
+  }, [link]);
+
+  // 화면에서 고른 값도 주소창에 남겨, 그대로 복사해 공유할 수 있게 합니다.
+  useEffect(() => {
+    const next: FoodLink = {
+      seg: segment,
+      ftab: tab,
+      filter,
+      // 매장 선택은 '야구장 푸드' 탭에서만 주소에 남깁니다.
+      food: tab === "stadium" && picked !== "all" ? picked : null,
+      userFood: segment === "food" && link.seg === "food" ? link.userFood : null,
+      parking: segment === "parking" && link.seg === "parking" ? link.parking : null,
+      guide: segment === "parking" && link.seg === "parking" ? link.guide : null,
+    };
+    const key = foodLinkKey(next);
+    if (key === linkKeyRef.current) return;
+    linkKeyRef.current = key;
+    onLinkChange?.(next);
+  }, [segment, tab, filter, picked, link, onLinkChange]);
 
   // 검색에서 특정 매장·맛집·주차 항목을 골라 들어오면 그 카드가 바로 보이게 맞춰요.
   useEffect(() => {

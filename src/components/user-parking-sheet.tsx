@@ -77,6 +77,25 @@ export function UserParkingSheet({ open, onClose, editing = null }: UserParkingS
       dirtyMessage={
         editing ? "수정 중인 주차 팁이 사라져요. 닫을까요?" : "작성 중인 주차 팁이 사라져요. 닫을까요?"
       }
+      footer={
+        <div className="flex gap-2">
+          <button
+            type="button"
+            onClick={onClose}
+            className="flex-1 rounded-[13px] bg-white py-3 text-[13px] font-extrabold text-ink-2 ring-1 ring-line"
+          >
+            취소
+          </button>
+          <button
+            type="button"
+            onClick={submit}
+            disabled={!valid || submitting}
+            className="flex-1 rounded-[13px] bg-brand py-3 text-[13px] font-extrabold text-white shadow-brand disabled:bg-[#E4E7EC] disabled:text-ink-faint disabled:shadow-none"
+          >
+            {submitting ? "저장 중…" : editing ? "수정 완료" : "주차 팁 등록"}
+          </button>
+        </div>
+      }
     >
       <span className="text-xs font-extrabold text-ink-2">장소 이름</span>
       <input
@@ -150,28 +169,10 @@ export function UserParkingSheet({ open, onClose, editing = null }: UserParkingS
         rows={3}
         onChange={(event) => setTip(event.target.value)}
         placeholder="예: 전설로가 만차여도 여기는 자리가 있어요. 단속 구간은 피하세요."
-        className="w-full resize-none rounded-[13px] border border-line bg-[#FAFBFC] px-3 py-[11px] text-[13px] leading-relaxed text-ink outline-none focus:border-[#C7D7F0] focus:bg-white"
+        className="min-h-[96px] w-full shrink-0 resize-none rounded-[13px] border border-line bg-[#FAFBFC] px-3 py-[11px] text-[13px] leading-relaxed text-ink outline-none focus:border-[#C7D7F0] focus:bg-white"
       />
       <div className="-mt-2 text-right text-[10.5px] font-bold text-[#B4BCC9]">
         {tip.length} / 120
-      </div>
-
-      <div className="flex gap-2 pt-0.5">
-        <button
-          type="button"
-          onClick={onClose}
-          className="flex-1 rounded-[13px] bg-white py-3 text-[13px] font-extrabold text-ink-2 ring-1 ring-line"
-        >
-          취소
-        </button>
-        <button
-          type="button"
-          onClick={submit}
-          disabled={!valid || submitting}
-          className="flex-1 rounded-[13px] bg-brand py-3 text-[13px] font-extrabold text-white shadow-brand disabled:bg-[#E4E7EC] disabled:text-ink-faint disabled:shadow-none"
-        >
-          {submitting ? "저장 중…" : editing ? "수정 완료" : "주차 팁 등록"}
-        </button>
       </div>
 
       {editing && !editing.mine && isAdmin ? (

@@ -134,6 +134,25 @@ export function ComposeSheet({ open, onClose, editing = null, onPosted }: Compos
       onClose={onClose}
       dirty={body.trim().length > 0 || seatZone !== (editing?.seatZone ?? "") || photosChanged}
       dirtyMessage={editing ? "수정 중인 내용이 사라져요. 닫을까요?" : "작성 중인 글이 사라져요. 닫을까요?"}
+      footer={
+        <div className="flex gap-2">
+          <button
+            type="button"
+            onClick={onClose}
+            className="flex-1 rounded-[13px] bg-white py-3 text-[13px] font-extrabold text-ink-2 ring-1 ring-line"
+          >
+            취소
+          </button>
+          <button
+            type="button"
+            onClick={submit}
+            disabled={!body.trim() || submitting || busy}
+            className="flex-1 rounded-[13px] bg-brand py-3 text-[13px] font-extrabold text-white shadow-brand disabled:bg-[#E4E7EC] disabled:text-ink-faint disabled:shadow-none"
+          >
+            {submitting ? "저장 중…" : editing ? "수정 완료" : "등록하기"}
+          </button>
+        </div>
+      }
     >
       <span className="text-xs font-extrabold text-ink-2">카테고리</span>
       <div className="flex flex-wrap gap-1.5">
@@ -185,7 +204,7 @@ export function ComposeSheet({ open, onClose, editing = null, onPosted }: Compos
         onChange={(event) => setBody(event.target.value)}
         placeholder="라팍에서 있었던 일을 남겨보세요. 좌석 후기, 응원 팁, 먹거리 정보 모두 좋아요."
         rows={5}
-        className="w-full resize-none rounded-[14px] border border-line bg-[#FAFBFC] px-[13px] py-3 text-[13.5px] leading-relaxed text-ink outline-none focus:border-[#C7D7F0] focus:bg-white"
+        className="min-h-[120px] w-full shrink-0 resize-none rounded-[14px] border border-line bg-[#FAFBFC] px-[13px] py-3 text-[13.5px] leading-relaxed text-ink outline-none focus:border-[#C7D7F0] focus:bg-white"
       />
       <div className="-mt-2 text-right text-[10.5px] font-bold text-[#B4BCC9]">
         {body.length} / 300
@@ -271,24 +290,6 @@ export function ComposeSheet({ open, onClose, editing = null, onPosted }: Compos
           마스터 권한으로 다른 직관러의 글을 수정합니다.
         </p>
       ) : null}
-
-      <div className="flex gap-2 pt-0.5">
-        <button
-          type="button"
-          onClick={onClose}
-          className="flex-1 rounded-[13px] bg-white py-3 text-[13px] font-extrabold text-ink-2 ring-1 ring-line"
-        >
-          취소
-        </button>
-        <button
-          type="button"
-          onClick={submit}
-          disabled={!body.trim() || submitting || busy}
-          className="flex-1 rounded-[13px] bg-brand py-3 text-[13px] font-extrabold text-white shadow-brand disabled:bg-[#E4E7EC] disabled:text-ink-faint disabled:shadow-none"
-        >
-          {submitting ? "저장 중…" : editing ? "수정 완료" : "등록하기"}
-        </button>
-      </div>
     </Sheet>
   );
 }

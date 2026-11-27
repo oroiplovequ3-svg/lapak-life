@@ -191,6 +191,25 @@ export function GameSheet({ open, onClose, editing = null }: GameSheetProps) {
       dirtyMessage={
         editing ? "수정 중인 기록이 사라져요. 닫을까요?" : "작성 중인 기록이 사라져요. 닫을까요?"
       }
+      footer={
+        <div className="flex gap-2">
+          <button
+            type="button"
+            onClick={onClose}
+            className="flex-1 rounded-[13px] bg-white py-3 text-[13px] font-extrabold text-ink-2 ring-1 ring-line"
+          >
+            취소
+          </button>
+          <button
+            type="button"
+            onClick={submit}
+            disabled={!valid || submitting || busy}
+            className="flex-1 rounded-[13px] bg-brand py-3 text-[13px] font-extrabold text-white shadow-brand disabled:bg-[#E4E7EC] disabled:text-ink-faint disabled:shadow-none"
+          >
+            {submitting ? "저장 중…" : editing ? "수정 완료" : "기록 저장"}
+          </button>
+        </div>
+      }
     >
       <span className="text-xs font-extrabold text-ink-2">경기 날짜</span>
       <input
@@ -442,24 +461,6 @@ export function GameSheet({ open, onClose, editing = null }: GameSheetProps) {
         최대 {MAX_GAME_PHOTOS}장 · 폰으로 찍은 사진도 저장할 때 자동으로 줄여서 담아요.
         {photos.length ? ` 지금 ${formatPhotoSize(totalSize)}` : ""}
       </p>
-
-      <div className="flex gap-2 pt-0.5">
-        <button
-          type="button"
-          onClick={onClose}
-          className="flex-1 rounded-[13px] bg-white py-3 text-[13px] font-extrabold text-ink-2 ring-1 ring-line"
-        >
-          취소
-        </button>
-        <button
-          type="button"
-          onClick={submit}
-          disabled={!valid || submitting || busy}
-          className="flex-1 rounded-[13px] bg-brand py-3 text-[13px] font-extrabold text-white shadow-brand disabled:bg-[#E4E7EC] disabled:text-ink-faint disabled:shadow-none"
-        >
-          {submitting ? "저장 중…" : editing ? "수정 완료" : "기록 저장"}
-        </button>
-      </div>
     </Sheet>
   );
 }

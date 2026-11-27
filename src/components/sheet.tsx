@@ -36,6 +36,11 @@ interface SheetProps {
    */
   dirty?: boolean;
   dirtyMessage?: string;
+  /**
+   * 시트 하단에 늘 붙어 있는 영역(등록·저장 버튼 등).
+   * 본문 스크롤과 분리돼 있어 작은 화면에서도 스크롤 없이 바로 보입니다.
+   */
+  footer?: ReactNode;
   children: ReactNode;
 }
 
@@ -46,6 +51,7 @@ export function Sheet({
   onClose,
   dirty = false,
   dirtyMessage = "작성 중인 내용이 사라져요. 닫을까요?",
+  footer,
   children,
 }: SheetProps) {
   const [asking, setAsking] = useState(false);
@@ -102,8 +108,8 @@ export function Sheet({
         aria-modal="true"
         aria-label={title}
       >
-        <div className="mx-auto mt-[9px] h-1 w-[38px] rounded-full bg-[#E0E4EB]" />
-        <div className="flex items-center gap-2.5 border-b border-line-soft px-[18px] py-2 pb-3">
+        <div className="mx-auto mt-[7px] h-1 w-[38px] rounded-full bg-[#E0E4EB]" />
+        <div className="flex items-center gap-2.5 border-b border-line-soft px-[18px] pb-2.5 pt-1.5">
           <h2 className="text-base font-extrabold tracking-tight3">{title}</h2>
           <button
             type="button"
@@ -114,9 +120,19 @@ export function Sheet({
             <Icon name="close" size={14} strokeWidth={2.4} />
           </button>
         </div>
-        <div className="flex flex-col gap-3.5 overflow-y-auto px-[18px] pb-[calc(20px+env(safe-area-inset-bottom))] pt-4">
+        <div
+          className={`flex flex-col gap-3.5 overflow-y-auto px-[18px] pt-3.5 ${
+            footer ? "pb-4" : "pb-[calc(20px+env(safe-area-inset-bottom))]"
+          }`}
+        >
           {children}
         </div>
+
+        {footer ? (
+          <div className="flex-none border-t border-line-soft bg-white px-[18px] pb-[calc(14px+env(safe-area-inset-bottom))] pt-3">
+            {footer}
+          </div>
+        ) : null}
 
         {asking ? (
           <div className="absolute inset-0 z-10 flex items-end rounded-t-[26px] bg-ink/40 px-[18px] pb-[calc(20px+env(safe-area-inset-bottom))] pt-4">

@@ -4,8 +4,7 @@ export type CategoryId =
   | "live"
   | "talk"
   | "goods"
-  | "bluewave"
-  | "event";
+  | "bluewave";
 
 export interface Category {
   id: CategoryId;

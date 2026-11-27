@@ -638,9 +638,9 @@ export function HomeScreen({ onCompose, highlightedPostId, onGoSeat, onGoFood }:
         </div>
       </section>
 
-      {/* 칩 7개(블루웨이브 후기 포함)는 390px 한 줄(358px)에 다 들어가지 않습니다.
-          칩은 글자 폭만큼만 차지하고(줄바꿈 금지), 넘치면 다음 줄로 자연스럽게 내려가되
-          줄마다 가운데 정렬해 좌우 여백이 한쪽으로 몰리지 않게 합니다.
+      {/* 칩 7개(전체·공지·직관후기·실시간현장·소통해요·굿즈·블루웨이브 후기)는 390px 한 줄(358px)에
+          다 들어가지 않습니다. 칩은 글자 폭만큼만 차지하고(줄바꿈 금지), 넘치면 다음 줄로
+          자연스럽게 내려가되 줄마다 가운데 정렬해 좌우 여백이 한쪽으로 몰리지 않게 합니다.
           글자·간격을 더 줄이지 않아 320~430px 어디서도 칩 안 글자가 잘리지 않습니다. */}
       <div className="flex flex-wrap justify-center gap-[6px]">
         {FEED_FILTERS.map((c) => (
@@ -698,22 +698,13 @@ export function HomeScreen({ onCompose, highlightedPostId, onGoSeat, onGoFood }:
         ) : (
           <div className="rounded-md2 border border-dashed border-[#D9DEE7] bg-[#FBFCFE] px-[16px] py-[22px] text-center">
             <div className="mb-[7px] text-[26px]">
-              {filter === "event" ? "🎉" : filter === "notice" ? "📌" : "💬"}
+              {filter === "notice" ? "📌" : "💬"}
             </div>
             {filter === "notice" ? (
               <>
                 <p className="text-[13px] font-extrabold text-ink-2">아직 공지가 없어요</p>
                 <p className="mt-1 text-[11.5px] leading-relaxed text-ink-faint">
                   운영진이 중요한 소식을 올리면 이곳 맨 위에 고정됩니다.
-                </p>
-              </>
-            ) : filter === "event" ? (
-              <>
-                <p className="text-[13px] font-extrabold text-ink-2">
-                  아직 등록된 이벤트가 없어요
-                </p>
-                <p className="mt-1 text-[11.5px] leading-relaxed text-ink-faint">
-                  이벤트 소식이 준비되면 운영자가 이곳에 올려드릴게요.
                 </p>
               </>
             ) : posts.length > 0 ? (

@@ -30,6 +30,18 @@ import type { Comment, Post } from "@/lib/types";
 const POSTS_PER_PAGE = 5;
 
 /**
+ * 피드 정렬 — 마스터 공지(category === 'notice')는 항상 맨 위에 고정합니다.
+ * 공지끼리는 최신 공지가 위, 그 아래에 일반 글 최신순.
+ */
+function pinNotices(list: Post[]): Post[] {
+  const newestFirst = (a: Post, b: Post) => (a.createdAt < b.createdAt ? 1 : -1);
+  const notices = list.filter((post) => post.category === "notice");
+  if (!notices.length) return list;
+  const others = list.filter((post) => post.category !== "notice");
+  return [...notices.sort(newestFirst), ...others];
+}
+
+/**
  * 카드 상세 줄에 쓸 좌석 문구 — 바로 위 배지가 이미 같은 구역(예: 스윗박스)을
  * 보여 주므로 "스윗박스 / 스윗박스"처럼 두 번 나오지 않게 구역 이름을 덜어냅니다.
  */
@@ -223,6 +235,8 @@ function PostCard({
   const comments = commentsByPost[post.id] ?? [];
   const canManage = post.mine || isAdmin;
   const seatDetail = seatDetailText(post);
+  /** 마스터 공지 — 피드 맨 위에 고정되고 카드도 살짝 강조합니다 */
+  const isNotice = post.category === "notice";
 
   /** 이 글의 공유 링크 — /?post=딥링크로 들어오면 이 글로 바로 이동합니다. */
   const shareUrl = () =>
@@ -266,11 +280,19 @@ function PostCard({
 
   return (
     <article
-      className={`rounded-md2 border border-line bg-white px-3.5 pb-[11px] pt-[13px] shadow-card ${
-        highlight ? "animate-flash" : ""
-      }`}
+      className={`rounded-md2 border px-3.5 pb-[11px] pt-[13px] shadow-card ${
+        isNotice
+          ? "border-[#BFD3F2] bg-gradient-to-b from-[#F4F8FE] to-white shadow-[0_2px_10px_-4px_rgba(7,76,161,.28)]"
+          : "border-line bg-white"
+      } ${highlight ? "animate-flash" : ""}`}
       data-post-id={post.id}
     >
+      {isNotice ? (
+        <div className="mb-1 flex items-center gap-1.5 text-[10.5px] font-bold tracking-wide text-[#5B7CA8]">
+          <i className="h-[6px] w-[6px] rounded-full bg-[#074CA1]" />
+          피드 상단 고정
+        </div>
+      ) : null}
       <div className="flex items-center gap-2">
         <Avatar
           nickname={post.nickname}
@@ -305,9 +327,13 @@ function PostCard({
         </div>
         <span
           className="rounded-md px-[7px] py-[2.5px] text-[10.5px] font-extrabold"
-          style={{ color: "#0A58CA", background: "#EAF1FD" }}
+          style={
+            isNotice
+              ? { color: "#FFFFFF", background: "#074CA1" }
+              : { color: "#0A58CA", background: "#EAF1FD" }
+          }
         >
-          {categoryOf(post.category).label}
+          {isNotice ? "📌 공지" : categoryOf(post.category).label}
         </span>
         {canManage ? (
           <span className="ml-[-2px] flex flex-none items-center">
@@ -484,10 +510,12 @@ export function HomeScreen({ onCompose, highlightedPostId, onGoSeat, onGoFood }:
     return result;
   }, [posts]);
 
-  const list = useMemo(
-    () => (filter === "all" ? posts : posts.filter((post) => post.category === filter)),
-    [posts, filter],
-  );
+  // '전체'와 '공지' 탭에서는 공지가 항상 최상단 — 다른 카테고리 탭은 그 카테고리 글만 최신순.
+  const list = useMemo(() => {
+    const filtered =
+      filter === "all" ? posts : posts.filter((post) => post.category === filter);
+    return filter === "all" || filter === "notice" ? pinNotices(filtered) : filtered;
+  }, [posts, filter]);
   const pageCount = Math.max(1, Math.ceil(list.length / POSTS_PER_PAGE));
   // 글이 지워지거나 카테고리를 바꿔 페이지 수가 줄면 범위를 넘지 않게 맞춥니다.
   const currentPage = Math.min(page, pageCount);
@@ -517,7 +545,8 @@ export function HomeScreen({ onCompose, highlightedPostId, onGoSeat, onGoFood }:
       return;
     }
     if (jumpedFor.current === highlightedPostId) return;
-    const index = posts.findIndex((post) => post.id === highlightedPostId);
+    // 페이지는 '전체' 피드(공지 고정 정렬) 기준으로 세므로 같은 순서에서 찾습니다.
+    const index = pinNotices(posts).findIndex((post) => post.id === highlightedPostId);
     if (index < 0) return;
     jumpedFor.current = highlightedPostId;
     setPage(Math.floor(index / POSTS_PER_PAGE) + 1);
@@ -667,9 +696,18 @@ export function HomeScreen({ onCompose, highlightedPostId, onGoSeat, onGoFood }:
             />
           ))
         ) : (
-          <div className="rounded-md2 border border-dashed border-[#D9DEE7] bg-[#FBFCFE] px-4 py-[22px] text-center">
-            <div className="mb-[7px] text-[26px]">{filter === "event" ? "🎉" : "💬"}</div>
-            {filter === "event" ? (
+          <div className="rounded-md2 border border-dashed border-[#D9DEE7] bg-[#FBFCFE] px-[16px] py-[22px] text-center">
+            <div className="mb-[7px] text-[26px]">
+              {filter === "event" ? "🎉" : filter === "notice" ? "📌" : "💬"}
+            </div>
+            {filter === "notice" ? (
+              <>
+                <p className="text-[13px] font-extrabold text-ink-2">아직 공지가 없어요</p>
+                <p className="mt-1 text-[11.5px] leading-relaxed text-ink-faint">
+                  운영진이 중요한 소식을 올리면 이곳 맨 위에 고정됩니다.
+                </p>
+              </>
+            ) : filter === "event" ? (
               <>
                 <p className="text-[13px] font-extrabold text-ink-2">
                   아직 등록된 이벤트가 없어요

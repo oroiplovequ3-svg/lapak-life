@@ -32,7 +32,8 @@ interface ComposeSheetProps {
   onPosted?: () => void;
   /**
    * 열 때 기본으로 골라 둘 카테고리 — 라팍톡에서 보고 있던 칩.
-   * '전체'이거나 쓸 수 없는 카테고리(비마스터의 '이벤트')면 '직관후기'로 엽니다.
+   * '전체'이거나 쓸 수 없는 카테고리(비마스터의 '공지'·'이벤트')면 '직관후기'로 엽니다.
+   * 마스터가 '공지' 탭에서 열면 '공지'가 그대로 기본 선택됩니다.
    */
   initialCategory?: FilterId | null;
 }
@@ -55,7 +56,7 @@ export function ComposeSheet({
   const toast = useToast();
   const fileRef = useRef<HTMLInputElement>(null);
   const [category, setCategory] = useState<CategoryId>("review");
-  /** 마스터만 이벤트를 고를 수 있습니다 (DB RLS 도 같은 규칙) */
+  /** 마스터만 공지·이벤트를 고를 수 있습니다 (DB RLS 도 같은 규칙) */
   const categories = writeCategoriesFor(isAdmin);
   const [seatZone, setSeatZone] = useState("");
   const [body, setBody] = useState("");
@@ -195,6 +196,13 @@ export function ComposeSheet({
           </button>
         ))}
       </div>
+
+      {category === "notice" ? (
+        <p className="rounded-[11px] bg-[#EEF4FD] px-3 py-2.5 text-[11.5px] leading-relaxed text-[#063E84]">
+          📌 공지 글은 라팍톡·공지 탭 <b className="font-extrabold">맨 위에 고정</b>되어 모든
+          회원에게 보여요. 안내·알림 소식을 적어 주세요.
+        </p>
+      ) : null}
 
       {withSeat && (
         <>

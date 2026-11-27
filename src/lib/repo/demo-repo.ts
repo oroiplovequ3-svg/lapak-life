@@ -8,6 +8,7 @@ import {
 import { SEED_USER_FOODS, SEED_USER_PARKINGS } from "@/lib/data/user-community";
 import { ZONES } from "@/lib/data/zones";
 import type {
+  AdminUserStats,
   AdminUserSummary,
   Author,
   BanStatus,
@@ -894,6 +895,19 @@ export class DemoRepository implements Repository {
 
   async listUsers(): Promise<AdminUserSummary[]> {
     return [];
+  }
+
+  async adminUserStats(): Promise<AdminUserStats> {
+    // 데모 모드에는 실제 계정이 없습니다. 화면이 열리지 않도록 0으로 답합니다.
+    return {
+      totalUsers: 0,
+      activeUsers: 0,
+      bannedUsers: 0,
+      todaySignins: 0,
+      weekSignins: 0,
+      newToday: 0,
+      lastSigninAt: null,
+    };
   }
 
   async banUser(): Promise<void> {

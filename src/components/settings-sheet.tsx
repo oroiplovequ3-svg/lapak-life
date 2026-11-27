@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useCallback, useEffect, useState, type ReactNode } from "react";
 
+import { AdminStatsRow, useAdminUserStats } from "@/components/admin-stats";
 import { Avatar } from "@/components/avatar";
 import { Icon, type IconName } from "@/components/icons";
 import { ProfileSheet } from "@/components/profile-sheet";
@@ -257,6 +258,9 @@ export function SettingsSheet({ open, onClose, onOpenReportTarget }: SettingsShe
     nickname: string;
     from: "member" | "report";
   } | null>(null);
+
+  /** 마스터가 설정을 열면 읽는 회원 수·로그인 통계 (회원 관리 배지·패널) */
+  const adminStats = useAdminUserStats(open && isAdmin);
 
   const refreshReports = useCallback(async () => {
     setReportsLoading(true);
@@ -714,11 +718,22 @@ export function SettingsSheet({ open, onClose, onOpenReportTarget }: SettingsShe
               <MenuRow
                 icon="my"
                 label="회원 관리"
-                hint={membersOpen ? "접기" : "정지·해제"}
+                hint={
+                  membersOpen
+                    ? "접기"
+                    : adminStats.stats
+                      ? `전체 ${adminStats.stats.totalUsers.toLocaleString("ko-KR")}명`
+                      : "정지·해제"
+                }
                 onClick={() => setMembersOpen((value) => !value)}
               />
               {membersOpen ? (
                 <div className="border-t border-line-soft bg-[#FBFCFE] px-3.5 py-3">
+                  <AdminStatsRow
+                    stats={adminStats.stats}
+                    loading={adminStats.loading}
+                    error={adminStats.error}
+                  />
                   {membersLoading ? (
                     <p className="py-2 text-center text-[11.5px] text-ink-faint">불러오는 중…</p>
                   ) : membersError ? (
@@ -799,7 +814,10 @@ export function SettingsSheet({ open, onClose, onOpenReportTarget }: SettingsShe
                   )}
                   <button
                     type="button"
-                    onClick={() => void refreshMembers()}
+                    onClick={() => {
+                      void refreshMembers();
+                      void adminStats.refresh();
+                    }}
                     className="mt-2 w-full rounded-[10px] bg-white py-2 text-[11px] font-extrabold text-ink-muted ring-1 ring-line"
                   >
                     새로고침

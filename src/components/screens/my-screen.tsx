@@ -4,6 +4,7 @@ import Image from "next/image";
 import Link from "next/link";
 import { useMemo, useState } from "react";
 
+import { AdminStatsCard, useAdminUserStats } from "@/components/admin-stats";
 import { Avatar } from "@/components/avatar";
 import { DeleteButton } from "@/components/delete-button";
 import { Icon } from "@/components/icons";
@@ -50,6 +51,9 @@ export function MyScreen({ onOpenPost, onCompose, onAddGame, onEditGame }: MyScr
 
   const [lightbox, setLightbox] = useState<PhotoLightboxState | null>(null);
   const [profileOpen, setProfileOpen] = useState(false);
+
+  // 마스터만 — 회원 수·로그인 통계 (일반 회원·게스트에게는 요청 자체를 보내지 않습니다)
+  const adminStats = useAdminUserStats(configured && isAdmin);
 
   const myPosts = useMemo(() => posts.filter((post) => post.mine), [posts]);
 
@@ -215,6 +219,15 @@ export function MyScreen({ onOpenPost, onCompose, onAddGame, onEditGame }: MyScr
           </div>
         )}
       </section>
+
+      {configured && isAdmin ? (
+        <AdminStatsCard
+          stats={adminStats.stats}
+          loading={adminStats.loading}
+          error={adminStats.error}
+          onRefresh={() => void adminStats.refresh()}
+        />
+      ) : null}
 
       <section className="relative overflow-hidden rounded-lg2 bg-gradient-to-br from-[#0B4E9B] via-brand-600 to-[#2A7BE4] px-[17px] py-[17px] text-white shadow-[0_12px_26px_-12px_rgba(7,76,161,.7)]">
         <div className="pointer-events-none absolute -right-[46px] -top-[52px] h-[160px] w-[160px] rounded-full bg-white/[.07]" />

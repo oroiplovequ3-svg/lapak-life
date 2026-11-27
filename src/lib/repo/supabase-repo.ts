@@ -4,6 +4,7 @@ import { normalizeCategory } from "@/lib/data/categories";
 import { FOODS } from "@/lib/data/foods";
 import { ZONES } from "@/lib/data/zones";
 import type {
+  AdminUserStats,
   AdminUserSummary,
   Author,
   BanStatus,
@@ -313,6 +314,9 @@ function fail(context: string, error: { message: string } | null): never {
 /** 017 회원 정지 마이그레이션이 아직 적용되지 않았을 때 보여 줄 안내 */
 export const BAN_NOT_READY_MESSAGE =
   "회원 정지 기능이 아직 준비되지 않았어요. 잠시 뒤 다시 시도해 주세요.";
+
+export const ADMIN_STATS_NOT_READY_MESSAGE =
+  "회원 현황 기능이 아직 준비되지 않았어요. 잠시 뒤 다시 시도해 주세요.";
 
 /** RPC 함수가 DB에 없을 때(42883) 또는 PostgREST 가 못 찾을 때(PGRST202) */
 function isMissingFunctionError(
@@ -1646,6 +1650,29 @@ export class SupabaseRepository implements Repository {
       isBanned: row.is_banned === true,
       banReason: str(row.ban_reason) || null,
     }));
+  }
+
+  /** 마스터만 — 회원 수·로그인 통계 (admin_user_stats) */
+  async adminUserStats(): Promise<AdminUserStats> {
+    const { data, error } = await this.supabase.rpc("admin_user_stats");
+    if (error) {
+      if (isMissingFunctionError(error)) throw new Error(ADMIN_STATS_NOT_READY_MESSAGE);
+      if (error.code === "42501") throw new Error("마스터만 회원 현황을 볼 수 있어요");
+      fail("회원 현황을 불러오지 못했습니다", error);
+    }
+    const row = (Array.isArray(data) ? data[0] : data) as AnyRow | null | undefined;
+    if (!row) {
+      throw new Error("회원 현황을 불러오지 못했어요. 잠시 뒤 다시 시도해 주세요.");
+    }
+    return {
+      totalUsers: num(row.total_users),
+      activeUsers: num(row.active_users),
+      bannedUsers: num(row.banned_users),
+      todaySignins: num(row.today_signins),
+      weekSignins: num(row.week_signins),
+      newToday: num(row.new_today),
+      lastSigninAt: str(row.last_signin_at) || null,
+    };
   }
 
   /** 마스터만 — 회원 영구 정지 (admin_ban_user) */

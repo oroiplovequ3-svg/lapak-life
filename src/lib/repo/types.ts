@@ -1,4 +1,5 @@
 import type {
+  AdminUserStats,
   AdminUserSummary,
   Author,
   BanStatus,
@@ -135,6 +136,8 @@ export interface Repository {
   getMyBanStatus(): Promise<BanStatus>;
   /** 마스터만 — 회원 목록 (관리 패널) */
   listUsers(): Promise<AdminUserSummary[]>;
+  /** 마스터만 — 회원 수·로그인 통계 (admin_user_stats) */
+  adminUserStats(): Promise<AdminUserStats>;
   /** 마스터만 — 회원 영구 정지 (admin_ban_user) */
   banUser(userId: string, reason: string | null): Promise<void>;
   /** 마스터만 — 영구 정지 해제 (admin_unban_user) */

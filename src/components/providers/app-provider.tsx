@@ -20,6 +20,7 @@ import { DEMO_AUTHOR, type Repository, type SaveTargetType } from "@/lib/repo/ty
 import { getSupabaseBrowserClient } from "@/lib/supabase/client";
 import { getSiteUrl, isSupabaseConfigured } from "@/lib/supabase/config";
 import type {
+  AdminUserStats,
   AdminUserSummary,
   AppUser,
   Author,
@@ -132,6 +133,8 @@ interface AppContextValue {
   /* 회원 영구 정지 (마스터) */
   /** 마스터만 — 회원 목록 (닉네임·가입일·정지 여부) */
   listUsers: () => Promise<AdminUserSummary[]>;
+  /** 마스터만 — 회원 수·로그인 통계 (전체·오늘·7일·정지) */
+  loadUserStats: () => Promise<AdminUserStats>;
   /** 마스터만 — 회원 영구 정지. 성공하면 목록·피드를 새로 읽어 옵니다 */
   banUser: (userId: string, reason: string | null) => Promise<boolean>;
   /** 마스터만 — 영구 정지 해제 */
@@ -1195,6 +1198,14 @@ export function AppProvider({ children }: { children: ReactNode }) {
     return repo.listUsers();
   }, [repo]);
 
+  /** 마스터 화면 — 회원 수·로그인 통계. 화면이 직접 오류를 보여 줄 수 있게 그대로 던집니다. */
+  const loadUserStats = useCallback(async () => {
+    if (!repo) {
+      throw new Error("회원 현황을 불러오지 못했어요");
+    }
+    return repo.adminUserStats();
+  }, [repo]);
+
   const banUser = useCallback(
     async (userId: string, reason: string | null) => {
       if (!repo) return false;
@@ -1287,6 +1298,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
       restoreReportedContent,
       deleteOwnAccount,
       listUsers,
+      loadUserStats,
       banUser,
       unbanUser,
       reload,
@@ -1349,6 +1361,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
       restoreReportedContent,
       deleteOwnAccount,
       listUsers,
+      loadUserStats,
       banUser,
       unbanUser,
       reload,

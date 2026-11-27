@@ -333,6 +333,24 @@ export interface AdminUserSummary {
   banReason: string | null;
 }
 
+/** 마스터 회원 현황 요약 (admin_user_stats) — 화면 상단 카드·회원 관리 패널 */
+export interface AdminUserStats {
+  /** 전체 회원 수 (정지 포함) */
+  totalUsers: number;
+  /** 정지를 뺀 회원 수 */
+  activeUsers: number;
+  /** 영구 정지된 회원 수 */
+  bannedUsers: number;
+  /** KST 오늘 00:00 이후 로그인한 회원 수 */
+  todaySignins: number;
+  /** 최근 7일 안에 로그인한 회원 수 */
+  weekSignins: number;
+  /** KST 오늘 가입한 회원 수 */
+  newToday: number;
+  /** 가장 최근 로그인 시각 (없으면 null) */
+  lastSigninAt: string | null;
+}
+
 /** 내가 영구 정지된 계정인지 (get_my_ban_status) */
 export interface BanStatus {
   banned: boolean;

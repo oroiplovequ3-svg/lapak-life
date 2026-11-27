@@ -453,7 +453,8 @@ function PostCard({
 }
 
 interface HomeScreenProps {
-  onCompose: () => void;
+  /** 글쓰기 — 지금 보고 있는 카테고리 칩을 그대로 넘겨 기본 카테고리로 씁니다. */
+  onCompose: (category: FilterId) => void;
   highlightedPostId: string | null;
   onGoSeat?: () => void;
   onGoFood?: () => void;
@@ -557,7 +558,7 @@ export function HomeScreen({ onCompose, highlightedPostId, onGoSeat, onGoFood }:
         </div>
       )}
 
-      <section className="relative overflow-hidden rounded-[22px] bg-gradient-to-br from-[#063E84] via-brand to-brand-500 px-[17px] pb-[15px] pt-[17px] text-white shadow-brand">
+      <section className="relative overflow-hidden rounded-[22px] bg-gradient-to-br from-[#063E84] via-brand to-brand-500 px-[17px] pb-[15px] pt-[17px] text-white shadow-brand [@media(max-height:500px)]:px-3.5 [@media(max-height:500px)]:pb-2 [@media(max-height:500px)]:pt-2.5">
         <div className="pointer-events-none absolute -right-14 -top-[72px] h-[190px] w-[190px] rounded-full bg-white/[.18] blur-[1px]" />
         <div className="pointer-events-none absolute -bottom-20 -left-[30px] h-[170px] w-[170px] rounded-full border-[26px] border-white/[.06]" />
         {/* 글과 마스코트를 한 줄에 두고, 마스코트 발끝을 글 마지막 줄에 맞춰 CTA 버튼 바로 위에 서게 합니다. */}
@@ -570,12 +571,12 @@ export function HomeScreen({ onCompose, highlightedPostId, onGoSeat, onGoFood }:
               </span>
               <span>라팍 · 오프시즌</span>
             </div>
-            <h2 className="mt-2.5 text-[22px] font-extrabold leading-[1.28] tracking-tight3">
+            <h2 className="mt-2.5 text-[22px] font-extrabold leading-[1.28] tracking-tight3 [@media(max-height:500px)]:mt-1 [@media(max-height:500px)]:text-[16px] [@media(max-height:350px)]:hidden">
               12년 만의 정상,
               <br />
               <span className="text-[#FFD77A]">V9</span>의 계절이 끝났다
             </h2>
-            <p className="mt-1.5 text-[12.5px] leading-relaxed text-white/80">
+            <p className="mt-1.5 text-[12.5px] leading-relaxed text-white/80 [@media(max-height:500px)]:hidden">
               한국시리즈 4승 1패 · 정규시즌 2위
               <br />
               다음 시즌 직관 준비는 여기서 시작해요.
@@ -587,21 +588,21 @@ export function HomeScreen({ onCompose, highlightedPostId, onGoSeat, onGoFood }:
             aria-hidden
             width={440}
             height={543}
-            className="pointer-events-none -mb-[7px] h-[134px] w-auto flex-none select-none drop-shadow-[0_10px_16px_rgba(3,20,50,.32)]"
+            className="pointer-events-none -mb-[7px] h-[134px] w-auto flex-none select-none drop-shadow-[0_10px_16px_rgba(3,20,50,.32)] [@media(max-height:500px)]:h-[68px] [@media(max-height:350px)]:hidden"
           />
         </div>
-        <div className="relative mt-3.5 flex gap-2">
+        <div className="relative mt-3.5 flex gap-2 [@media(max-height:500px)]:mt-1.5">
           <button
             type="button"
             onClick={onGoSeat}
-            className="flex-1 rounded-xl bg-white/[.92] py-2.5 text-[12.5px] font-extrabold text-brand"
+            className="flex-1 rounded-xl bg-white/[.92] py-2.5 text-[12.5px] font-extrabold text-brand [@media(max-height:500px)]:py-1.5"
           >
             좌석 시야 보기
           </button>
           <button
             type="button"
             onClick={onGoFood}
-            className="flex-1 rounded-xl bg-white/[.14] py-2.5 text-[12.5px] font-extrabold text-white shadow-[inset_0_0_0_1px_rgba(255,255,255,.24)]"
+            className="flex-1 rounded-xl bg-white/[.14] py-2.5 text-[12.5px] font-extrabold text-white shadow-[inset_0_0_0_1px_rgba(255,255,255,.24)] [@media(max-height:500px)]:py-1.5"
           >
             먹거리·주차
           </button>
@@ -724,13 +725,15 @@ export function HomeScreen({ onCompose, highlightedPostId, onGoSeat, onGoFood }:
       </div>
 
       {/* FAB는 뷰포트가 아니라 앱 컨테이너(최대 430px) 기준으로 앉아야 합니다.
-          바깥 레이어를 컨테이너 폭에 맞춰 두어 390·430·데스크톱 모두 오른쪽 안쪽 16px에 놓입니다. */}
-      <div className="pointer-events-none fixed inset-x-0 bottom-[calc(72px+env(safe-area-inset-bottom))] z-30 mx-auto flex w-full max-w-[430px] justify-end px-4">
+          바깥 레이어를 컨테이너 폭에 맞춰 두어 390·430·데스크톱 모두 오른쪽 안쪽 16px에 놓입니다.
+          세로가 낮은 화면(640×356 가로 폰·200% 확대 등)에서는 히어로의 '먹거리·주차' 버튼을
+          가리지 않도록 히어로를 컴팩트하게 줄이고 FAB 도 작게·아래로 붙여 둡니다. */}
+      <div className="pointer-events-none fixed inset-x-0 bottom-[calc(72px+env(safe-area-inset-bottom))] z-30 mx-auto flex w-full max-w-[430px] justify-end px-4 [@media(max-height:500px)]:bottom-[calc(60px+env(safe-area-inset-bottom))] [@media(max-height:500px)]:px-3">
         <button
           type="button"
-          onClick={onCompose}
+          onClick={() => onCompose(filter)}
           aria-label="새 글 쓰기"
-          className="pointer-events-auto grid h-[54px] w-[54px] place-items-center rounded-full bg-gradient-to-br from-brand-500 to-brand text-white shadow-[0_10px_22px_-6px_rgba(7,76,161,.7),0_2px_6px_rgba(16,24,40,.12)] transition active:scale-90"
+          className="pointer-events-auto grid h-[54px] w-[54px] place-items-center rounded-full bg-gradient-to-br from-brand-500 to-brand text-white shadow-[0_10px_22px_-6px_rgba(7,76,161,.7),0_2px_6px_rgba(16,24,40,.12)] transition active:scale-90 [@media(max-height:500px)]:h-[42px] [@media(max-height:500px)]:w-[42px]"
         >
           <Icon name="plus" size={24} strokeWidth={2.2} />
         </button>

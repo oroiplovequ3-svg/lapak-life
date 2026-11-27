@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useId, useState, type ReactNode } from "react";
+import { useEffect, useId, useRef, useState, type ReactNode } from "react";
 
 import { Icon } from "@/components/icons";
 
@@ -24,6 +24,23 @@ function removeSheet(id: string) {
 
 function isTopSheet(id: string): boolean {
   return openSheetStack[openSheetStack.length - 1] === id;
+}
+
+/** 모달 안에서 Tab 으로 오갈 수 있는 요소 */
+const FOCUSABLE_SELECTOR = [
+  "a[href]",
+  "button:not([disabled])",
+  "input:not([disabled]):not([type='hidden'])",
+  "select:not([disabled])",
+  "textarea:not([disabled])",
+  "[tabindex]:not([tabindex='-1'])",
+].join(",");
+
+function focusableIn(root: HTMLElement): HTMLElement[] {
+  return Array.from(root.querySelectorAll<HTMLElement>(FOCUSABLE_SELECTOR)).filter(
+    // 화면에 실제로 그려진 요소만 — 숨은 input·사진 첨부 파일 선택기 등은 건너뜁니다.
+    (el) => el.getClientRects().length > 0 && el.getAttribute("aria-hidden") !== "true",
+  );
 }
 
 interface SheetProps {
@@ -56,6 +73,9 @@ export function Sheet({
 }: SheetProps) {
   const [asking, setAsking] = useState(false);
   const sheetId = useId();
+  const dialogRef = useRef<HTMLDivElement | null>(null);
+  /** 시트를 열기 직전에 포커스가 있던 요소 — 닫으면 여기로 되돌립니다. */
+  const restoreFocusRef = useRef<HTMLElement | null>(null);
 
   useEffect(() => {
     if (!open) setAsking(false);
@@ -66,6 +86,66 @@ export function Sheet({
     if (!open) return;
     pushSheet(sheetId);
     return () => removeSheet(sheetId);
+  }, [open, sheetId]);
+
+  /*
+   * 포커스 트랩 — 시트를 열면 직전 포커스를 기억해 두고 모달 안 첫 요소로 옮기며,
+   * 닫으면 원래 있던 곳(예: 누른 버튼)으로 돌려놓습니다.
+   * 시트가 겹치면(신고 시트 위 로그인 안내 등) 맨 위 시트가 열릴 때의 자리로 돌아갑니다.
+   */
+  useEffect(() => {
+    if (!open) return;
+    const previous = document.activeElement;
+    restoreFocusRef.current = previous instanceof HTMLElement ? previous : null;
+
+    const raf = window.requestAnimationFrame(() => {
+      const dialog = dialogRef.current;
+      if (!dialog) return;
+      const first = focusableIn(dialog)[0];
+      (first ?? dialog).focus({ preventScroll: true });
+    });
+
+    return () => {
+      window.cancelAnimationFrame(raf);
+      const target = restoreFocusRef.current;
+      restoreFocusRef.current = null;
+      if (target && document.contains(target)) target.focus({ preventScroll: true });
+    };
+  }, [open]);
+
+  // Tab / Shift+Tab 이 모달 밖으로 나가지 않고 안에서만 순환합니다.
+  useEffect(() => {
+    if (!open) return;
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key !== "Tab") return;
+      // 시트가 겹쳐 있으면 맨 위 시트만 가둡니다.
+      if (!isTopSheet(sheetId)) return;
+      const dialog = dialogRef.current;
+      if (!dialog) return;
+      const list = focusableIn(dialog);
+      if (!list.length) {
+        event.preventDefault();
+        dialog.focus({ preventScroll: true });
+        return;
+      }
+      const first = list[0];
+      const last = list[list.length - 1];
+      const active = document.activeElement as HTMLElement | null;
+      if (!active || !dialog.contains(active)) {
+        event.preventDefault();
+        (event.shiftKey ? last : first).focus({ preventScroll: true });
+        return;
+      }
+      if (!event.shiftKey && active === last) {
+        event.preventDefault();
+        first.focus({ preventScroll: true });
+      } else if (event.shiftKey && active === first) {
+        event.preventDefault();
+        last.focus({ preventScroll: true });
+      }
+    };
+    document.addEventListener("keydown", onKeyDown);
+    return () => document.removeEventListener("keydown", onKeyDown);
   }, [open, sheetId]);
 
   useEffect(() => {
@@ -103,7 +183,9 @@ export function Sheet({
         type="button"
       />
       <div
-        className="animate-sheetUp fixed inset-x-0 bottom-0 z-50 mx-auto flex max-h-[88%] w-full max-w-[430px] flex-col rounded-t-[26px] bg-white shadow-sheet"
+        ref={dialogRef}
+        tabIndex={-1}
+        className="animate-sheetUp fixed inset-x-0 bottom-0 z-50 mx-auto flex max-h-[88%] w-full max-w-[430px] flex-col rounded-t-[26px] bg-white shadow-sheet outline-none"
         role="dialog"
         aria-modal="true"
         aria-label={title}

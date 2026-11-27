@@ -66,6 +66,12 @@ interface AppContextValue {
   signingIn: boolean;
   authPrompt: AuthPrompt;
   closeAuthPrompt: () => void;
+  /**
+   * 쓰기 권한 확인 — 게스트면 로그인 안내를 띄우고 false.
+   * 작성 시트를 열기 전에 불러, 쓰던 내용이 날아가지 않게 합니다.
+   * ("글을 쓰" → "글을 쓰려면 구글 로그인이 필요해요")
+   */
+  ensureCanWrite: (action: string) => boolean;
 
   zones: Zone[];
   foods: Food[];
@@ -1249,6 +1255,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
       signingIn,
       authPrompt,
       closeAuthPrompt: () => setAuthPrompt({ open: false, reason: "" }),
+      ensureCanWrite,
       zones,
       foods,
       posts,
@@ -1312,6 +1319,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
       profile,
       signingIn,
       authPrompt,
+      ensureCanWrite,
       zones,
       foods,
       posts,

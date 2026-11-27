@@ -16,6 +16,7 @@ import { HomeScreen } from "@/components/screens/home-screen";
 import { MyScreen } from "@/components/screens/my-screen";
 import { SeatScreen } from "@/components/screens/seat-screen";
 import type { FoodFocus, FoodFocusKind, Game, Report, ReportTargetPreview } from "@/lib/types";
+import type { FilterId } from "@/lib/data/categories";
 import {
   DEFAULT_FOOD_LINK,
   buildAppSearch,
@@ -65,9 +66,11 @@ function focusFromFoodLink(link: FoodLink): FoodFocus | null {
 }
 
 export function AppShell() {
-  const { isAdmin, posts } = useApp();
+  const { isAdmin, posts, ensureCanWrite } = useApp();
   const [tab, setTab] = useState<Tab>("home");
   const [composeOpen, setComposeOpen] = useState(false);
+  /** 글쓰기를 열 때 기본으로 골라 둘 카테고리 — 라팍톡에서 보던 칩 */
+  const [composeCategory, setComposeCategory] = useState<FilterId>("all");
   const [reviewOpen, setReviewOpen] = useState(false);
   const [reviewZone, setReviewZone] = useState<string>(DEFAULT_REVIEW_ZONE);
   const [gameOpen, setGameOpen] = useState(false);
@@ -137,6 +140,30 @@ export function AppShell() {
     pushHistory.current = next !== tab;
     setTab(next);
     scrollScreenTop();
+  };
+
+  /*
+   * 작성 시트는 게스트에게 열지 않습니다.
+   * 예전에는 빈 폼을 먼저 보여 주고 '저장'을 눌러야 로그인 안내가 떠서 쓰던 내용이 날아갔어요.
+   * 이제 쓰기 버튼을 누른 자리에서 바로 로그인 안내를 띄우고, 로그인 후 다시 누르면 폼이 열립니다.
+   */
+  const openCompose = (category: FilterId = "all") => {
+    if (!ensureCanWrite("글을 쓰")) return;
+    setComposeCategory(category);
+    setComposeOpen(true);
+  };
+
+  /** 시야 후기 작성 — 지금 보고 있는 구역을 그대로 이어받습니다. */
+  const openReview = (zoneCode: string) => {
+    if (!ensureCanWrite("시야 후기를 올리")) return;
+    setReviewZone(zoneCode);
+    setReviewOpen(true);
+  };
+
+  /** 직관 기록 추가 — 게스트는 빈 시트 대신 로그인 안내부터 */
+  const openGameSheet = () => {
+    if (!ensureCanWrite("직관 기록을 추가하")) return;
+    setGameOpen(true);
   };
 
   useEffect(() => {
@@ -250,7 +277,7 @@ export function AppShell() {
                 </span>
               ) : null}
             </div>
-            <span className="mt-0.5 text-[10.5px] font-semibold tracking-tight text-ink-faint">
+            <span className="mt-0.5 text-[11px] font-semibold tracking-tight text-ink-muted">
               {SUBS[tab]}
             </span>
           </div>
@@ -272,8 +299,7 @@ export function AppShell() {
               aria-label="직관 시야 후기 작성"
               onClick={() => {
                 // 지금 보고 있는 구역을 그대로 후기 구역으로 이어받습니다.
-                setReviewZone(seatZone === "all" ? DEFAULT_REVIEW_ZONE : seatZone);
-                setReviewOpen(true);
+                openReview(seatZone === "all" ? DEFAULT_REVIEW_ZONE : seatZone);
               }}
               className="grid h-9 w-9 place-items-center rounded-xl text-[#475467]"
             >
@@ -297,7 +323,7 @@ export function AppShell() {
       <main id="screen" className="flex-1 overflow-y-auto overscroll-contain [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
         {tab === "home" ? (
           <HomeScreen
-            onCompose={() => setComposeOpen(true)}
+            onCompose={openCompose}
             highlightedPostId={highlightId}
             onGoSeat={() => goTab("seat")}
             onGoFood={() => goTab("food")}
@@ -308,10 +334,7 @@ export function AppShell() {
             selectedZone={seatZone}
             onSelectZone={setSeatZone}
             focusNonce={seatFocusNonce}
-            onWriteReview={(zoneCode) => {
-              setReviewZone(zoneCode);
-              setReviewOpen(true);
-            }}
+            onWriteReview={openReview}
           />
         ) : null}
         {tab === "food" ? (
@@ -328,8 +351,8 @@ export function AppShell() {
         {tab === "my" ? (
           <MyScreen
             onOpenPost={openMyPost}
-            onCompose={() => setComposeOpen(true)}
-            onAddGame={() => setGameOpen(true)}
+            onCompose={() => openCompose("all")}
+            onAddGame={openGameSheet}
             onEditGame={(game) => setEditingGame(game)}
           />
         ) : null}
@@ -362,6 +385,7 @@ export function AppShell() {
       <ComposeSheet
         open={composeOpen}
         onClose={() => setComposeOpen(false)}
+        initialCategory={composeCategory}
         onPosted={() => {
           setHighlightId(null);
           setTab("home");

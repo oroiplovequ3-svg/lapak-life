@@ -30,6 +30,15 @@ interface GameSheetProps {
   editing?: Game | null;
 }
 
+/**
+ * 점수 입력값이 0 이상의 정수인지 확인합니다.
+ * type="number" 만으로는 -1·1.5 같은 값을 막을 수 없어(모바일 키패드도 '-'·'.' 를 넣을 수 있음)
+ * 저장 전에 한 번 더 검사합니다.
+ */
+function isScoreDigits(value: string): boolean {
+  return /^\d+$/.test(value.trim());
+}
+
 /** 내 직관 · 직관 기록 추가·수정 바텀시트 */
 export function GameSheet({ open, onClose, editing = null }: GameSheetProps) {
   const { addGame, updateGame } = useApp();
@@ -48,7 +57,11 @@ export function GameSheet({ open, onClose, editing = null }: GameSheetProps) {
   const [busy, setBusy] = useState(false);
   const [submitting, setSubmitting] = useState(false);
 
-  const valid = opponent.trim() && scoreFor !== "" && scoreAgainst !== "";
+  const valid = opponent.trim() && isScoreDigits(scoreFor) && isScoreDigits(scoreAgainst);
+  // 입력은 했는데 0 이상의 정수가 아닌 경우 (음수 · 소수 · 문자) — 인라인 안내
+  const scoreForInvalid = scoreFor.trim() !== "" && !isScoreDigits(scoreFor);
+  const scoreAgainstInvalid = scoreAgainst.trim() !== "" && !isScoreDigits(scoreAgainst);
+  const scoreInvalid = scoreForInvalid || scoreAgainstInvalid;
 
   const dayGames = gamesOnDate(playedOn);
   const matchedGame: Samsung2026Game | null = dayGames[gameIndex] ?? dayGames[0] ?? null;
@@ -153,6 +166,11 @@ export function GameSheet({ open, onClose, editing = null }: GameSheetProps) {
   const totalSize = photos.reduce((sum, photo) => sum + photo.bytes, 0);
 
   const submit = async () => {
+    // 0 이상의 정수가 아니면 저장하지 않습니다 (서버에 보내기 전 마지막 검사).
+    if (!isScoreDigits(scoreFor) || !isScoreDigits(scoreAgainst)) {
+      toast("점수는 0 이상의 정수로 입력해 주세요");
+      return;
+    }
     if (!valid || busy) return;
     setSubmitting(true);
     const input = {
@@ -161,8 +179,8 @@ export function GameSheet({ open, onClose, editing = null }: GameSheetProps) {
       homeAway,
       // 좌석 구역은 선택 사항 — 고른 경우에만 저장합니다.
       zoneCode: zoneCode || null,
-      scoreFor: Number(scoreFor),
-      scoreAgainst: Number(scoreAgainst),
+      scoreFor: Number.parseInt(scoreFor, 10),
+      scoreAgainst: Number.parseInt(scoreAgainst, 10),
       note: note.trim(),
       photoUrls: photos.map((photo) => photo.dataUrl),
     };
@@ -365,23 +383,43 @@ export function GameSheet({ open, onClose, editing = null }: GameSheetProps) {
         <input
           type="number"
           min={0}
+          step={1}
           inputMode="numeric"
           value={scoreFor}
           onChange={(event) => setScoreFor(event.target.value)}
+          aria-label="삼성 점수"
+          aria-invalid={scoreForInvalid}
           placeholder="삼성"
-          className="w-full rounded-[13px] border border-line bg-[#FAFBFC] px-3 py-[11px] text-center text-[15px] font-extrabold text-ink outline-none"
+          className={`w-full rounded-[13px] border px-3 py-[11px] text-center text-[15px] font-extrabold text-ink outline-none ${
+            scoreForInvalid
+              ? "border-[#F04438] bg-[#FEF3F2]"
+              : "border-line bg-[#FAFBFC]"
+          }`}
         />
         <span className="text-ink-faint">:</span>
         <input
           type="number"
           min={0}
+          step={1}
           inputMode="numeric"
           value={scoreAgainst}
           onChange={(event) => setScoreAgainst(event.target.value)}
+          aria-label="상대팀 점수"
+          aria-invalid={scoreAgainstInvalid}
           placeholder="상대"
-          className="w-full rounded-[13px] border border-line bg-[#FAFBFC] px-3 py-[11px] text-center text-[15px] font-extrabold text-ink outline-none"
+          className={`w-full rounded-[13px] border px-3 py-[11px] text-center text-[15px] font-extrabold text-ink outline-none ${
+            scoreAgainstInvalid
+              ? "border-[#F04438] bg-[#FEF3F2]"
+              : "border-line bg-[#FAFBFC]"
+          }`}
         />
       </div>
+      {scoreInvalid ? (
+        <p className="-mt-1 flex items-start gap-1 break-keep text-[11px] font-bold leading-relaxed text-[#B42318]">
+          <span aria-hidden="true">⚠️</span>
+          점수는 0 이상의 정수로만 입력할 수 있어요. (예: 5 · 0)
+        </p>
+      ) : null}
 
       <span className="text-xs font-extrabold text-ink-2">
         메모 <span className="text-[10.5px] font-bold text-ink-faint">(선택)</span>

@@ -6,7 +6,11 @@ import { Icon } from "@/components/icons";
 import { useApp } from "@/components/providers/app-provider";
 import { useToast } from "@/components/providers/toast-provider";
 import { Sheet } from "@/components/sheet";
-import { writeCategoriesFor } from "@/lib/data/categories";
+import {
+  ADMIN_ONLY_CATEGORY_IDS,
+  writeCategoriesFor,
+  type FilterId,
+} from "@/lib/data/categories";
 import { zoneFullName, ZONE_ORDER } from "@/lib/data/zones";
 import {
   MAX_POST_PHOTOS,
@@ -26,9 +30,27 @@ interface ComposeSheetProps {
   editing?: Post | null;
   /** 등록·수정 성공 시 (예: 피드 새로고침·스크롤) */
   onPosted?: () => void;
+  /**
+   * 열 때 기본으로 골라 둘 카테고리 — 라팍톡에서 보고 있던 칩.
+   * '전체'이거나 쓸 수 없는 카테고리(비마스터의 '이벤트')면 '직관후기'로 엽니다.
+   */
+  initialCategory?: FilterId | null;
 }
 
-export function ComposeSheet({ open, onClose, editing = null, onPosted }: ComposeSheetProps) {
+/** 홈에서 보던 카테고리 → 글쓰기 기본 카테고리 */
+function defaultWriteCategory(id: FilterId | null | undefined, isAdmin: boolean): CategoryId {
+  if (!id || id === "all") return "review";
+  if (!isAdmin && ADMIN_ONLY_CATEGORY_IDS.includes(id)) return "review";
+  return id;
+}
+
+export function ComposeSheet({
+  open,
+  onClose,
+  editing = null,
+  onPosted,
+  initialCategory = null,
+}: ComposeSheetProps) {
   const { createPost, updatePost, user, configured, isAdmin } = useApp();
   const toast = useToast();
   const fileRef = useRef<HTMLInputElement>(null);
@@ -44,7 +66,7 @@ export function ComposeSheet({ open, onClose, editing = null, onPosted }: Compos
   // 열 때마다 새 글 / 수정할 글로 채웁니다. (수정이면 붙어 있던 사진을 그대로 보여 줍니다)
   useEffect(() => {
     if (!open) return;
-    setCategory(editing?.category ?? "review");
+    setCategory(editing?.category ?? defaultWriteCategory(initialCategory, isAdmin));
     setSeatZone(editing?.seatZone ?? "");
     setBody(editing?.body ?? "");
     setPhotos(
@@ -59,6 +81,8 @@ export function ComposeSheet({ open, onClose, editing = null, onPosted }: Compos
     );
     setBusy(false);
     setSubmitting(false);
+    // initialCategory 는 시트를 열 때의 값만 씁니다(카테고리를 바꿔도 다시 채우지 않음).
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open, editing]);
 
   /** 소통해요·굿즈에서는 좌석 항목을 숨기고 저장도 하지 않는다 */

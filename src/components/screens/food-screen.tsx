@@ -806,6 +806,7 @@ export function FoodScreen({ focus, link, onLinkChange }: FoodScreenProps) {
     deleteUserParking,
     isAdmin,
     restoreReportedContent,
+    ensureCanWrite,
     loadError,
     reload,
   } = useApp();
@@ -829,6 +830,16 @@ export function FoodScreen({ focus, link, onLinkChange }: FoodScreenProps) {
     id: string;
     hint: string;
   } | null>(null);
+
+  /** 맛집·주차 팁 등록 — 게스트는 빈 시트 대신 로그인 안내부터 띄웁니다. */
+  const openFoodSheet = () => {
+    if (!ensureCanWrite("맛집을 추가하")) return;
+    setFoodSheetOpen(true);
+  };
+  const openParkingSheet = () => {
+    if (!ensureCanWrite("주차 팁을 추가하")) return;
+    setParkingSheetOpen(true);
+  };
 
   // 주소창(딥링크·뒤로가기) 값이 바뀌면 화면도 그 값으로 맞춥니다.
   useEffect(() => {
@@ -971,6 +982,17 @@ export function FoodScreen({ focus, link, onLinkChange }: FoodScreenProps) {
               <div className="mt-[3px] text-[11.5px] leading-relaxed text-ink-faint">
                 현장 판매가 없어 사전에 잡지 않으면 입차할 수 없어요.
               </div>
+              <a
+                href="https://www.ticketlink.co.kr"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="mt-1.5 inline-flex items-center gap-1 text-[11.5px] font-extrabold text-brand-600 underline underline-offset-2"
+              >
+                티켓링크에서 주차권 예약
+                <span aria-hidden="true" className="text-[10.5px] opacity-80">
+                  ↗
+                </span>
+              </a>
             </div>
           </div>
 
@@ -998,6 +1020,27 @@ export function FoodScreen({ focus, link, onLinkChange }: FoodScreenProps) {
                   <span className="text-right font-extrabold tracking-tight text-ink">{v}</span>
                 </div>
               ))}
+              {card.note ? (
+                <div className="mt-2.5 flex gap-1.5 wrap-any rounded-[11px] bg-[#F8FAFC] px-[11px] py-2.5 text-xs leading-relaxed text-[#475467] ring-1 ring-[#EAECF0]">
+                  <span aria-hidden="true" className="flex-none">
+                    ℹ️
+                  </span>
+                  <span>{card.note}</span>
+                </div>
+              ) : null}
+              {card.link ? (
+                <a
+                  href={card.link.href}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="mt-2.5 flex items-center justify-center gap-1 rounded-[11px] bg-brand px-3 py-2.5 text-[12px] font-extrabold text-white shadow-brand transition active:scale-[.99]"
+                >
+                  {card.link.label}
+                  <span aria-hidden="true" className="text-[11px] opacity-80">
+                    ↗
+                  </span>
+                </a>
+              ) : null}
               {card.warn ? (
                 <div className="mt-2.5 wrap-any rounded-[11px] bg-[#FEF3F2] px-[11px] py-2.5 text-xs leading-relaxed text-[#B42318]">
                   ⚠️ {card.warn}
@@ -1015,7 +1058,7 @@ export function FoodScreen({ focus, link, onLinkChange }: FoodScreenProps) {
             title="🦁 직관러 주차 팁"
             sub="직접 주차해 본 직관러의 장소·요금·도보 시간이에요."
             count={userParkings.length}
-            onAdd={() => setParkingSheetOpen(true)}
+            onAdd={openParkingSheet}
           />
 
           {userParkings.length ? (
@@ -1130,7 +1173,7 @@ export function FoodScreen({ focus, link, onLinkChange }: FoodScreenProps) {
                 title="🦁 직관러 맛집"
                 sub="직접 다녀온 직관러가 올린 맛집이에요. 나도 한 곳 올려보세요."
                 count={userFoods.length}
-                onAdd={() => setFoodSheetOpen(true)}
+                onAdd={openFoodSheet}
                 addLabel="맛집 추가"
               />
 
@@ -1159,7 +1202,7 @@ export function FoodScreen({ focus, link, onLinkChange }: FoodScreenProps) {
               ) : (
                 <button
                   type="button"
-                  onClick={() => setFoodSheetOpen(true)}
+                  onClick={openFoodSheet}
                   className="w-full rounded-md2 border border-dashed border-[#D9DEE7] bg-[#FBFCFE] px-4 py-[18px] text-center"
                 >
                   <div className="mb-[6px] text-[24px]">🍗</div>

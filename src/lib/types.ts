@@ -51,6 +51,10 @@ export interface ParkingCard {
   title: string;
   sub: string;
   kvs: [string, string][];
+  /** 값 아래에 헷갈리는 기준(예: 개방 시간 vs 입차 가능 시간)을 풀어 주는 한 줄 */
+  note?: string;
+  /** 바로가기 링크 (예: 티켓링크 주차권 예약) */
+  link?: { label: string; href: string };
   warn?: string;
   tip?: string;
 }

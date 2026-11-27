@@ -63,3 +63,11 @@ select {
       linear-gradient(180deg, #edf1f7 0%, #e4e9f1 100%);
   }
 }
+
+/* 세로가 낮은 화면(가로로 든 폰 640×356 · 브라우저 200% 확대)에서는
+   프레임 위아래 여백 44px 때문에 앱이 잘리지 않도록 여백을 없앱니다. */
+@media (min-width: 520px) and (max-height: 520px) {
+  body {
+    padding: 0;
+  }
+}

@@ -608,15 +608,17 @@ export function HomeScreen({ onCompose, highlightedPostId, onGoSeat, onGoFood }:
         </div>
       </section>
 
-      {/* 칩 6개가 390px 한 줄(358px)에는 다 들어가지 않아 가로 스크롤로 마지막 칩이 잘렸습니다.
-          390·430px 모두에서 3×2 그리드로 한 번에 다 보이게 두고, 칩 안 글자는 줄바꿈하지 않습니다. */}
-      <div className="grid grid-cols-3 gap-[6px]">
+      {/* 칩 7개(블루웨이브 후기 포함)는 390px 한 줄(358px)에 다 들어가지 않습니다.
+          칩은 글자 폭만큼만 차지하고(줄바꿈 금지), 넘치면 다음 줄로 자연스럽게 내려가되
+          줄마다 가운데 정렬해 좌우 여백이 한쪽으로 몰리지 않게 합니다.
+          글자·간격을 더 줄이지 않아 320~430px 어디서도 칩 안 글자가 잘리지 않습니다. */}
+      <div className="flex flex-wrap justify-center gap-[6px]">
         {FEED_FILTERS.map((c) => (
           <button
             key={c.id}
             type="button"
             onClick={() => setFilter(c.id)}
-            className={`flex items-center justify-center gap-[5px] whitespace-nowrap rounded-full border px-2 py-2 text-[12.5px] font-bold transition ${
+            className={`flex flex-none items-center justify-center gap-[5px] whitespace-nowrap rounded-full border px-2 py-2 text-[12.5px] font-bold transition ${
               filter === c.id
                 ? "border-brand bg-brand text-white shadow-[0_3px_10px_-2px_rgba(7,76,161,.5)]"
                 : "border-line bg-white text-[#475467]"

@@ -9,13 +9,15 @@ export interface FeedFilter {
   bg: string;
 }
 
-/** 피드 카테고리 칩 (전체 · 직관후기 · 실시간현장 · 소통해요 · 굿즈 · 이벤트) */
+/** 피드 카테고리 칩 (전체 · 직관후기 · 실시간현장 · 소통해요 · 굿즈 · 블루웨이브 후기 · 이벤트) */
 export const FEED_FILTERS: FeedFilter[] = [
   { id: "all", label: "전체", color: "#074CA1", bg: "#EEF4FD" },
   { id: "review", label: "직관후기", color: "#0A58CA", bg: "#EAF1FD" },
   { id: "live", label: "실시간현장", color: "#D92D20", bg: "#FEF3F2" },
   { id: "talk", label: "소통해요", color: "#039855", bg: "#ECFDF3" },
   { id: "goods", label: "굿즈", color: "#7A5AF8", bg: "#F4F3FF" },
+  // 블루웨이브 응원 현장 후기 — 전체(#074CA1)·직관후기(#0A58CA)와 겹치지 않는 하늘색
+  { id: "bluewave", label: "블루웨이브 후기", color: "#0284C7", bg: "#E0F2FE" },
   { id: "event", label: "이벤트", color: "#C11574", bg: "#FDF2FA" },
 ];
 
